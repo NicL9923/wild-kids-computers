@@ -301,6 +301,8 @@ export function createBrowserBridge(options: BrowserBridgeOptions): PlatformBrid
       },
       // A browser tab cannot hold a close, so no close request ever arrives.
       onCloseRequest: () => () => undefined,
+      // A browser tab has no application menu.
+      onMenuCommand: () => () => undefined,
       acknowledgeCloseRequest: async () => undefined,
       quit: async () => page.close(),
     },

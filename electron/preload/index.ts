@@ -3,7 +3,12 @@
 // window.wkBridge, with one function per bridge method that forwards the call unchanged. The
 // main process validates every argument. Keep logic out of this file.
 import { contextBridge, ipcRenderer } from 'electron';
-import { BRIDGE_METHODS, channelFor, CLOSE_REQUEST_CHANNEL } from '../../src/core/platform/ipc.ts';
+import {
+  BRIDGE_METHODS,
+  channelFor,
+  CLOSE_REQUEST_CHANNEL,
+  MENU_COMMAND_CHANNEL,
+} from '../../src/core/platform/ipc.ts';
 
 const api: Record<string, unknown> = Object.fromEntries(
   BRIDGE_METHODS.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channelFor(method), ...args)]),
@@ -14,6 +19,14 @@ api.onCloseRequest = (listener: () => void) => {
   ipcRenderer.on(CLOSE_REQUEST_CHANNEL, handler);
   return () => {
     ipcRenderer.removeListener(CLOSE_REQUEST_CHANNEL, handler);
+  };
+};
+
+api.onMenuCommand = (listener: (command: unknown) => void) => {
+  const handler = (_event: unknown, command: unknown) => listener(command);
+  ipcRenderer.on(MENU_COMMAND_CHANNEL, handler);
+  return () => {
+    ipcRenderer.removeListener(MENU_COMMAND_CHANNEL, handler);
   };
 };
 

@@ -5,7 +5,7 @@ import { isDocumentName, isExportFileStem, isSafeId } from '../../src/core/platf
 
 /** The bridge as the main process implements it. Close requests travel the other way. */
 export type BridgeImplementation = Omit<PlatformBridge, 'window'> & {
-  window: Omit<PlatformBridge['window'], 'onCloseRequest'>;
+  window: Omit<PlatformBridge['window'], 'onCloseRequest' | 'onMenuCommand'>;
 };
 
 const documentName = z.string().refine(isDocumentName, 'not a known document name');

@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { app, ipcMain, Menu, powerMonitor, protocol, session } from 'electron';
-import { BRIDGE_METHODS, channelFor, CLOSE_REQUEST_CHANNEL } from '../../src/core/platform/ipc.ts';
+import {
+  BRIDGE_METHODS,
+  channelFor,
+  CLOSE_REQUEST_CHANNEL,
+  MENU_COMMAND_CHANNEL,
+} from '../../src/core/platform/ipc.ts';
 import { appMenuTemplate } from './appMenu.ts';
 import { handleBridgeCall, isTrustedSender, originOf, type BridgeImplementation } from './bridgeHandlers.ts';
 import { BUNDLE_SCHEME, registerBundleProtocol } from './bundleProtocol.ts';
@@ -55,9 +60,12 @@ async function start(): Promise<void> {
   await app.whenReady();
   await hardenSession(sessionControls(session.defaultSession), networkPolicy);
   registerBundleProtocol(protocol, rendererRoot);
-  Menu.setApplicationMenu(Menu.buildFromTemplate(appMenuTemplate(os, app.getName())));
-
   const window = createMainWindow({ startUrl, preloadPath });
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      appMenuTemplate(os, app.getName(), (command) => window.webContents.send(MENU_COMMAND_CHANNEL, command)),
+    ),
+  );
   const windowControl = createWindowControl(window, {
     notifyCloseRequest: () => window.webContents.send(CLOSE_REQUEST_CHANNEL),
     setTimeout: (callback, ms) => setTimeout(callback, ms),

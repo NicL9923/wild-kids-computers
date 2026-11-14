@@ -28,7 +28,7 @@ Inline styles are allowed because Radix adds `<style>` tags for scroll locking. 
 
 ### Keyboard and clipboard ownership
 
-- The main process sets an application menu with only the edit roles, which macOS needs for text fields. It blocks reload, close, quit, zoom, and developer tools shortcuts in `before-input-event` unless the app runs unpackaged in dev. It fixes the zoom factor at 1.
+- The main process sets an application menu with only the edit commands, which macOS needs for text fields. On macOS, Undo and Redo from the menu bar go to the page over `MENU_COMMAND_CHANNEL`, and `src/app/menuCommands.ts` replays them as the shortcut on the focused element, so an activity's own text model handles them instead of the browser's undo. Windows and Linux hide the menu bar and keep the plain edit role. It blocks reload, close, quit, zoom, and developer tools shortcuts in `before-input-event` unless the app runs unpackaged in dev. It fixes the zoom factor at 1.
 - The app never reads or writes the system clipboard. `src/app/` handles `copy`, `cut`, and `paste` events at the document root and routes them to an in-app toy clipboard. An adult's copied password cannot land in a toy app, and a child's text cannot leave the app.
 - The app root cancels every `dragstart`, so images do not produce ghost drags.
 - Spellcheck is off.
