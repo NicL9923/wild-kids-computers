@@ -18,6 +18,27 @@ const percentAlong = (mark: Mark, count: number) =>
   `${String(((LINE_START + (mark.index * LINE_LENGTH) / (count - 1)) / 1000) * 100)}%`;
 
 /**
+ * What a screen reader hears for a place on the line: how many marks it is from the nearest
+ * written number on its left, such as "2 marks after 50", or on its right when none is to the
+ * left. A sighted child counts marks the same way. It never says the place's own number.
+ */
+function placeName(marks: readonly Mark[], mark: Mark): string {
+  const before = marks.findLast((each) => each.labeled && each.index < mark.index);
+  const from = before ?? marks.find((each) => each.labeled && each.index > mark.index);
+  if (from === undefined) return '';
+  const distance = Math.abs(mark.index - from.index);
+  const words =
+    before === undefined
+      ? distance === 1
+        ? strings.markBefore
+        : strings.marksBefore
+      : distance === 1
+        ? strings.markAfter
+        : strings.marksAfter;
+  return [t(numberHandle(distance)), t(words), t(numberHandle(from.value))].join(' ');
+}
+
+/**
  * A number line. In a "missing" round one label is blank and the child picks its number from a
  * row of choices. In a "place" round a number sits above the line and the child clicks its mark.
  * A wrong try is set aside, and after two the right one is shown more plainly.
@@ -90,7 +111,7 @@ export default function NumberLineActivity({ level, kit }: ActivityProps<LineLev
                   style={{ left, width: spacing }}
                   data-mark={mark.index}
                   data-look={look}
-                  aria-label={t(numberHandle(mark.value))}
+                  aria-label={placeName(level.marks, mark)}
                   disabled={look === 'tried' || look === 'done'}
                   onClick={(event) => round.choose(mark.index, event.currentTarget)}
                 >

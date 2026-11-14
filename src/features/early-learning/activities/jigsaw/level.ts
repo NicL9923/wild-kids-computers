@@ -49,7 +49,11 @@ export interface JigsawLevel {
    * scene. A fraction keeps the level pure: the gallery is only known when the round starts.
    */
   readonly gallery: number | null;
-  /** The pieces in the tray, by home index counted row by row. Never all in home order. */
+  /**
+   * The pieces in the tray, by home index counted row by row, in any order at all. Ruling out
+   * home order would make two pieces always arrive crossed, which a child learns instead of the
+   * picture.
+   */
   readonly tray: readonly number[];
 }
 
@@ -69,8 +73,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Ji
   const scene = makeScene(random, PICTURE.width, PICTURE.height, Math.max(columns, 3), Math.max(rows, 2));
   const gallery = random.next() < 0.5 ? random.next() : null;
   const home = Array.from({ length: columns * rows }, (_, index) => index);
-  let tray = random.shuffle(home);
-  // A tray in home order would hand the answer over; turning it around never is.
-  if (tray.every((piece, index) => piece === index)) tray = tray.toReversed();
+  const tray = random.shuffle(home);
   return { columns, rows, guide, scene, gallery, tray };
 }

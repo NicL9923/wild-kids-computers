@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createScope, type OwnedScope, type Scope } from '../core/activityKit/scope.ts';
-import type { Scheduler } from '../core/activityKit/scheduler.ts';
+import type { KitClock, Scheduler } from '../core/activityKit/scheduler.ts';
 import { kitScheduler } from './kitTime.ts';
 
 /** A scope that a component owns while it is mounted, and opens again if React mounts it again. */
@@ -42,6 +42,30 @@ export function createScopeLifetime(scheduler: Scheduler): ScopeLifetime {
  */
 export function useScope(): Scope {
   const [lifetime] = useState(() => createScopeLifetime(kitScheduler));
+  useEffect(() => {
+    lifetime.open();
+    return () => lifetime.close();
+  }, [lifetime]);
+  return lifetime.scope;
+}
+
+/**
+ * A scope for one part of an activity that can end before the round does, such as one attempt
+ * at a step that the child starts again. Its timers and frames run through the parent scope, so
+ * leaving the activity still cancels them, and unmounting the part cancels only its own. A pause
+ * an earlier attempt started can then never act on the attempt that replaced it.
+ */
+export function useChildScope(parent: { readonly scope: Scope; readonly clock: KitClock }): Scope {
+  const { scope, clock } = parent;
+  const [lifetime] = useState(() =>
+    createScopeLifetime({
+      now: () => clock.now(),
+      monotonic: () => clock.monotonic(),
+      setTimeout: (callback, ms) => scope.setTimeout(callback, ms),
+      setInterval: (callback, ms) => scope.setInterval(callback, ms),
+      requestFrame: (callback) => scope.requestFrame(callback),
+    }),
+  );
   useEffect(() => {
     lifetime.open();
     return () => lifetime.close();

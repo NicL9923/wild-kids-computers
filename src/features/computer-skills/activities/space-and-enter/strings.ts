@@ -11,4 +11,5 @@ export const strings = defineStrings('space-and-enter', {
   enterIsBig: { text: 'Enter is the big key on the right side.' },
   gate: { text: 'Gate', silent: 'decorative' },
   home: { text: 'Home', silent: 'decorative' },
+  path: { text: 'The path home', silent: 'decorative' },
 });

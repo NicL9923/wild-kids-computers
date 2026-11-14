@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { expectNoPositionTell } from '../../../../core/activityKit/testing/positionTell.ts';
 import type { Random } from '../../../../core/activityKit/random.ts';
 import {
   GAP,
@@ -36,10 +37,8 @@ function problems(level: BigAndSmallLevel): string[] {
   return found;
 }
 
-const isSortedEitherWay = (sizes: readonly number[]) =>
-  [sizes, sizes.toReversed()].some((list) =>
-    list.every((size, index) => index === 0 || size >= (list[index - 1] ?? 0)),
-  );
+/** True when clicking left to right gives the answer of an order round. */
+const leftToRight = (level: BigAndSmallLevel) => level.answer.every((id, index) => id === `item-${String(index)}`);
 
 describe('generateLevel', () => {
   // The design table: what the child does, how many pictures, and how far apart in size.
@@ -65,38 +64,22 @@ describe('generateLevel', () => {
         for (let index = 1; index < sizes.length; index += 1) {
           expect((sizes[index - 1] ?? 0) / (sizes[index] ?? 1)).toBeCloseTo(ratio, 1);
         }
-        // An order round never starts solved.
-        expect(mode === 'order' && isSortedEitherWay(level.items.map((item) => item.size))).toBe(false);
+        // An order round never starts as a plain walk along the row.
+        expect(mode === 'order' && leftToRight(level)).toBe(false);
         seen.add(level.direction);
       }
       expect([...seen].toSorted()).toEqual([...directions].toSorted());
     },
   );
 
-  it('puts the answer of a pick round in every place across rounds', () => {
-    const places = new Set(
-      SEEDS.map((seed) => {
-        const level = generateLevel(seed, 3, 'band-3-5');
-        return level.items.findIndex((item) => item.id === level.answer[0]);
-      }),
-    );
-    expect([...places].toSorted((a, b) => a - b)).toEqual([0, 1, 2]);
-  });
-
-  it('puts the bigger of two pictures on either side across rounds', () => {
-    const sides = new Set(SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5').answer[0]));
-    expect(sides).toEqual(new Set(['item-0', 'item-1']));
-  });
-
-  it('starts order rounds in every mixed order of three', () => {
-    const orders = new Set(
-      SEEDS.map((seed) => {
-        const level = generateLevel(seed, 5, 'band-3-5');
-        return level.items.map((item) => level.answer.indexOf(item.id)).join('');
-      }),
-    );
-    // Six orders of three, less the two already sorted.
-    expect(orders).toEqual(new Set(['021', '102', '120', '201']));
+  // Pick rounds at both ends, then order rounds at both ends: where to click is never a rule.
+  it.each([1, 4, 5, MAX_DIFFICULTY])('gives no answer away by position at difficulty %i', (difficulty) => {
+    const seeds = Array.from({ length: 600 }, (_, index) => index * 4_817 + 9);
+    expectNoPositionTell(seeds, (seed) => {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      const places = level.answer.map((id) => level.items.findIndex((item) => item.id === id));
+      return { positions: places, slots: level.items.length };
+    });
   });
 
   it('uses every picture across rounds', () => {
@@ -143,21 +126,17 @@ describe('unsortedOrder', () => {
   };
 
   it.each([
-    [
-      [300, 214, 153],
-      [300, 153, 214],
-    ],
-    [
-      [153, 214, 300],
-      [300, 153, 214],
-    ],
-    [
-      [260, 200, 154, 118],
-      [260, 118, 200, 154],
-    ],
-  ])('mixes sorted sizes %j when shuffling keeps them sorted', (sizes, expected) => {
-    const order = unsortedOrder(still, sizes);
-    expect(order).toEqual(expected);
-    expect(isSortedEitherWay(order)).toBe(false);
+    ['small', [153, 214, 300], [214, 300, 153]],
+    ['big', [300, 214, 153], [214, 153, 300]],
+    ['big', [260, 200, 154, 118], [200, 154, 118, 260]],
+  ] as const)(
+    'turns sizes already in %s-first click order when shuffling keeps them there',
+    (direction, sizes, expected) => {
+      expect(unsortedOrder(still, sizes, direction)).toEqual(expected);
+    },
+  );
+
+  it('keeps an order that is only the reverse of the click order', () => {
+    expect(unsortedOrder(still, [300, 214, 153], 'small')).toEqual([300, 214, 153]);
   });
 });

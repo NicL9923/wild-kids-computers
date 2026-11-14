@@ -7,6 +7,7 @@ import {
   maskLevel,
   MASK_LEVELS,
   readSourceHash,
+  parseRenderArgs,
   sourceHash,
 } from './coloringPages.ts';
 
@@ -123,5 +124,37 @@ describe('mapRegions', () => {
     const hole = map.regions[(map.labels[3 * 9 + 3] ?? 0) - 1];
     // The middle of a 3 by 3 hole is two steps from the wall: a disc 4 pixels across.
     expect(hole?.inscribed).toBe(4);
+  });
+});
+
+describe('parseRenderArgs', () => {
+  const pages = ['apple-and-pear', 'barn', 'kite'];
+
+  it.each([
+    ['one page id', ['barn'], { all: false, previewDir: null, ids: ['barn'] }],
+    ['several page ids, the first included', ['kite', 'barn'], { all: false, previewDir: null, ids: ['barn', 'kite'] }],
+    ['no page id', [], { all: false, previewDir: null, ids: pages }],
+    ['--all', ['--all'], { all: true, previewDir: null, ids: pages }],
+    [
+      'a page id after the preview folder',
+      ['--preview', 'out', 'kite'],
+      { all: false, previewDir: 'out', ids: ['kite'] },
+    ],
+    [
+      'page ids around both flags',
+      ['barn', '--all', '--preview', 'out', 'apple-and-pear'],
+      { all: true, previewDir: 'out', ids: ['apple-and-pear', 'barn'] },
+    ],
+  ])('selects pages for %s', (_name, args, expected) => {
+    expect(parseRenderArgs(args, pages)).toEqual(expected);
+  });
+
+  it.each([
+    ['a page id with no source', ['barn', 'castle'], 'No coloring page source for: castle'],
+    ['--preview with no folder', ['--preview'], '--preview needs a folder'],
+    ['--preview followed by a flag', ['--preview', '--all'], '--preview needs a folder'],
+    ['an unknown flag', ['--al'], 'Unknown option: --al'],
+  ])('refuses %s', (_name, args, reason) => {
+    expect(() => parseRenderArgs(args, pages)).toThrow(reason);
   });
 });

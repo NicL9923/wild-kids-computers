@@ -12,6 +12,7 @@ import {
   saveBandScreenshot,
   spokenIds,
 } from '../support/activity.ts';
+import { expectVisibleFocus, tabTo } from '../support/keyboard.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
 
 const SEED = 20_261_114;
@@ -74,9 +75,10 @@ forEachBand(activity.bands, (band) => {
     await expect(stage(page)).toHaveAttribute('data-phase', 'waiting');
     await expect(stage(page)).toHaveAttribute('data-stop', '0');
     await expectInstructionSpoken(page, strings.pressSpace);
-    // The replay control has focus now, so Space would press it. A click on the path gives the
-    // keys back to the activity, as a child would do.
-    await page.locator('.jump-path').click();
+    // The replay control has focus now, so Space would press it. Tab comes back to the path,
+    // which gives Space back to the activity with no pointer at all.
+    await tabTo(page, page.locator('[data-key-area]'));
+    await expectVisibleFocus(page);
     await page.keyboard.press('Space');
     await expect(stage(page)).toHaveAttribute('data-stop', '1');
   });

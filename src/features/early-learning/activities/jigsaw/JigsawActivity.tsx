@@ -26,12 +26,15 @@ function trayColumns(count: number): number {
  * The board with an outline for each piece, and the pieces in a tray beside it. A piece moves with
  * useCarry: dragged, clicked up and clicked down, or carried with the keyboard. It stays only in
  * its own place; anywhere else it goes back to the tray with the kit's neutral nudge. After two
- * misses with one piece, its place glows while that piece is carried.
+ * misses with one piece, "Here it is" plays and that piece and its place glow until it lands.
+ * While another piece that missed twice is carried, the glow follows the carried one.
  */
 export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel>) {
   const picture = useJigsawPicture(kit, level);
   const [placed, setPlaced] = useState<ReadonlySet<number>>(() => new Set());
   const [misses, setMisses] = useState<ReadonlyMap<number, number>>(() => new Map());
+  /** The last piece that missed twice. It and its place glow from the moment "Here it is" plays. */
+  const [hinted, setHinted] = useState<number | null>(null);
   const tray = useRef<HTMLUListElement>(null);
   const count = level.columns * level.rows;
   const done = placed.size === count;
@@ -47,8 +50,12 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
         const tries = (misses.get(home) ?? 0) + 1;
         setMisses(new Map(misses).set(home, tries));
         kit.feedback.wrong({ at });
-        if (tries === HINT_AFTER_TRIES) kit.hint(feedback.hereItIs);
-        else void kit.speak(feedback.goesSomewhereElse);
+        if (tries === HINT_AFTER_TRIES) {
+          setHinted(home);
+          kit.hint(feedback.hereItIs);
+        } else {
+          void kit.speak(feedback.goesSomewhereElse);
+        }
         return;
       }
       const next = new Set(placed).add(home);
@@ -67,7 +74,12 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
   });
 
   const carried = carry.carried === null ? null : indexOf(carry.carried);
-  const hintPlace = carried !== null && (misses.get(carried) ?? 0) >= HINT_AFTER_TRIES ? carried : null;
+  const hintPiece =
+    carried !== null && (misses.get(carried) ?? 0) >= HINT_AFTER_TRIES
+      ? carried
+      : hinted !== null && !placed.has(hinted)
+        ? hinted
+        : null;
 
   if (picture.status === 'loading') return <div className='jg-stage' data-loading='true' />;
   const { source } = picture;
@@ -97,7 +109,7 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
               {...carry.target(placeId(index))}
               data-place={index}
               data-filled={placed.has(index)}
-              data-hint={hintPlace === index}
+              data-hint={hintPiece === index}
             >
               {placed.has(index) && <PictureCrop source={source} crop={crop(index)} />}
             </div>
@@ -114,6 +126,7 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
                   className='jg-piece'
                   {...carry.item(pieceId(index))}
                   data-piece={index}
+                  data-hint={hintPiece === index}
                   aria-label={[t(strings.piece), t(numberHandle(index + 1))].join(' ')}
                 >
                   <PictureCrop source={source} crop={crop(index)} />

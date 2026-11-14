@@ -28,7 +28,10 @@ export const MAX_DIFFICULTY = TIERS.length;
 export interface AnimalHomesLevel {
   /** The animals in screen order. */
   readonly animals: readonly Animal[];
-  /** The homes in screen order, one per animal, never lined up under its own animal. */
+  /**
+   * The homes in screen order, one per animal. The animals are in any order at all, so an animal
+   * is as likely over its own home as over any other, and position never gives the match away.
+   */
   readonly homes: readonly Home[];
 }
 
@@ -63,16 +66,6 @@ export function animalsFor(random: Random, homes: readonly Home[], familiarOnly:
 
 const ATTEMPTS = 200;
 
-/** The animals in an order where none sits right over its own home. */
-export function animalOrder(random: Random, animals: readonly Animal[], homes: readonly Home[]): Animal[] {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const order = random.shuffle(animals);
-    if (order.every((animal, index) => animal.home !== homes[index])) return order;
-  }
-  // `animals` follows `homes`, so a turn by one place moves every animal off its home.
-  return [...animals.slice(1), ...animals.slice(0, 1)];
-}
-
 /** Pure: the same seed and difficulty give the same round in every band. */
 export function generateLevel(seed: number, difficulty: number, _band: Band): AnimalHomesLevel {
   const tier = tierFor(difficulty);
@@ -82,8 +75,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): An
     const homes = random.sample(allHomes, tier.pairs);
     const animals = animalsFor(random, homes, tier.familiarOnly);
     if (animals === null) continue;
-    // No home sits right under its own animal, so position never gives the match away.
-    return { animals: animalOrder(random, animals, homes), homes };
+    return { animals: random.shuffle(animals), homes };
   }
   throw new Error(`Animal homes found no fair round at difficulty ${String(difficulty)}.`);
 }

@@ -17,4 +17,11 @@ export const strings = defineStrings('tell-the-time', {
   minuteForward: { text: 'Minute hand forward' },
   check: { text: 'This is the time' },
   times: { text: 'Times to choose from', silent: 'decorative' },
+  // For screen readers: where the hands are, never the time itself, which is the answer.
+  clock: { text: 'Clock', silent: 'decorative' },
+  shortHandAt: { text: 'The short hand is on', silent: 'decorative' },
+  shortHandBetween: { text: 'The short hand is between', silent: 'decorative' },
+  longHandAt: { text: 'The long hand is on', silent: 'decorative' },
+  longHandBetween: { text: 'The long hand is between', silent: 'decorative' },
+  and: { text: 'and', silent: 'decorative' },
 });

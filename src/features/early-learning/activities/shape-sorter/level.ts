@@ -1,5 +1,5 @@
 import type { Band } from '../../../../core/bands.ts';
-import { createRandom, type Random } from '../../../../core/activityKit/random.ts';
+import { createRandom } from '../../../../core/activityKit/random.ts';
 import { chooseWithAnswer } from '../../reading/choices.ts';
 import type { ShapeKind, ShapePaint } from '../../shapes/shapes.ts';
 
@@ -77,7 +77,10 @@ interface Piece {
 export interface ShapeSorterLevel {
   /** The pieces in screen order. No two share a shape. */
   readonly pieces: readonly Piece[];
-  /** One hole per piece, in screen order, never lined up under its own piece. */
+  /**
+   * One hole per piece, in screen order, in any order at all. A hole is as likely under its own
+   * piece as anywhere else, so where it sits never gives the match away.
+   */
   readonly holes: readonly ShapeKind[];
 }
 
@@ -87,16 +90,6 @@ function tierFor(difficulty: number): Tier {
     throw new RangeError(`Shape sorter has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);
   }
   return tier;
-}
-
-/** The holes in an order where no hole sits in the same place as its piece. */
-export function holeOrder(random: Random, shapes: readonly ShapeKind[]): ShapeKind[] {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const order = random.shuffle(shapes);
-    if (order.every((shape, index) => shape !== shapes[index])) return order;
-  }
-  // A turn by one place always moves every hole.
-  return [...shapes.slice(1), ...shapes.slice(0, 1)];
 }
 
 /** Pure: the same seed and difficulty give the same round in every band. */
@@ -117,5 +110,5 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Sh
   });
   const paints = random.sample(PIECE_PAINTS, shapes.length);
   const pieces = shapes.map((shape, index): Piece => ({ id: `piece-${index}`, shape, paint: paints[index] ?? 'red' }));
-  return { pieces, holes: holeOrder(random, shapes) };
+  return { pieces, holes: random.shuffle(shapes) };
 }

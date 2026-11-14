@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Random } from '../../../../core/activityKit/random.ts';
+import { expectNoPositionTell } from '../../../../core/activityKit/testing/positionTell.ts';
 import { ANIMALS, HOMES, livesIn } from './homes.ts';
-import { animalOrder, animalsFor, generateLevel, MAX_DIFFICULTY, type AnimalHomesLevel } from './level.ts';
+import { animalsFor, generateLevel, MAX_DIFFICULTY, type AnimalHomesLevel } from './level.ts';
 
 const SEEDS = Array.from({ length: 300 }, (_, index) => index * 8_191 + 4);
 
-/** What makes a round fair: each animal fits exactly one home on screen, its own, and positions give nothing away. */
+/** What makes a round fair: each animal fits exactly one home on screen, its own. */
 function problems(level: AnimalHomesLevel): string[] {
   const found: string[] = [];
   if (new Set(level.homes).size !== level.homes.length) found.push('a home repeats');
@@ -16,9 +17,6 @@ function problems(level: AnimalHomesLevel): string[] {
     if (fits.length !== 1 || fits[0] !== animal.home)
       found.push(`${animal.id} fits ${fits.join(' and ') || 'nothing'}`);
   }
-  level.animals.forEach((animal, index) => {
-    if (level.homes[index] === animal.home) found.push(`${animal.id} sits over its own home`);
-  });
   return found;
 }
 
@@ -42,14 +40,12 @@ describe('generateLevel', () => {
     expect(unfamiliar === 0).toBe(familiarOnly);
   });
 
-  it('lays the animals out in many orders, not always one turn along', () => {
-    const orders = new Set(
-      SEEDS.map((seed) => {
-        const level = generateLevel(seed, 2, 'band-3-5');
-        return level.animals.map((animal) => level.homes.indexOf(animal.home)).join('');
-      }),
-    );
-    expect(orders).toEqual(new Set(['120', '201']));
+  it.each([1, MAX_DIFFICULTY])('gives no home away by position at difficulty %i', (difficulty) => {
+    const seeds = Array.from({ length: 600 }, (_, index) => index * 8_191 + 4);
+    expectNoPositionTell(seeds, (seed) => {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      return { positions: level.animals.map((animal) => level.homes.indexOf(animal.home)) };
+    });
   });
 
   it('uses every home and every animal across the hardest rounds', () => {
@@ -97,25 +93,5 @@ describe('animalsFor', () => {
     expect(animalsFor(inOrder, ['ocean'], true)?.map((animal) => animal.id)).toEqual(['whale']);
     expect(animalsFor(inOrder, ['cave', 'burrow'], true)).toBeNull();
     expect(animalsFor(inOrder, ['cave', 'burrow'], false)?.map((animal) => animal.id)).toEqual(['bat', 'rabbit']);
-  });
-});
-
-describe('animalOrder', () => {
-  const still: Random = {
-    next: () => 0,
-    int: (min) => min,
-    pick: (items) => {
-      for (const item of items) return item;
-      throw new RangeError('empty');
-    },
-    shuffle: (items) => [...items],
-    sample: (items, count) => items.slice(0, count),
-  };
-
-  it('moves every animal off its own home by one place when shuffling keeps failing', () => {
-    const homes = ['nest', 'ocean', 'barn'] as const;
-    const animals = animalsFor(still, homes, true);
-    if (animals === null) throw new Error('The table has familiar animals for these homes.');
-    expect(animalOrder(still, animals, homes).map((animal) => animal.home)).toEqual(['ocean', 'barn', 'nest']);
   });
 });

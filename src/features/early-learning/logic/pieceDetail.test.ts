@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitForPieces, MIN_DETAIL, pieceDetail } from './pieceDetail.ts';
+import { fitForPieces, MIN_DETAIL, MIN_DIFFERENCE, pieceDetail, piecesAlike } from './pieceDetail.ts';
 
 /** An RGBA image filled by `paint(x, y)`, which returns [r, g, b, a]. */
 function image(width: number, height: number, paint: (x: number, y: number) => readonly number[]): Uint8ClampedArray {
@@ -11,6 +11,11 @@ function image(width: number, height: number, paint: (x: number, y: number) => r
 const WHITE = [255, 255, 255, 255];
 const gray = (value: number) => [value, value, value, 255];
 const BLACK = [0, 0, 0, 255];
+
+/** Two pieces side by side with the same light and dark columns, the right one `shift` grays lighter. */
+function shifted(shift: number): Uint8ClampedArray {
+  return image(4, 2, (x) => gray((x % 2 === 0 ? 40 : 200) + (x < 2 ? 0 : shift)));
+}
 
 describe('pieceDetail', () => {
   it('finds no detail in a blank piece and full detail in a half black, half white one', () => {
@@ -52,11 +57,47 @@ describe('pieceDetail', () => {
 
 describe('fitForPieces', () => {
   it('passes a picture with something in every piece, and fails one with a blank piece', () => {
-    const busy = image(8, 8, (x, y) => ((x + y) % 2 === 0 ? BLACK : WHITE));
+    // Checks in a different ink in each quarter, so every piece shows something and no two look alike.
+    const inks = [BLACK, [220, 0, 0, 255], [0, 0, 220, 255], [0, 150, 0, 255]];
+    const busy = image(8, 8, (x, y) =>
+      (x + y) % 2 === 0 ? (inks[(y < 4 ? 0 : 2) + (x < 4 ? 0 : 1)] ?? BLACK) : WHITE,
+    );
     expect(fitForPieces(busy, 8, 8, 2, 2)).toBe(true);
     const corner = image(8, 8, (x, y) => (x < 4 && y < 4 && (x + y) % 2 === 0 ? BLACK : WHITE));
     expect(fitForPieces(corner, 8, 8, 2, 2)).toBe(false);
     expect(fitForPieces(corner, 8, 8, 1, 1)).toBe(true);
+  });
+
+  it('fails a picture whose pieces all look alike, such as the same stripes repeated', () => {
+    // Every piece is the same stripes, so each shows plenty, yet a child cannot tell one from another.
+    const stripes = image(16, 8, (x) => (x % 4 < 2 ? BLACK : WHITE));
+    expect(pieceDetail(stripes, 16, 8, 2, 2).every((detail) => detail >= MIN_DETAIL)).toBe(true);
+    expect(fitForPieces(stripes, 16, 8, 2, 2)).toBe(false);
+  });
+
+  it('fails a picture with just two look-alike pieces among different ones', () => {
+    // Columns 0 and 2 are the same checks; column 1 is a black block on its left half.
+    const pixels = image(24, 8, (x, y) => {
+      if (x >= 8 && x < 16) return x < 12 ? BLACK : WHITE;
+      return (x + y) % 2 === 0 ? BLACK : WHITE;
+    });
+    expect(fitForPieces(pixels, 24, 8, 3, 1)).toBe(false);
+    expect(piecesAlike(pixels, 24, 8, 3, 1)).toEqual([[0, 2]]);
+  });
+
+  it('tells pieces apart by color as well as by light', () => {
+    // The same shape in red and in blue: equal brightness spread, plainly different pieces.
+    const pixels = image(16, 8, (x, y) => {
+      const ink = x < 8 ? [220, 0, 0, 255] : [0, 0, 220, 255];
+      return x % 8 < 4 === y < 4 ? ink : WHITE;
+    });
+    expect(piecesAlike(pixels, 16, 8, 2, 1)).toEqual([]);
+    expect(fitForPieces(pixels, 16, 8, 2, 1)).toBe(true);
+  });
+
+  it('calls pieces alike below the least difference, and different at it', () => {
+    expect(piecesAlike(shifted(MIN_DIFFERENCE), 4, 2, 2, 1)).toEqual([]);
+    expect(piecesAlike(shifted(MIN_DIFFERENCE - 1), 4, 2, 2, 1)).toEqual([[0, 1]]);
   });
 
   it('needs at least the least detail, not more', () => {

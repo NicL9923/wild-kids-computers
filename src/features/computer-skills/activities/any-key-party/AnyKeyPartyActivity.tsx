@@ -6,6 +6,7 @@ import { t } from '../../../../core/strings/defineStrings.ts';
 import { emojiNames, letterNames, numberHandle } from '../../../../core/strings/shared/index.ts';
 import { isLetter } from '../../shared/keyboardLayout.ts';
 import { KeyboardPicture } from '../../shared/KeyboardPicture.tsx';
+import { KeyPlayArea } from '../../shared/KeyPlayArea.tsx';
 import './anyKeyParty.css';
 import { FRIEND_SIZE, FULL_MEADOW_MS, MEADOW, type PartyLevel } from './level.ts';
 import { strings } from './strings.ts';
@@ -64,7 +65,7 @@ export default function AnyKeyPartyActivity({ level, kit }: ActivityProps<PartyL
 
   return (
     <div className='party-stage' data-arrived={arrived} data-full={full}>
-      <div className='party-meadow-area'>
+      <KeyPlayArea className='party-meadow-area' label={t(strings.meadow)}>
         <div className='party-meadow' onPointerDown={clicked}>
           <svg className='party-ground' viewBox='0 0 1000 600' preserveAspectRatio='none' aria-hidden='true'>
             <path className='party-hill' d='M0 420 C200 360 380 380 520 410 S820 450 1000 390 V600 H0 Z' />
@@ -84,7 +85,7 @@ export default function AnyKeyPartyActivity({ level, kit }: ActivityProps<PartyL
             </div>
           ))}
         </div>
-      </div>
+      </KeyPlayArea>
       <div className='party-keyboard'>
         <KeyboardPicture label={t(emojiNames.keyboard)} marks={pressed === null ? {} : { [pressed]: 'pressed' }} />
       </div>

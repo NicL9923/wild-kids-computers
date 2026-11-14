@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Band } from '../../../../core/bands.ts';
 import { createRandom } from '../../../../core/activityKit/random.ts';
+import { expectNoPositionTell } from '../../../../core/activityKit/testing/positionTell.ts';
 import {
   BLANKET,
   belongs,
@@ -87,12 +88,12 @@ describe('generateLevel', () => {
     expect(level.places).toEqual([expect.objectContaining({ id: 'basket', takes: null })]);
   });
 
-  it('lays the blanket places in another order than the food, across seeds', () => {
-    const levels = SEEDS.slice(0, 60).map((seed) => generateLevel(seed, 6, 'band-6-8'));
-    const shuffled = levels.filter((level) =>
-      level.places.some((place, index) => place.takes !== `piece-${String(index)}`),
-    );
-    expect(shuffled.length).toBeGreaterThan(50);
+  it.each([4, MAX_PICNIC_DIFFICULTY])('gives no blanket place away by position at difficulty %i', (difficulty) => {
+    const seeds = Array.from({ length: 600 }, (_, index) => index * 7_727 + 13);
+    expectNoPositionTell(seeds, (seed) => {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      return { positions: level.pieces.map((piece) => level.places.findIndex((place) => place.takes === piece.id)) };
+    });
   });
 
   it('moves food and places a little from round to round', () => {
