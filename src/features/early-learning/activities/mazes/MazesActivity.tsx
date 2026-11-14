@@ -26,6 +26,9 @@ const UNIT = 100;
  * arrow keys move it one cell. Cells it has walked keep a small dot, so the child sees where it
  * has been. A wall stops it with a little wobble. After two bumps or clicks that cannot be
  * reached in one place, the next cell on the way glows.
+ *
+ * Moves can come faster than the screen draws, so every handler reads and writes the place, the
+ * bumps, and the arrival in one live record, never the values of the last render.
  */
 export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) {
   const [at, setAt] = useState<Cell>(level.start);
@@ -36,6 +39,7 @@ export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) 
   const board = useRef<HTMLDivElement>(null);
   const critter = useRef<HTMLDivElement>(null);
   const helpedAt = useRef<string | null>(null);
+  const live = useRef({ at, bumps, arrived });
 
   const nextStep = waysFrom(level.cells, at).get(keyOf(level.goal))?.[0] ?? null;
   const nextCell = nextStep === null ? null : neighbor(at, nextStep, level.columns, level.rows);
@@ -43,7 +47,8 @@ export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) 
 
   function walk(run: readonly Cell[]): void {
     const last = run.at(-1);
-    if (last === undefined || arrived) return;
+    if (last === undefined || live.current.arrived) return;
+    live.current = { at: last, bumps: 0, arrived: same(last, level.goal) };
     setAt(last);
     setBumps(0);
     setVisited((before) => new Set([...before, ...run.map(keyOf)]));
@@ -60,9 +65,10 @@ export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) 
   function bump(spot: { x: number; y: number } | undefined): void {
     setWobble((count) => count + 1);
     kit.feedback.wrong({ at: spot ?? critter.current ?? undefined, silent: true });
-    const count = bumps + 1;
+    const count = live.current.bumps + 1;
+    live.current = { ...live.current, bumps: count };
     setBumps(count);
-    const here = keyOf(at);
+    const here = keyOf(live.current.at);
     if (count >= HINT_AFTER_TRIES && helpedAt.current !== here) {
       helpedAt.current = here;
       kit.hint(strings.thisWay);
@@ -71,10 +77,11 @@ export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) 
 
   useActivityKeys(kit, (event) => {
     const direction = KEY_DIRECTIONS[event.key];
-    if (direction === undefined || arrived || event.repeat) return;
+    const { at: from, arrived: done } = live.current;
+    if (direction === undefined || done || event.repeat) return;
     event.preventDefault();
-    const to = neighbor(at, direction, level.columns, level.rows);
-    const run = to === null ? null : straightRun(level, at, to);
+    const to = neighbor(from, direction, level.columns, level.rows);
+    const run = to === null ? null : straightRun(level, from, to);
     if (run === null) bump(undefined);
     else walk(run);
   });
@@ -90,15 +97,17 @@ export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) 
 
   function follow(event: ReactPointerEvent<HTMLDivElement>): void {
     const cell = cellAt(event.clientX, event.clientY);
-    if (cell === null || arrived) return;
-    const run = straightRun(level, at, cell, level.goal);
+    const { at: from, arrived: done } = live.current;
+    if (cell === null || done) return;
+    const run = straightRun(level, from, cell, level.goal);
     if (run !== null) walk(run);
   }
 
   function click(event: ReactPointerEvent<HTMLDivElement>): void {
     const cell = cellAt(event.clientX, event.clientY);
-    if (cell === null || arrived || same(cell, at)) return;
-    const run = straightRun(level, at, cell, level.goal);
+    const { at: from, arrived: done } = live.current;
+    if (cell === null || done || same(cell, from)) return;
+    const run = straightRun(level, from, cell, level.goal);
     if (run === null) bump({ x: event.clientX, y: event.clientY });
     else walk(run);
   }
