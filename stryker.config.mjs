@@ -28,6 +28,10 @@ const config = {
     // The alphabet and choice rules every letters and reading level generator builds on.
     'src/features/early-learning/reading/alphabet.ts',
     'src/features/early-learning/reading/choices.ts',
+    // The picture sets, scenes, and picture check the memory and logic level generators build on.
+    'src/features/early-learning/logic/pictures.ts',
+    'src/features/early-learning/logic/scene.ts',
+    'src/features/early-learning/logic/pieceDetail.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],

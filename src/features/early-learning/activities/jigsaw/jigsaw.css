@@ -1,0 +1,132 @@
+/*
+ * Jigsaw: the board on the left as big as the stage allows, keeping the picture's 16 by 10 shape,
+ * and the tray of pieces on the right. Each place has a dashed outline until its piece is in.
+ * Every value is a token.
+ */
+
+.jg-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--wk-space-section);
+  padding: var(--wk-space-container);
+}
+
+.jg-board-area {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.jg-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--jg-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--jg-rows), minmax(0, 1fr));
+  width: min(100cqw, calc(100cqh * 16 / 10));
+  aspect-ratio: 16 / 10;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface);
+  overflow: hidden;
+}
+
+/* The faint picture to match pieces against, at the easy end of the range. */
+.jg-guide {
+  position: absolute;
+  inset: 0;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.jg-place {
+  position: relative;
+  box-sizing: border-box;
+  border: var(--wk-border-width) dashed var(--wk-color-border);
+  min-width: 0;
+  min-height: 0;
+}
+
+.jg-place[data-filled='true'] {
+  border: 0;
+}
+
+/* While a piece is carried, the places it can go show a solid edge; the one under it fills. */
+.jg-place[data-carry-valid='true'] {
+  border-style: solid;
+  border-color: var(--wk-color-primary);
+}
+
+.jg-place[data-carry-over='true'] {
+  background: rgb(from var(--wk-color-selected) r g b / 0.7);
+  border-width: calc(var(--wk-border-width) * 2);
+}
+
+/* After two misses with the carried piece, its place glows with a thick accent edge. */
+.jg-place[data-hint='true'] {
+  border: calc(var(--wk-border-width) * 3) solid var(--wk-color-accent);
+  animation: jg-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes jg-hint {
+  to {
+    background: rgb(from var(--wk-color-accent) r g b / 0.35);
+  }
+}
+
+.jg-tray-area {
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.jg-tray {
+  --jg-gap: var(--wk-space-item);
+  /* Pieces keep the picture's piece shape and fit the tray's columns and rows. */
+  --jg-piece-width: min(
+    calc((100cqw - (var(--jg-tray-columns) - 1) * var(--jg-gap)) / var(--jg-tray-columns)),
+    calc(
+      (100cqh - (var(--jg-tray-rows) - 1) * var(--jg-gap)) / var(--jg-tray-rows) * 16 / 10 * var(--jg-rows) /
+        var(--jg-columns)
+    )
+  );
+  display: grid;
+  grid-template-columns: repeat(var(--jg-tray-columns), var(--jg-piece-width));
+  align-content: center;
+  justify-content: center;
+  gap: var(--jg-gap);
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jg-slot {
+  width: var(--jg-piece-width);
+  aspect-ratio: calc(16 * var(--jg-rows)) / calc(10 * var(--jg-columns));
+}
+
+.jg-piece {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  overflow: hidden;
+  cursor: grab;
+}
+
+.jg-piece[data-carried='true'] {
+  z-index: 2;
+  box-shadow: var(--wk-shadow-overlay);
+  cursor: grabbing;
+}
