@@ -14,14 +14,33 @@ const safeId = z.string().refine(isSafeId, 'must be a lowercase id');
 // ---- app ----------------------------------------------------------------------------------
 
 export const PIN_ALGORITHM = 'PBKDF2-SHA256';
+export const PIN_SALT_BYTES = 16;
+/** PBKDF2-SHA256 derives 32 bytes. */
+export const PIN_HASH_BYTES = 32;
 
-const base64 = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, 'must be base64');
+/**
+ * True when `text` is the exact base64 that btoa writes for `bytes` bytes. atob alone accepts
+ * missing padding, spaces, and stray padding bits, so the text must also survive a round trip.
+ */
+function isBase64Of(text: string, bytes: number): boolean {
+  let decoded: string;
+  try {
+    decoded = atob(text);
+  } catch {
+    return false;
+  }
+  return decoded.length === bytes && btoa(decoded) === text;
+}
 
+const base64Of = (bytes: number) =>
+  z.string().refine((text) => isBase64Of(text, bytes), `must be base64 of ${bytes} bytes`);
+
+/** A record the gate can verify. A record that fails this is set aside with the app document. */
 export const parentPinSchema = z.object({
   algorithm: z.literal(PIN_ALGORITHM),
   iterations: z.int().min(100_000).max(10_000_000),
-  salt: base64,
-  hash: base64,
+  salt: base64Of(PIN_SALT_BYTES),
+  hash: base64Of(PIN_HASH_BYTES),
 });
 
 export type ParentPinRecord = z.infer<typeof parentPinSchema>;
