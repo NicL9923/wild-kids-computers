@@ -10,7 +10,8 @@ type KitCall =
   | { readonly call: 'play'; readonly name: string }
   | { readonly call: 'correct' | 'wrong'; readonly say: string | null }
   | { readonly call: 'hint'; readonly say: string | null }
-  | { readonly call: 'round-complete'; readonly outcome: RoundOutcomeInput | null };
+  | { readonly call: 'round-complete'; readonly outcome: RoundOutcomeInput | null }
+  | { readonly call: 'checkpoint' };
 
 export interface FakeKit<S> {
   readonly kit: ActivityKit<S>;
@@ -19,6 +20,8 @@ export interface FakeKit<S> {
   readonly scheduler: ManualScheduler;
   /** The kit's scope. Disposing it is what leaving the activity does. */
   readonly scope: OwnedScope;
+  /** How many session holds are on now, such as while something is carried or a robot runs. */
+  readonly holds: () => number;
 }
 
 const unexpected = (name: string) => () => {
@@ -37,6 +40,7 @@ export function createFakeKit<S = never>(options: { state?: KitState<S> } = {}):
   const scheduler = createManualScheduler({ wall: 0 });
   const scope = createScope(scheduler);
   const { state } = options;
+  let holds = 0;
   const kit: ActivityKit<S> = {
     scope,
     clock: scheduler,
@@ -59,11 +63,20 @@ export function createFakeKit<S = never>(options: { state?: KitState<S> } = {}):
     hint: (say) => calls.push({ call: 'hint', say: say?.id ?? null }),
     roundComplete: (outcome) => calls.push({ call: 'round-complete', outcome: outcome ?? null }),
     stepSolved: unexpected('stepSolved'),
+    checkpoint: () => calls.push({ call: 'checkpoint' }),
+    holdCheckpoint: () => {
+      holds += 1;
+      let held = true;
+      return () => {
+        if (held) holds -= 1;
+        held = false;
+      };
+    },
     get state(): KitState<S> {
       if (state === undefined) throw new Error('This test gave the kit no saved state');
       return state;
     },
     pictures: { list: unexpected('pictures.list'), read: unexpected('pictures.read') },
   };
-  return { kit, calls, scheduler, scope };
+  return { kit, calls, scheduler, scope, holds: () => holds };
 }

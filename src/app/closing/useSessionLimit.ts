@@ -10,7 +10,7 @@ export const MORE_TIME_MS = 10 * 60_000;
  * The session length for features. Nothing here interrupts the child or re-renders on time:
  * a feature asks at a natural stopping point and the shell shows the calm closing screen.
  *
- * - The activity kit checks between rounds, never during one.
+ * - The activity kit checks between rounds, never during one, and free play at its calm moments.
  * - The paint studio checks when the pen is up, so a stroke is never cut off.
  * - The shell checks when the child moves to another screen.
  *

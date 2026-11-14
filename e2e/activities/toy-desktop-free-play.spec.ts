@@ -4,8 +4,19 @@ import { strings } from '../../src/features/toy-desktop/activities/toy-desktop-f
 import { generateLevel } from '../../src/features/toy-desktop/activities/toy-desktop-free-play/level.ts';
 import { SAMPLE_PICTURE_IDS } from '../../src/features/toy-desktop/model/sampleContent.ts';
 import { expectAccessible } from '../support/accessibility.ts';
-import { expectInstructionSpoken, forEachBand, openActivity, REVIEW_SIZES } from '../support/activity.ts';
-import type { LaunchedApp } from '../support/launchApp.ts';
+import { BETWEEN_ROUNDS_MS } from '../../src/activityShell/timing.ts';
+import { strings as closingStrings } from '../../src/app/closing/strings.ts';
+import { SAVE_PAUSE_MS } from '../../src/features/toy-desktop/activities/toy-desktop-free-play/saving.ts';
+import {
+  expectInstructionSpoken,
+  forEachBand,
+  goToActivity,
+  kitTime,
+  openActivity,
+  REVIEW_SIZES,
+} from '../support/activity.ts';
+import { advanceClock } from '../support/clock.ts';
+import { restartApp, type LaunchedApp } from '../support/launchApp.ts';
 import { readSystemClipboard, withSystemClipboard, writeSystemClipboard } from '../support/systemClipboard.ts';
 import {
   clickCenter,
@@ -19,6 +30,8 @@ import {
 } from '../support/toyDesktop.ts';
 
 const SEED = 7_301;
+/** The wall time the kit clock is pinned at, where a test steps it. */
+const PINNED_AT = Date.UTC(2026, 10, 14, 9, 0, 0);
 
 let launched: LaunchedApp | undefined;
 
@@ -66,6 +79,44 @@ forEachBand(activity.bands, (band) => {
 
 test.describe('band-3-5', () => {
   const band = 'band-3-5';
+
+  test('keeps playing before the session limit, and once it is reached saves the desktop and closes calmly', async () => {
+    const LIMIT_MINUTES = 15;
+    launched = await openActivity({
+      activity: activity.id,
+      band,
+      seed: SEED,
+      pinClockAt: PINNED_AT,
+      sessionMinutes: LIMIT_MINUTES,
+    });
+    const { page } = launched;
+    const closing = page.getByRole('heading', { level: 1, name: closingStrings.heading.text });
+    // A minute short of the limit, opening the music box leaves the child playing.
+    await advanceClock(page, (LIMIT_MINUTES - 1) * 60_000);
+    await clickCenter(page, desktopIcon(page, 'app:music-box'));
+    const box = windowOf(page, 'music-box');
+    await expect(box).toBeVisible();
+    await kitTime(page).advance(SAVE_PAUSE_MS + BETWEEN_ROUNDS_MS);
+    await expect(closing).toBeHidden();
+
+    // Past the limit, the next note lands, is saved, and then the closing screen comes.
+    await advanceClock(page, 60_000);
+    const cell = box.locator('[data-step="0"][data-note="2"]');
+    await clickCenter(page, cell);
+    await expect(cell).toHaveAttribute('aria-pressed', 'true');
+    await kitTime(page).advance(SAVE_PAUSE_MS);
+    await expect(closing).toBeHidden();
+    await kitTime(page).advance(BETWEEN_ROUNDS_MS);
+    await expect(closing).toBeVisible();
+
+    // The next day the music box is open again with the note.
+    launched = await restartApp(launched, { band, seed: SEED, activity: activity.id });
+    await goToActivity(launched.page, activity.id);
+    await expect(windowOf(launched.page, 'music-box').locator('[data-step="0"][data-note="2"]')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
 
   test('opens the music box filling the screen, plays with a note, and closes it', async () => {
     launched = await openActivity({ activity: activity.id, band, seed: SEED });

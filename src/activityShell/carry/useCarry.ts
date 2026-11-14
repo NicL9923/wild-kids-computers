@@ -153,11 +153,17 @@ function snap(value: number, min: number, max: number, step: number): number {
   return Math.min(max, Math.max(min, snapped));
 }
 
+/**
+ * The kit parts `useCarry` needs. `holdCheckpoint` is optional so a test can pass a bare scope; in
+ * free play it keeps the session length from closing the activity while something is carried.
+ */
+type CarryKit = Pick<ActivityKit<unknown>, 'scope' | 'play'> & Partial<Pick<ActivityKit<unknown>, 'holdCheckpoint'>>;
+
 export function useCarry<I extends string, T extends string = never>(
-  kit: Pick<ActivityKit<unknown>, 'scope' | 'play'>,
+  kit: CarryKit,
   mode: CarryMode<I, T>,
 ): Carry<I, T> {
-  const { scope, play } = kit;
+  const { scope, play, holdCheckpoint } = kit;
   const [active, setActive] = useState<Active<I> | null>(null);
   const [over, setOver] = useState<T | null>(null);
   const targets = useRef(new Map<T, HTMLElement>());
@@ -280,6 +286,9 @@ export function useCarry<I extends string, T extends string = never>(
     // Losing the window, such as to another program, puts back whatever is carried, however.
     return scope.listen(window, 'blur', () => finish(false));
   }, [engaged, finish, scope]);
+
+  // Free play waits for a calm moment to close at the end of the session; a carry is not one.
+  useEffect(() => (engaged ? holdCheckpoint?.() : undefined), [engaged, holdCheckpoint]);
 
   // An item that leaves the screen while carried is let go of, so a later click places nothing.
   useLayoutEffect(() => {

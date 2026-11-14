@@ -37,6 +37,9 @@ function appForSaving(app: AppState): AppState {
   }
 }
 
+/** How long the desktop waits after the last change before it saves, so typing is one save. */
+export const SAVE_PAUSE_MS = 600;
+
 export function forSaving(state: DesktopState): DesktopState {
   return { ...state, windows: state.windows.map((window) => ({ ...window, app: appForSaving(window.app) })) };
 }

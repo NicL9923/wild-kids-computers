@@ -22,7 +22,14 @@ function placeAt(element: Element | null, left: number, top: number, width: numb
 function fakeKit() {
   const sounds: SfxName[] = [];
   const scope: OwnedScope = createScope(createManualScheduler({ wall: 0 }));
-  return { scope, play: (name: SfxName) => sounds.push(name), sounds };
+  const session = { holds: 0 };
+  const holdCheckpoint = () => {
+    session.holds += 1;
+    return () => {
+      session.holds -= 1;
+    };
+  };
+  return { scope, play: (name: SfxName) => sounds.push(name), sounds, holdCheckpoint, session };
 }
 
 type Fruit = 'apple' | 'pear';
@@ -429,6 +436,24 @@ describe('useCarry with drop targets', () => {
     key(screen.getByText('pear'), 'Enter');
     key(screen.getByText('pear'), 'Enter');
     expect(log.drops).toEqual(['pear -> basket']);
+  });
+
+  it('holds the free-play session check while an item is carried, and lets go when it lands or goes back', () => {
+    const { kit, log, apple } = renderPicnic();
+    const holds: number[] = [];
+    // A drag that lands on the basket.
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    holds.push(kit.session.holds);
+    up({ x: 450, y: 50 });
+    holds.push(kit.session.holds);
+    // A keyboard carry that goes back.
+    key(apple, 'Enter');
+    holds.push(kit.session.holds);
+    key(apple, 'Escape');
+    holds.push(kit.session.holds);
+    expect(holds).toEqual([1, 0, 1, 0]);
+    expect(log.drops).toEqual(['apple -> basket']);
   });
 
   it('stops listening once the activity scope is disposed', () => {

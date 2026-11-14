@@ -60,7 +60,7 @@ Kind `sequence`, for authored steps such as a typing course: replace the rounds 
 
 The registry test fails when a file in `stepsDirectory` is not in `steps`, so a new step cannot be forgotten. The kit saves the furthest step and shows a picker of the steps reached.
 
-Kind `free`, for open play: `kind: 'free'` and `generateLevel: (seed, band) => startingState`. It has no rounds, no finish screen, and `kit.roundComplete` throws.
+Kind `free`, for open play: `kind: 'free'` and `generateLevel: (seed, band) => startingState`. It has no rounds, no finish screen, and `kit.roundComplete` throws. The session length has no round to wait for, so call `kit.checkpoint()` at each calm moment, such as a finished action, and hold it with `const release = kit.holdCheckpoint()` while something the child started is still going. A carry holds it on its own. The shell also checks after a while with no input, so the session still ends if a checkpoint is missed. Save state before a checkpoint; leaving unmounts the activity.
 
 `defineActivity` throws at import on a missing goal, a silent title, an empty `spoken`, a band without a difficulty range, a range outside 1 to 10, or state defaults its schema rejects. `npm test` imports every definition, so these fail before a child sees them.
 
