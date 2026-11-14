@@ -70,10 +70,35 @@ describe('what young readers mix up', () => {
     ['p', 'q', 'lower', true],
     ['b', 'd', 'upper', false],
     ['e', 'f', 'upper', true],
+    ['u', 'v', 'upper', true],
+    ['d', 'o', 'upper', true],
+    ['i', 't', 'upper', true],
     ['e', 'f', 'lower', false],
     ['b', 'b', 'lower', false],
   ] as const)('%s and %s look alike in %s case: %s', (a, b, letterCase, expected) => {
     expect(lookAlike(a, b, letterCase)).toBe(expected);
+  });
+
+  // The groups are the design: each one is a set of sounds a young ear mixes up.
+  it.each(['bp', 'dt', 'fv', 'mn', 'sz', 'gkc', 'ei', 'ou'])(
+    'counts every two letters in %s as close sounds',
+    (group) => {
+      for (const a of lettersOf(group)) {
+        for (const b of lettersOf(group)) expect(similarSound(a, b), `${a} ${b}`).toBe(a !== b);
+      }
+    },
+  );
+
+  // The groups are the design: each one is a set of shapes a beginning reader mixes up.
+  it.each([
+    ['lower', ['bdpq', 'mn', 'nuhr', 'ilj', 'vwy', 'coe', 'ft']],
+    ['upper', ['ef', 'oqcg', 'mnw', 'prb', 'ilt', 'uv', 'do']],
+  ] as const)('pairs every two letters in each %s-case group', (letterCase, groups) => {
+    for (const group of groups) {
+      for (const a of lettersOf(group)) {
+        for (const b of lettersOf(group)) expect(lookAlike(a, b, letterCase), `${a} ${b}`).toBe(a !== b);
+      }
+    }
   });
 
   it('defaults to lowercase shapes', () => {

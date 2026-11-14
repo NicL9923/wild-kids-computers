@@ -79,13 +79,13 @@ export function ActivityRun({ definition, band }: { definition: ActivityDefiniti
   );
 }
 
-/** What every runner shares: the instruction, feedback marks, and the host the kit talks to. */
 /** What replay says, and what the instruction line shows. */
 interface Instruction {
   readonly spoken: readonly SpokenHandle[];
   readonly shown: readonly StringHandle[];
 }
 
+/** What every runner shares: the instruction, feedback marks, and the host the kit talks to. */
 interface Player {
   readonly instruction: Instruction;
   readonly marks: readonly FeedbackMark[];

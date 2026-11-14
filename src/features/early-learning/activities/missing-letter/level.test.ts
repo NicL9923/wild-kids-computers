@@ -68,6 +68,20 @@ describe('generateLevel', () => {
     expect([...seen].toSorted((a, b) => a - b)).toEqual(gaps);
   });
 
+  it('never offers q or x as a wrong letter, though x can be the answer, as in fox', () => {
+    const answers = new Set<string>();
+    for (let difficulty = 1; difficulty <= MAX_DIFFICULTY; difficulty += 1) {
+      for (const seed of SEEDS) {
+        const level = generateLevel(seed, difficulty, 'band-6-8');
+        answers.add(level.answer);
+        const wrong = level.choices.filter((letter) => letter !== level.answer);
+        expect(wrong).not.toContain('q');
+        expect(wrong).not.toContain('x');
+      }
+    }
+    expect(answers).toContain('x');
+  });
+
   it('offers only vowels for the middle vowel', () => {
     for (const seed of SEEDS) {
       for (const letter of generateLevel(seed, 3, 'band-6-8').choices) expect(VOWELS).toContain(letter);

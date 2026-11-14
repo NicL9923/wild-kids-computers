@@ -67,16 +67,25 @@ describe('generateLevel', () => {
     expect(Math.max(...SEEDS.map((seed) => generateLevel(seed, difficulty, band).tiles.length))).toBe(most);
   });
 
-  it('from difficulty 6 makes all but one spare tile look or sound like a letter of the word when it can', () => {
-    for (const seed of SEEDS) {
-      const level = generateLevel(seed, 6, 'band-6-8');
-      const spareTiles = level.tiles.filter((tile) => !level.letters.includes(tile.letter));
-      const near = spareTiles.filter((tile) =>
-        level.letters.some((own) => lookAlike(own, tile.letter) || similarSound(own, tile.letter)),
-      );
-      expect(near.length, `seed ${String(seed)}`).toBe(Math.min(1, spareLetters(level.letters, true).near.length));
-    }
-  });
+  it.each([
+    [6, 1],
+    [7, 1],
+    [8, 2],
+  ])(
+    'at difficulty %i makes %i spare tiles look or sound like a letter of the word when it can',
+    (difficulty, wanted) => {
+      for (const seed of SEEDS) {
+        const level = generateLevel(seed, difficulty, 'band-6-8');
+        const spareTiles = level.tiles.filter((tile) => !level.letters.includes(tile.letter));
+        const near = spareTiles.filter((tile) =>
+          level.letters.some((own) => lookAlike(own, tile.letter) || similarSound(own, tile.letter)),
+        );
+        expect(near.length, `seed ${String(seed)}`).toBe(
+          Math.min(wanted, spareLetters(level.letters, true).near.length),
+        );
+      }
+    },
+  );
 
   it('keeps spare tiles unlike the word before difficulty 6', () => {
     for (const seed of SEEDS) {

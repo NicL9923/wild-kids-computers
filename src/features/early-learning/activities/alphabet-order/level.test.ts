@@ -68,6 +68,14 @@ describe('next-letter rounds', () => {
     }
   });
 
+  it(`offers wrong letters exactly ${String(FAR)} away early, so the easy rounds stay close enough to teach`, () => {
+    const distances = SEEDS.flatMap((seed) => {
+      const level = next(seed, 1);
+      return level.choices.map((letter) => Math.abs(position(letter) - position(level.answer)));
+    });
+    expect(distances).toContain(FAR);
+  });
+
   it('puts the answer in every position', () => {
     const positions = new Set(SEEDS.map((seed) => next(seed, 2).choices.indexOf(next(seed, 2).answer)));
     expect([...positions].toSorted((a, b) => a - b)).toEqual([0, 1, 2]);
@@ -97,6 +105,20 @@ describe('ordering rounds', () => {
       expect(level.shuffled).not.toEqual(level.letters);
     }
     expect(Math.max(...steps)).toBe(gap);
+  });
+
+  it('starts each ordering round in a different order', () => {
+    const firsts = new Set(SEEDS.map((seed) => order(seed, 4).shuffled.indexOf(order(seed, 4).letters[0] ?? 'a')));
+    expect([...firsts].toSorted((a, b) => a - b)).toEqual([0, 1, 2]);
+    const orders = new Set(
+      SEEDS.map((seed) =>
+        order(seed, 4)
+          .shuffled.map((letter) => order(seed, 4).letters.indexOf(letter))
+          .join(''),
+      ),
+    );
+    // Every order of three but the sorted one.
+    expect([...orders].toSorted()).toEqual(['021', '102', '120', '201', '210']);
   });
 
   it('reaches both ends of the alphabet', () => {

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import { sameSound, similarSound, VOWELS } from '../../reading/alphabet.ts';
 import { firstLetter, generateLevel, MAX_DIFFICULTY, type FirstSoundLevel } from './level.ts';
 
@@ -39,13 +38,17 @@ describe('generateLevel', () => {
     }
   });
 
-  it.each<[Band, number, boolean]>([
-    ['band-3-5', 1, false],
-    ['band-3-5', 5, true],
-    ['band-6-8', 3, true],
-    ['band-6-8', 7, true],
-  ])('in %s at difficulty %i asks for vowel-start words: %s', (band, difficulty, vowels) => {
-    const answers = SEEDS.map((seed) => generateLevel(seed, difficulty, band).answer);
+  // Short vowels are hard to hear alone, so vowel-start words wait for difficulty 3.
+  it.each([
+    [1, false],
+    [2, false],
+    [3, true],
+    [4, true],
+    [5, true],
+    [6, true],
+    [7, true],
+  ])('at difficulty %i asks for vowel-start words: %s', (difficulty, vowels) => {
+    const answers = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-6-8').answer);
     expect(answers.some((letter) => VOWELS.includes(letter))).toBe(vowels);
   });
 
