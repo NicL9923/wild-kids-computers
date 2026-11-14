@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { Random } from '../../../../core/activityKit/random.ts';
-import { SHAPE_KINDS, type ShapeKind } from '../../shapes/shapes.ts';
-import { FORMS, generateLevel, holeOrder, lookAlike, MAX_DIFFICULTY, type ShapeSorterLevel } from './level.ts';
+import { expectNoPositionTell } from '../../../../core/activityKit/testing/positionTell.ts';
+import { SHAPE_KINDS } from '../../shapes/shapes.ts';
+import { FORMS, generateLevel, lookAlike, MAX_DIFFICULTY, type ShapeSorterLevel } from './level.ts';
 
 const SEEDS = Array.from({ length: 300 }, (_, index) => index * 6_151 + 5);
 
-/** What makes a round fair: one hole per shape, every shape different, no hole under its own shape. */
+/** What makes a round fair: one hole per shape, every shape different. */
 function problems(level: ShapeSorterLevel): string[] {
   const found: string[] = [];
   const shapes = level.pieces.map((piece) => piece.shape);
   if (new Set(shapes).size !== shapes.length) found.push('a shape repeats');
   if ([...level.holes].toSorted().join() !== [...shapes].toSorted().join())
     found.push('the holes do not match the shapes');
-  if (level.holes.some((hole, index) => hole === shapes[index])) found.push('a hole sits under its own shape');
   if (level.pieces.some((piece, index) => piece.id !== `piece-${String(index)}`))
     found.push('piece ids are not in order');
   if (level.pieces.some((piece) => !BRIGHT.includes(piece.paint))) found.push('a piece has no bright paint');
@@ -55,14 +54,12 @@ describe('generateLevel', () => {
     }
   });
 
-  it('lays the holes out in many orders, not always one turn along', () => {
-    const orders = new Set(
-      SEEDS.map((seed) => {
-        const level = generateLevel(seed, 2, 'band-3-5');
-        return level.holes.map((hole) => level.pieces.findIndex((piece) => piece.shape === hole)).join('');
-      }),
-    );
-    expect(orders).toEqual(new Set(['120', '201']));
+  it.each([1, MAX_DIFFICULTY])('gives no hole away by position at difficulty %i', (difficulty) => {
+    const seeds = Array.from({ length: 600 }, (_, index) => index * 6_151 + 5);
+    expectNoPositionTell(seeds, (seed) => {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      return { positions: level.pieces.map((piece) => level.holes.indexOf(piece.shape)) };
+    });
   });
 
   it('uses every bright paint across rounds', () => {
@@ -114,24 +111,5 @@ describe('FORMS', () => {
     for (const shape of SHAPE_KINDS) {
       expect(Math.min(FORMS[shape].width, FORMS[shape].height)).toBeGreaterThanOrEqual(75);
     }
-  });
-});
-
-describe('holeOrder', () => {
-  /** A generator whose shuffle never moves anything. */
-  const still: Random = {
-    next: () => 0,
-    int: (min) => min,
-    pick: (items) => {
-      for (const item of items) return item;
-      throw new RangeError('empty');
-    },
-    shuffle: (items) => [...items],
-    sample: (items, count) => items.slice(0, count),
-  };
-
-  it('moves every hole by one place when shuffling keeps failing', () => {
-    const shapes: ShapeKind[] = ['circle', 'square', 'triangle'];
-    expect(holeOrder(still, shapes)).toEqual(['square', 'triangle', 'circle']);
   });
 });

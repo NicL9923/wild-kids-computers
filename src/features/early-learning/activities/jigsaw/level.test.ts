@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { expectNoPositionTell } from '../../../../core/activityKit/testing/positionTell.ts';
 import activity from './activity.ts';
 import { generateLevel, MAX_DIFFICULTY, PICTURE, type JigsawLevel } from './level.ts';
 
 const SEEDS = Array.from({ length: 200 }, (_, index) => index * 5_303 + 23);
 
 /**
- * What makes a jigsaw fair: every piece in the tray once, not in home order, and every piece shows
+ * What makes a jigsaw fair: every piece in the tray once, and every piece shows
  * at least one whole picture of its own, so the child can tell where it goes.
  */
 function problems(level: JigsawLevel): string[] {
@@ -14,7 +15,6 @@ function problems(level: JigsawLevel): string[] {
   if ([...level.tray].toSorted((a, b) => a - b).join() !== Array.from({ length: count }, (_, index) => index).join()) {
     found.push('the tray is not every piece once');
   }
-  if (level.tray.every((piece, index) => piece === index)) found.push('the tray is in home order');
   if (level.gallery !== null && (level.gallery < 0 || level.gallery >= 1))
     found.push('the gallery pick is not a fraction');
   const width = PICTURE.width / level.columns;
@@ -80,9 +80,10 @@ describe('generateLevel', () => {
     expect(Math.max(...offered)).toBeGreaterThan(0.8);
   });
 
-  it('never hands over two pieces in home order, even when the shuffle does', () => {
-    // Two pieces shuffle into home order half the time; every tray still starts mixed.
-    for (const seed of SEEDS) expect(generateLevel(seed, 1, 'band-3-5').tray).toEqual([1, 0]);
+  it.each([1, 2])('gives no place away by tray order at difficulty %i', (difficulty) => {
+    const seeds = Array.from({ length: 600 }, (_, index) => index * 5_303 + 23);
+    // The tray lists home places, so the i-th piece in the tray belongs at place tray[i].
+    expectNoPositionTell(seeds, (seed) => ({ positions: generateLevel(seed, difficulty, 'band-3-5').tray }));
   });
 
   it.each([0, MAX_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {

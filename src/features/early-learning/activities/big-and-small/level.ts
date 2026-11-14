@@ -91,18 +91,26 @@ export function sizesFor(count: number, ratio: number): number[] {
   return Array.from({ length: count }, (_, index) => Math.round(biggest / ratio ** index));
 }
 
-const isSorted = (values: readonly number[]) =>
-  values.every((value, index) => index === 0 || value >= (values[index - 1] ?? 0));
+/** True when clicking the pictures left to right would follow the size order the round asks for. */
+const inClickOrder = (sizes: readonly number[], direction: Direction) =>
+  sizes.every((size, index) => {
+    const before = sizes[index - 1];
+    return before === undefined || (direction === 'small' ? size > before : size < before);
+  });
 
-/** An order that is not already sorted either way, so an order round never starts solved. */
-export function unsortedOrder(random: Random, sizes: readonly number[]): number[] {
+/**
+ * An order where clicking left to right is not the answer, so an order round never asks for a
+ * plain walk along the row. Only that one order is ruled out: ruling out the reverse too would
+ * leave three pictures with the middle size never in the middle, a rule a child could learn.
+ */
+export function unsortedOrder(random: Random, sizes: readonly number[], direction: Direction): number[] {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const order = random.shuffle(sizes);
-    if (!isSorted(order) && !isSorted(order.toReversed())) return order;
+    if (!inClickOrder(order, direction)) return order;
   }
-  // Biggest, smallest, then the rest from big to small is sorted neither way for three or more.
-  const [biggest = 0, ...rest] = sizes.toSorted((a, b) => b - a);
-  return [biggest, ...rest.toReversed().slice(0, 1), ...rest.slice(0, -1)];
+  // Turning the click order by one place moves every picture, so it is never the click order.
+  const clickOrder = sizes.toSorted((a, b) => (direction === 'small' ? a - b : b - a));
+  return [...clickOrder.slice(1), ...clickOrder.slice(0, 1)];
 }
 
 /** Pure: the same seed and difficulty give the same round in every band. */
@@ -112,7 +120,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Bi
   const direction = random.pick(tier.directions);
   const kind = random.pick(KINDS);
   const sizes = sizesFor(tier.count, tier.ratio);
-  const order = tier.mode === 'order' ? unsortedOrder(random, sizes) : random.shuffle(sizes);
+  const order = tier.mode === 'order' ? unsortedOrder(random, sizes, direction) : random.shuffle(sizes);
   const items = order.map((size, index): Item => ({ id: `item-${index}`, size }));
   const bySize = items.toSorted((a, b) => (direction === 'big' ? b.size - a.size : a.size - b.size));
   const [first, ...rest] = bySize.map((item) => item.id);

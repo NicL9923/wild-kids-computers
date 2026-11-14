@@ -77,6 +77,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Letters that say the same sound never share a round.** c and k share the shared clip "kuh", and q starts with it, so a sound or a spelling round never offers two of them.
 - **Sight words, missing letter, and sentence builder start at band-6-8.** Each needs the child to read written words, which hard rule 5 keeps away from the youngest. First sound and build the word with its letter guide cover the same ground for them.
 - **Rhyme sets are true rhymes in General American English, checked by ear.** Pairs that share only a vowel, such as goat and nose, meet only at higher difficulty, and near rhymes are left out.
+- **Matching rounds lay items out in any order at all.** Shape sorter, animal homes, and the jigsaw tray once ruled out the order that lines each item up with its target, which left two items always crossed, so a child could succeed by position. A shared test, `expectNoPositionTell`, checks that every item lands on every place across seeds. Big and small order rounds rule out only the row that clicking left to right would solve; ruling out its reverse too left the middle size never in the middle.
 - **The jigsaw uses a painting only when no two of its pieces look alike.** It takes a piece only in its own place, so look-alike pieces would turn a right answer into a mistake. Accepting interchangeable pieces would need the board to track which piece sits where; falling back to the bundled scene keeps the round fair with no new rules.
 
 ### Assets
