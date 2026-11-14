@@ -46,6 +46,7 @@ history.replaceDocument(blankPaper, coloringPageMask); // "open a coloring page"
 | `sampleMap.ts`                | The precomputed sample map for whole-picture effects that move pixels                           |
 | `warp.ts`                     | `warpDab`, which moves the pixels under one dab for distort effects                             |
 | `recolor.ts`                  | `recolorStroke`, which maps each pixel's color once per stroke for color effects, and `luma`    |
+| `scatter.ts`                  | `Scatter`, which blends pieces over each other for paint-on effects that scatter things         |
 | `thumbnail.ts`                | Area-averaging downscale                                                                        |
 | `tools/`, `tips/`, `effects/` | One module per item, found by the registry in `src/registry/paint.ts`                           |
 | `testing/golden.ts`           | Golden image helpers. Test-only and excluded from the app build.                                |
@@ -105,8 +106,11 @@ Pick the group:
 | `paint-on`      | A stroke effect that adds things, like a brush. Scatter with a seeded random.                     | `effects/confetti` |
 | `whole-picture` | `apply(source, target)`, pure, fixed cost per pixel, so it can run in a worker.                   | `effects/mirror`   |
 
-1. Copy the reference directory to `effects/<effectId>/` and change the id, order, and the work. For a whole-picture effect that moves pixels, `sampleMapEffect(id, order, mapper)` builds and caches the map. One that changes colors loops over the pixels once.
-2. Keep the test file next to it and point its `expectGolden('effect-<effectId>', ...)` at the new effect. Paint something with `paintBands(doc)`, `paintChecks(doc)`, `paintSpectrum(doc)`, or strokes first, so the effect's change is obvious. Test that the same seed gives the same pixels and another seed does not, for scattering effects. `src/registry/paintStrokeEffects.test.ts` checks every distort and color effect at size zero, on a transparent picture, off the canvas edges, and on cancel.
+1. Copy the reference directory to `effects/<effectId>/` and change the id, order, and the work.
+   - A distort effect moves the pixels under each dab with `warpDab`. A color effect maps each pixel once per stroke with `recolorStroke`.
+   - A paint-on effect whose pieces sit on top of each other, like bubbles with a shine or leaves with a vein, draws them with `Scatter` from `scatter.ts`, which blends each piece over the last and touches what it writes. One that reveals a pattern fixed to the paper, like `effects/honeycomb`, paints through a `DabCanvas` so overlapping dabs do not stack.
+   - A whole-picture effect that moves pixels is a sample map. `sampleMapEffect(id, order, mapper)` builds and caches the map from a function called once per pixel. `builtMapEffect(id, order, build)` takes a function that builds the whole map, which a tight loop does several times faster: use it when the first run would come near the 60 ms budget. One that changes colors loops over the pixels once, and a filter uses a separable kernel.
+2. Keep the test file next to it and point its `expectGolden('effect-<effectId>', ...)` at the new effect. Paint something with `paintBands(doc)`, `paintChecks(doc)`, `paintSpectrum(doc)`, or strokes first, so the effect's change is obvious. Test that the same seed gives the same pixels and another seed does not, for scattering effects. The registry tests in `src/registry/` check every stroke effect at size zero, on a transparent picture, off the canvas edges, and on cancel, and every whole-picture effect for a source it must not modify.
 3. Run `npm run paint:goldens`, look at the PNG, and commit.
 
 ## Goldens
@@ -123,4 +127,4 @@ Pick the group:
 
 ## Measuring
 
-`npm run perf` times a full-canvas fill, a frame of fast strokes with large soft brushes, each whole-picture effect, a frame of fast 120 px strokes with each distort and color effect, and a full-canvas undo, on the 1600 by 1000 canvas. It prints numbers and gates nothing. Keep a distort or color effect under 4 ms per frame on a developer machine, since a child's laptop is several times slower.
+`npm run perf` times a full-canvas fill, a frame of fast strokes with large soft brushes, a frame of fast 120 px strokes with each distort, color, and paint-on effect, each whole-picture effect, and a full-canvas undo, on the 1600 by 1000 canvas. It prints numbers and gates nothing. A stroke effect should stay under 4 ms a frame on a developer machine. A whole-picture effect should finish its first run, map included, in under 60 ms, because a child's laptop is several times slower.
