@@ -161,7 +161,7 @@ forEachBand(activity.bands, (band) => {
     const window = await scroller(page).boundingBox();
     if (window === null) throw new Error('The tree is missing');
     const geometry = await scroller(page).evaluate((element) => ({
-      bar: element.offsetWidth - element.clientWidth,
+      bar: element instanceof HTMLElement ? element.offsetWidth - element.clientWidth : 0,
       top: element.scrollTop,
     }));
     // A real scroll bar takes room beside the tree.

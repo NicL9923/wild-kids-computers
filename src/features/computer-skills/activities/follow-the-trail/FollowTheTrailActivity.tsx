@@ -63,7 +63,7 @@ export default function FollowTheTrailActivity({ level, kit }: ActivityProps<Tra
     if (Math.floor(next.progress / STEP_SOUND_EVERY) > Math.floor(walk.progress / STEP_SOUND_EVERY)) kit.play('tap');
     if (walk.with && !next.with) {
       leaves.current += 1;
-      if (leaves.current % LEAVES_PER_HINT === 0) kit.hint(strings.comeBack);
+      if (leaves.current % LEAVES_PER_HINT === 0) kit.hint(strings.findTheBug);
     }
     setWalk(next);
     if (!arrived(level, next.progress)) return;

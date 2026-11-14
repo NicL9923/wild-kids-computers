@@ -18,6 +18,6 @@ export default defineActivity<TrailLevel>({
   },
   roundsPerSession: 4,
   generateLevel,
-  spoken: [strings.instruction, strings.comeBack],
+  spoken: [strings.instruction, strings.findTheBug],
   load: () => import('./FollowTheTrailActivity.tsx'),
 });

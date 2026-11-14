@@ -16,7 +16,7 @@ export const SKY = { width: 1000, height: 600 } as const;
 export const EDGE_MARGIN = 20;
 
 /** The sky is split into this grid, and each firefly loops inside its own cell. */
-export const CELLS = { columns: 3, rows: 2 } as const;
+const CELLS = { columns: 3, rows: 2 } as const;
 
 /** The wait after the last catch, so the child sees it glow before the round ends. */
 export const LAST_CATCH_PAUSE_MS = 900;

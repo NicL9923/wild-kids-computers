@@ -23,7 +23,7 @@ export const AWAKE_PAUSE_MS = 1400;
 /** The flowers a bud can open into. */
 export const FLOWERS = ['flower', 'tulip', 'sunflower', 'rose', 'cherry-blossom'] as const satisfies readonly EmojiId[];
 
-export interface Bud {
+interface Bud {
   readonly id: string;
   /** The center, in meadow units. */
   readonly x: number;
@@ -52,7 +52,7 @@ export interface Step {
  * moves over more of the meadow. At the easiest, two rows and a wide reach mean one sweep across
  * the middle is enough.
  */
-export const STEPS: readonly Step[] = [
+const STEPS: readonly Step[] = [
   { columns: 4, rows: 2, reach: 180 },
   { columns: 5, rows: 2, reach: 165 },
   { columns: 5, rows: 3, reach: 150 },

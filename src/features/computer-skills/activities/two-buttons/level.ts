@@ -36,7 +36,7 @@ export const THINGS = [
   'guitar',
 ] as const satisfies readonly EmojiId[];
 
-export interface Thing {
+interface Thing {
   readonly id: string;
   readonly picture: (typeof THINGS)[number];
   readonly button: MouseButton;

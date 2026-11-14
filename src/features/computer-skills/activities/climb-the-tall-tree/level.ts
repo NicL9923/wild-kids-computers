@@ -48,7 +48,7 @@ export const ANIMALS = [
   'dove',
 ] as const satisfies readonly EmojiId[];
 
-export type Animal = (typeof ANIMALS)[number];
+type Animal = (typeof ANIMALS)[number];
 
 export interface Perch {
   readonly id: string;

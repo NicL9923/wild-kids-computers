@@ -39,9 +39,9 @@ export const FOODS = [
   'cupcake',
 ] as const satisfies readonly EmojiId[];
 
-export type Food = (typeof FOODS)[number];
+type Food = (typeof FOODS)[number];
 
-export interface Piece {
+interface Piece {
   readonly id: string;
   readonly food: Food;
   /** Where it waits on the grass: its center, in scene units. */
@@ -87,7 +87,7 @@ export const STEPS: readonly Step[] = [
 export const MAX_PICNIC_DIFFICULTY = STEPS.length;
 
 /** The basket's size and center. */
-export const BASKET = { x: 750, y: 330, size: 300 } as const;
+const BASKET = { x: 750, y: 330, size: 300 } as const;
 
 /** A place on the blanket is this much bigger than the food, so there is room to land it. */
 const SPOT_ROOM = 24;
