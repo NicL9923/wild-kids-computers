@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { withDeadline } from '../../../../core/activityKit/deadline.ts';
+import { systemScheduler } from '../../../../core/activityKit/scheduler.ts';
 import { Emoji } from '../../../../components/ui/Emoji.tsx';
 import { t } from '../../../../core/strings/defineStrings.ts';
 import { getNode } from '../../model/fileSystem.ts';
@@ -10,21 +12,48 @@ import { ControlGlyph } from '../glyphs.tsx';
 import { pictureSource } from '../labels.ts';
 import { strings } from '../strings.ts';
 
-/** A painting from the gallery: loading, shown from an image URL, or gone. */
-type GalleryPicture = { status: 'loading' } | { status: 'shown'; url: string } | { status: 'gone' };
+/**
+ * How long reading a painting may take before the viewer gives up on it, in milliseconds. One PNG
+ * read takes well under a second on a slow laptop, and the child looks at an empty frame meanwhile.
+ */
+export const GALLERY_READ_DEADLINE_MS = 5_000;
 
-/** Reads a painting from the child's gallery while a picture viewer shows it. */
+/** Real time: a test that pins the kit clock cannot stop the deadline. */
+const realTime = systemScheduler();
+
+/** A painting from the gallery: loading, shown from an image URL, gone, or not read in time. */
+type GalleryPicture =
+  | { status: 'loading' }
+  | { status: 'shown'; url: string }
+  | { status: 'gone' }
+  | { status: 'timed-out' };
+
+/**
+ * Reads a painting from the child's gallery while a picture viewer shows it. A read that does not
+ * answer within GALLERY_READ_DEADLINE_MS is given up, and its late answer is dropped.
+ */
 function useGalleryPicture(pictures: DesktopKit['pictures'], pictureId: string | null): GalleryPicture {
-  const [loaded, setLoaded] = useState<{ pictureId: string; url: string | null } | null>(null);
+  const [loaded, setLoaded] = useState<{ pictureId: string; picture: GalleryPicture } | null>(null);
   useEffect(() => {
     if (pictureId === null) return undefined;
     let cancelled = false;
     let made: string | null = null;
     const read = async () => {
-      const result = await pictures.read(pictureId, 'picture');
-      if (cancelled) return;
-      made = result.ok ? URL.createObjectURL(new Blob([result.value.slice()], { type: 'image/png' })) : null;
-      setLoaded({ pictureId, url: made });
+      let picture: GalleryPicture;
+      try {
+        const result = await withDeadline(
+          pictures.read(pictureId, 'picture'),
+          GALLERY_READ_DEADLINE_MS,
+          realTime,
+          'Reading the painting',
+        );
+        if (cancelled) return;
+        made = result.ok ? URL.createObjectURL(new Blob([result.value.slice()], { type: 'image/png' })) : null;
+        picture = made === null ? { status: 'gone' } : { status: 'shown', url: made };
+      } catch {
+        picture = { status: 'timed-out' };
+      }
+      if (!cancelled) setLoaded({ pictureId, picture });
     };
     void read();
     return () => {
@@ -33,7 +62,7 @@ function useGalleryPicture(pictures: DesktopKit['pictures'], pictureId: string |
     };
   }, [pictures, pictureId]);
   if (loaded === null || loaded.pictureId !== pictureId) return { status: 'loading' };
-  return loaded.url === null ? { status: 'gone' } : { status: 'shown', url: loaded.url };
+  return loaded.picture;
 }
 
 /** Shows one picture big, with previous and next to step through the pictures in its folder. */
@@ -45,7 +74,9 @@ export function PictureViewerApp({ windowId, app }: { readonly windowId: string;
   const gallery = useGalleryPicture(kit.pictures, source?.kind === 'gallery' ? source.pictureId : null);
   const can = (command: 'previous' | 'next') => isCommandEnabled(state, windowId, command, toyClipboard);
 
-  if (file === undefined || source === null) {
+  // A painting that did not come in time leaves the viewer as it is with nothing open, so the
+  // child can open a picture again.
+  if (file === undefined || source === null || gallery.status === 'timed-out') {
     return (
       <div className='td-viewer td-viewer-empty'>
         <Emoji id='picture' decorative className='td-viewer-empty-picture' />

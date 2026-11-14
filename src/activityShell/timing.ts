@@ -15,3 +15,10 @@ export const FEEDBACK_MARK_MS = 900;
  * sooner.
  */
 export const IDLE_CHECK_MS = 20_000;
+
+/**
+ * How long an activity's component may take to load before the shell offers to try again. The
+ * component is a chunk of the app's own bundle, read from the local disk in milliseconds, so this
+ * passes only when something is wrong. Counted in real time, not on the kit clock a test pins.
+ */
+export const ACTIVITY_LOAD_DEADLINE_MS = 10_000;

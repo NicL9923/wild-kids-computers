@@ -12,6 +12,7 @@ export const strings = defineStrings('activity-shell', {
   pickAStep: { text: 'Pick one to play.' },
   nothingHereYet: { text: 'Nothing here yet. Go back to the meadow.' },
   loading: { text: 'Getting ready.', silent: 'decorative' },
+  notOpened: { text: 'This game did not open. Try again, or go back.' },
   // Area names, spoken when an area screen opens.
   'computer-skills': { text: 'Computer skills' },
   'toy-desktop': { text: 'Toy desktop' },

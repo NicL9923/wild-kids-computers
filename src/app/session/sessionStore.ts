@@ -1,10 +1,14 @@
 import type { AudioEngine, VolumeSettings } from '../../audio/audioEngine.ts';
+import { withDeadline } from '../../core/activityKit/deadline.ts';
+import { systemScheduler, type Scheduler } from '../../core/activityKit/scheduler.ts';
 import { DEFAULT_BAND, type Band } from '../../core/bands.ts';
 import {
   BridgeError,
   isBridgeError,
   type BridgeErrorCode,
+  type DocumentStore,
   type PictureFile,
+  type PictureStore,
   type PictureSummary,
   type PlatformBridge,
   type SavePictureInput,
@@ -37,11 +41,19 @@ import { isSessionLimitReached, type SessionClock } from './sessionLength.ts';
  * Every write to one document runs after the earlier ones, and a burst of updates coalesces into
  * the fewest writes that still end with the newest value. A read that started before an update
  * never replaces the updated value. A failed write becomes `saveProblem`, never a rejection.
+ *
+ * Every bridge call has a deadline, so one call that never answers cannot hold its queue, and with
+ * it every later read or write of the same document or pictures, or the start of the app.
  */
 
 export type SessionStatus =
   /** The app or profiles document, or the active profile's settings or progress, is loading. */
   | 'loading'
+  /**
+   * The app or profiles document could not be read, so the app cannot know which children it has.
+   * Nothing is replaced with defaults and nothing is written until `retryStart()` reads them.
+   */
+  | 'unavailable'
   /** First launch is not done, or no profile exists. */
   | 'needs-first-launch'
   /** Profiles exist and none is active. */
@@ -133,6 +145,8 @@ export interface SessionStoreOptions {
   /** Gets the active profile's volume and mute, and saves changes made through it. */
   audio?: SessionAudio;
   clock?: SessionClock;
+  /** The timers of the bridge call deadline. Real time by default; a test steps a manual scheduler. */
+  timers?: Pick<Scheduler, 'setTimeout'>;
 }
 
 export interface SessionStore {
@@ -140,6 +154,11 @@ export interface SessionStore {
   readonly getSnapshot: () => SessionSnapshot;
   /** Loads the app and profiles documents and the last active profile. Call once. */
   readonly start: () => Promise<void>;
+  /**
+   * With status `unavailable`, reads the app and profiles documents that could not be read, and
+   * goes on as `start` does once both are open. A retry already running is reused.
+   */
+  readonly retryStart: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
   readonly flush: () => Promise<void>;
   /** Whether a read or write is queued or running, so quitting now could drop a write. */
@@ -195,6 +214,63 @@ export interface SessionStore {
   readonly grantPlayTime: (ms: number) => void;
 }
 
+/**
+ * How long one bridge call of the session may take, in milliseconds. A document is a small JSON
+ * file and a picture a few megabytes, which a slow laptop's disk reads or writes in well under a
+ * second. The paint studio's picture calls use the same bound.
+ */
+export const SESSION_CALL_DEADLINE_MS = 10_000;
+
+/** The part of the bridge the session uses. */
+interface SessionBridge {
+  readonly info: PlatformBridge['info'];
+  readonly documents: DocumentStore;
+  readonly pictures: PictureStore;
+  readonly window: Pick<PlatformBridge['window'], 'setKioskLock'>;
+}
+
+/**
+ * The bridge with a deadline on every call the session makes. A call that does not answer in time
+ * rejects with an `io` BridgeError, the same failure a broken disk gives, so the session handles it
+ * the way it already handles that. A late answer is dropped. The store keeps only this object, and
+ * the types list every method of a store, so a new call cannot skip the deadline.
+ */
+function boundedBridge(bridge: PlatformBridge, timers: Pick<Scheduler, 'setTimeout'>, ms: number): SessionBridge {
+  function bound<A extends unknown[], T>(what: string, call: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+    return (...args) => {
+      let work: Promise<T>;
+      try {
+        work = call(...args);
+      } catch (error) {
+        work = Promise.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      return withDeadline(work, ms, timers, `The bridge call ${what}`).catch((error: unknown) => {
+        throw toBridgeError(error);
+      });
+    };
+  }
+  const { documents, pictures, window } = bridge;
+  return {
+    info: bound('info', () => bridge.info()),
+    documents: {
+      read: bound('documents.read', (name) => documents.read(name)),
+      write: bound('documents.write', (name, text) => documents.write(name, text)),
+      setAside: bound('documents.setAside', (name) => documents.setAside(name)),
+      removeProfile: bound('documents.removeProfile', (profileId) => documents.removeProfile(profileId)),
+    },
+    pictures: {
+      save: bound('pictures.save', (profileId, input) => pictures.save(profileId, input)),
+      list: bound('pictures.list', (profileId, place) => pictures.list(profileId, place)),
+      read: bound('pictures.read', (profileId, id, file) => pictures.read(profileId, id, file)),
+      copy: bound('pictures.copy', (profileId, id) => pictures.copy(profileId, id)),
+      trash: bound('pictures.trash', (profileId, id) => pictures.trash(profileId, id)),
+      restore: bound('pictures.restore', (profileId, id) => pictures.restore(profileId, id)),
+      purge: bound('pictures.purge', (profileId, id) => pictures.purge(profileId, id)),
+    },
+    window: { setKioskLock: bound('window.setKioskLock', (on) => window.setKioskLock(on)) },
+  };
+}
+
 const systemClock: SessionClock = {
   now: () => Date.now(),
   monotonic: () => performance.now(),
@@ -210,6 +286,11 @@ class Cell<T> {
   value: T;
   loaded = false;
   writeQueued = false;
+  /**
+   * Set for a document the app cannot start without, when its read failed. The cell then stays
+   * unloaded with its value untouched, so nothing writes defaults over the saved file.
+   */
+  unreadable = false;
   /** Updates made before the load finished, oldest first. They apply in one queued task. */
   readonly early: EarlyUpdate<T>[] = [];
   readonly ready: Promise<void>;
@@ -217,10 +298,13 @@ class Cell<T> {
 
   readonly name: DocumentName;
   readonly spec: DocumentSpec<T>;
+  /** The app cannot go on without the saved value: defaults would hide or overwrite it. */
+  readonly required: boolean;
 
-  constructor(name: DocumentName, spec: DocumentSpec<T>) {
+  constructor(name: DocumentName, spec: DocumentSpec<T>, required = false) {
     this.name = name;
     this.spec = spec;
+    this.required = required;
     this.value = spec.defaults();
     this.ready = new Promise((resolve) => {
       this.markReady = resolve;
@@ -272,12 +356,15 @@ const DEFAULT_SETTINGS = settingsDocument.defaults();
 const EMPTY_PROGRESS = progressDocument.defaults();
 
 export function createSessionStore(options: SessionStoreOptions): SessionStore {
-  const { bridge, audio } = options;
+  const { audio } = options;
+  const bridge = boundedBridge(options.bridge, options.timers ?? systemScheduler(), SESSION_CALL_DEADLINE_MS);
   const clock = options.clock ?? systemClock;
   const queues = createSerialQueues();
   const listeners = new Set<() => void>();
-  const app = new Cell(documentNames.app, appDocument);
-  const profiles = new Cell(documentNames.profiles, profilesDocument);
+  // Defaults in place of either would hide the children's profiles, and the next write would
+  // replace them, so the app waits for both.
+  const app = new Cell(documentNames.app, appDocument, true);
+  const profiles = new Cell(documentNames.profiles, profilesDocument, true);
   /** Profiles whose files are being removed. Their pictures take no more changes. */
   const removed = new Set<string>();
   let active: ActiveProfile | null = null;
@@ -317,6 +404,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function statusOf(): SessionStatus {
+    if (app.unreadable || profiles.unreadable) return 'unavailable';
     if (!app.loaded || !profiles.loaded) return 'loading';
     if (!app.value.firstLaunchDone || profiles.value.profiles.length === 0) return 'needs-first-launch';
     if (active === null) return 'needs-profile';
@@ -360,13 +448,24 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     void readInto(cell);
   }
 
-  async function readInto<T>(cell: Cell<T>): Promise<void> {
+  /**
+   * `queued` false reads at once instead of behind the document's queue. Only a retry of a
+   * required document does that: while it is unloaded, the only tasks on its queue are updates
+   * waiting for this very read, so a queued read would wait for them forever.
+   */
+  async function readInto<T>(cell: Cell<T>, queued = true): Promise<void> {
+    const read = () => loadDocument(bridge.documents, cell.name, cell.spec);
     let result: LoadResult<T>;
     try {
-      result = await queues.run(cell.name, () => loadDocument(bridge.documents, cell.name, cell.spec));
+      result = await (queued ? queues.run(cell.name, read) : read());
     } catch (error) {
       // loadDocument never throws on bad data. This covers a bridge that broke its contract.
       result = { value: cell.spec.defaults(), status: 'unreadable', problem: toBridgeError(error).message };
+    }
+    cell.unreadable = cell.required && result.status === 'unreadable';
+    if (cell.unreadable) {
+      emit();
+      return;
     }
     if (result.status === 'reset' || result.status === 'unreadable') {
       loadProblems = [...loadProblems, { document: cell.name, status: result.status, problem: result.problem ?? '' }];
@@ -567,8 +666,29 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
   // ---- the store --------------------------------------------------------------------------
 
+  /**
+   * Reads the required documents that are not open yet, and once both are, makes the last active
+   * profile active and turns kiosk lock back on. With either unreadable it returns, and the status
+   * says `unavailable`. `before` is work that must finish before a profile becomes active, such
+   * as reading the test info that fixes the seed of the first round.
+   */
+  async function open(queued: boolean, before?: Promise<void>): Promise<void> {
+    await Promise.all([
+      app.loaded ? undefined : readInto(app, queued),
+      profiles.loaded ? undefined : readInto(profiles, queued),
+      before,
+    ]);
+    if (!app.loaded || !profiles.loaded) return;
+    const last = app.value.lastActiveProfileId;
+    if (last !== null && profiles.value.profiles.some((p) => p.id === last)) activate(last);
+    if (app.value.kioskLock) void setKioskLock(true);
+    emit();
+    await Promise.all([active?.settings.ready, active?.progress.ready]);
+  }
+
   audio?.onVolumeChange(onEngineVolume);
   let started = false;
+  let retrying: Promise<void> | null = null;
 
   return {
     subscribe(listener) {
@@ -580,18 +700,23 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     async start() {
       if (started) throw new Error('The session already started.');
       started = true;
-      const info = bridge.info().then(
-        (result) => result.test ?? null,
-        () => null,
-      );
-      load(app);
-      load(profiles);
-      [testInfo] = await Promise.all([info, app.ready, profiles.ready]);
-      const last = app.value.lastActiveProfileId;
-      if (last !== null && profiles.value.profiles.some((p) => p.id === last)) activate(last);
-      if (app.value.kioskLock) void setKioskLock(true);
-      emit();
-      await Promise.all([active?.settings.ready, active?.progress.ready]);
+      const info = (async () => {
+        try {
+          testInfo = (await bridge.info()).test ?? null;
+        } catch {
+          // Not a test run, or a bridge that could not say: the app runs as usual.
+        }
+      })();
+      await open(true, info);
+    },
+
+    retryStart() {
+      if (!started) throw new Error('The session has not started.');
+      if (statusOf() !== 'unavailable') return Promise.resolve();
+      retrying ??= open(false).finally(() => {
+        retrying = null;
+      });
+      return retrying;
     },
 
     flush: () => queues.settled(),

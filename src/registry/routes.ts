@@ -7,7 +7,7 @@ import type { AnyRoute } from '@tanstack/react-router';
  * without editing a shared file.
  *
  * The files load eagerly because the router needs the whole tree at start. Keep screens out of
- * the main bundle with `lazyRouteComponent(() => import('./Screen.tsx'))`.
+ * the main bundle with `lazyScreen(() => import('./Screen.tsx'))`.
  */
 const modules = import.meta.glob<Record<string, unknown>>(
   ['/src/**/routes.ts', '/src/**/routes.tsx', '!/src/registry/**'],

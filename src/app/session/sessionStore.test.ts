@@ -17,7 +17,8 @@ import {
   type Settings,
 } from '../../core/storage/schemas.ts';
 import { createRandom } from '../../core/activityKit/random.ts';
-import { createSessionStore, type SessionStore } from './sessionStore.ts';
+import { createManualScheduler } from '../../core/activityKit/scheduler.ts';
+import { createSessionStore, SESSION_CALL_DEADLINE_MS, type SessionStore } from './sessionStore.ts';
 import { createFakeBridge, type FakeBridge, type FakeBridgeOptions } from './testing/fakeBridge.ts';
 
 const FOX: Profile = { id: 'fox-kid', avatarId: 'fox', colorId: 'sky', band: 'band-6-8' };
@@ -152,17 +153,6 @@ describe('session start', () => {
     expect(fake.setAside).toEqual(['profiles']);
     expect(snapshot.loadProblems).toEqual([
       { document: 'profiles', status: 'reset', problem: expect.stringMatching(/^invalid-json/) },
-    ]);
-  });
-
-  it('records a document the platform could not read and still starts', async () => {
-    const fake = createFakeBridge();
-    fake.failNext('read', 'app', new BridgeError('io', 'disk unplugged'));
-    const store = createSessionStore({ bridge: fake.bridge });
-    await store.start();
-    expect(store.getSnapshot().status).toBe('needs-first-launch');
-    expect(store.getSnapshot().loadProblems).toEqual([
-      { document: 'app', status: 'unreadable', problem: 'disk unplugged' },
     ]);
   });
 
@@ -737,5 +727,179 @@ describe('session length', () => {
     clock.mono += 6 * 60_000;
     store.updateSettings({ sessionLengthMinutes: 5 });
     expect(store.isSessionLimitReached()).toBe(true);
+  });
+});
+
+/** A bridge method whose calls never answer until the test answers them. */
+function hangCalls<T>(): {
+  readonly call: (...args: unknown[]) => Promise<T>;
+  readonly answerAll: (value: T) => void;
+  readonly failAll: (error: Error) => void;
+  readonly count: () => number;
+} {
+  const pending: Array<{ resolve: (value: T) => void; reject: (error: Error) => void }> = [];
+  return {
+    call: () => new Promise<T>((resolve, reject) => pending.push({ resolve, reject })),
+    answerAll: (value) => {
+      for (const entry of pending.splice(0)) entry.resolve(value);
+    },
+    failAll: (error) => {
+      for (const entry of pending.splice(0)) entry.reject(error);
+    },
+    count: () => pending.length,
+  };
+}
+
+const never = (): Promise<never> => new Promise<never>(() => undefined);
+
+/** A store on a manual deadline clock, not yet started. */
+function storeWithDeadlines(options: FakeBridgeOptions = {}) {
+  const fake = createFakeBridge(options);
+  const timers = createManualScheduler({ wall: 0 });
+  const store = createSessionStore({ bridge: fake.bridge, clock: createClock().sessionClock, timers });
+  return { fake, timers, store };
+}
+
+/** Whether the promise has settled after every pending promise ran. */
+async function hasSettled(promise: Promise<unknown>): Promise<boolean> {
+  let done = false;
+  void promise.then(
+    () => (done = true),
+    () => (done = true),
+  );
+  await settle();
+  return done;
+}
+
+describe('bridge calls that never answer', () => {
+  it('ends a document read at the deadline as unreadable for that attempt, without setting the file aside', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+    const settingsName = documentNames.settings(FOX.id);
+    const read = fake.bridge.documents.read.bind(fake.bridge.documents);
+    const hung = hangCalls<string | null>();
+    fake.bridge.documents.read = (name) => (name === settingsName ? hung.call(name) : read(name));
+    const started = store.start();
+    await settle();
+    expect(hung.count()).toBe(1);
+    timers.advance(SESSION_CALL_DEADLINE_MS - 1);
+    expect(await hasSettled(started)).toBe(false);
+    timers.advance(1);
+    await started;
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', settings: { muted: false } });
+    expect(store.getSnapshot().loadProblems).toEqual([
+      { document: settingsName, status: 'unreadable', problem: expect.stringMatching(/did not finish within/) },
+    ]);
+    expect(fake.calls).not.toContain(`documents.setAside ${settingsName}`);
+
+    // The late answer is dropped: it never replaces what the child changed since.
+    store.updateSettings({ voiceVolume: 0.5 });
+    hung.answerAll(json({ ...settingsDocument.defaults(), muted: true, voiceVolume: 0.2 }));
+    await store.flush();
+    expect(store.getSnapshot().settings).toMatchObject({ muted: false, voiceVolume: 0.5 });
+  });
+
+  it('turns a write that never answers into a save problem, lets the next write through, and ignores the late answer', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+    await store.start();
+    const name = documentNames.settings(FOX.id);
+    const write = fake.bridge.documents.write.bind(fake.bridge.documents);
+    const hung = hangCalls<void>();
+    fake.bridge.documents.write = hung.call;
+    store.updateSettings({ muted: true });
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await settle();
+    expect(store.getSnapshot().saveProblem).toMatchObject({
+      target: name,
+      operation: 'write',
+      code: 'io',
+      message: expect.stringMatching(/did not finish within/),
+    });
+
+    fake.bridge.documents.write = write;
+    store.updateSettings({ voiceVolume: 0.5 });
+    await store.flush();
+    expect(store.getSnapshot().saveProblem).toBeNull();
+    hung.failAll(new BridgeError('io', 'disk full'));
+    await settle();
+    expect(store.getSnapshot().saveProblem).toBeNull();
+  });
+
+  it.each([
+    [
+      'a picture save',
+      (store: SessionStore) => store.pictures().save({ png: new Uint8Array(), thumbnail: new Uint8Array() }),
+    ],
+    ['a picture list', (store: SessionStore) => store.pictures().list('gallery')],
+    ['a profile removal', (store: SessionStore) => store.deleteProfile(FOX.id)],
+    ['a kiosk lock change', (store: SessionStore) => store.setKioskLock(true)],
+  ] as const)('ends %s that never answers as an io failure, so the queue moves on', async (_name, act) => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+    await store.start();
+    fake.bridge.pictures.save = never;
+    fake.bridge.pictures.list = never;
+    fake.bridge.documents.removeProfile = never;
+    fake.bridge.window.setKioskLock = never;
+    const result = act(store);
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS - 1);
+    expect(await hasSettled(result)).toBe(false);
+    timers.advance(1);
+    expect(await result).toMatchObject({
+      ok: false,
+      error: { code: 'io', message: expect.stringMatching(/did not finish within/) },
+    });
+    // Nothing is left holding a queue, so quitting can flush.
+    expect(await hasSettled(store.flush())).toBe(true);
+  });
+});
+
+describe('saved things that cannot be opened at start', () => {
+  it('shows that the saved things could not be opened when the profiles read never answers, and opens them on retry', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], null) });
+    const read = fake.bridge.documents.read.bind(fake.bridge.documents);
+    const hung = hangCalls<string | null>();
+    fake.bridge.documents.read = (name) => (name === 'profiles' ? hung.call(name) : read(name));
+    const started = store.start();
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await started;
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', profiles: [] });
+
+    // The late answer of the first read is dropped; only a retry opens the saved things.
+    hung.answerAll(json({ version: 1, profiles: [FOX] }));
+    await settle();
+    expect(store.getSnapshot().status).toBe('unavailable');
+
+    fake.bridge.documents.read = read;
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profiles: [FOX, OWL] });
+    // Nothing was written while the saved things were unknown, so no profile was overwritten.
+    expect(fake.calls.filter((call) => call.startsWith('documents.write'))).toEqual([]);
+    // Only the document that failed is read again.
+    expect(fake.calls.filter((call) => call === 'documents.read app')).toHaveLength(1);
+  });
+
+  it.each(['app', 'profiles'] as const)(
+    'never falls through to first launch when the %s document is unreadable',
+    async (name) => {
+      const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+      fake.failNext('read', name, new BridgeError('io', 'disk unplugged'));
+      await store.start();
+      expect(store.getSnapshot().status).toBe('unavailable');
+      expect(store.getSnapshot().activeProfile).toBeNull();
+      await store.retryStart();
+      expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+    },
+  );
+
+  it('applies an update made while the saved things were unavailable to the opened value', async () => {
+    const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+    fake.failNext('read', 'app', new BridgeError('io', 'disk unplugged'));
+    await store.start();
+    store.updateApp({ kioskLock: false });
+    await store.retryStart();
+    await store.flush();
+    expect(saved(fake, 'app', appDocument)).toMatchObject({ firstLaunchDone: true, lastActiveProfileId: FOX.id });
   });
 });

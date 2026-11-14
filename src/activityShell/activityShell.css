@@ -140,6 +140,25 @@
     right: var(--wk-space-screen-edge);
   }
 
+  /* ---- TryAgainScreen: something did not open ---- */
+
+  .wk-try-again-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-section);
+    height: 100%;
+  }
+
+  .wk-try-again-heading {
+    max-width: 32ch;
+    margin: 0;
+    font-size: var(--wk-text-title);
+    text-align: center;
+    text-wrap: balance;
+  }
+
   /* ---- useCarry: a picked-up item lifts, and places it may go show a dashed edge ---- */
 
   [data-carry-item] {

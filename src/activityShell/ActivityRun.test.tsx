@@ -29,8 +29,9 @@ import { defineStrings } from '../core/strings/defineStrings.ts';
 import { ActivityRun } from './ActivityRun.tsx';
 import type { ActivityProps } from './kit.ts';
 import { kitScheduler } from './kitTime.ts';
+import { strings as appShellStrings } from '../app/shell/strings.ts';
 import { strings as shellStrings } from './strings.ts';
-import { BETWEEN_ROUNDS_MS, IDLE_CHECK_MS } from './timing.ts';
+import { ACTIVITY_LOAD_DEADLINE_MS, BETWEEN_ROUNDS_MS, IDLE_CHECK_MS } from './timing.ts';
 
 const strings = defineStrings('run-fixture', {
   title: { text: 'Fixture' },
@@ -119,22 +120,26 @@ function KitWatcher({ kit }: ActivityProps<string>) {
   );
 }
 
-const rounds = defineActivity<string>({
-  id: 'run-rounds',
-  area: 'early-learning',
-  order: 1,
-  bands: ['band-3-5'],
-  goal: strings.goal,
-  title: strings.title,
-  icon: { emoji: 'flower' },
-  inputs: ['click'],
-  spoken: [strings.say],
-  load,
-  kind: 'rounds',
-  difficulty: { 'band-3-5': { min: 2, max: 5 } },
-  roundsPerSession: 2,
-  generateLevel: (seed, difficulty) => `seed ${String(seed)} at ${String(difficulty)}`,
-});
+/** Everything of the rounds fixture but its id and load. */
+function roundsFields(id: string) {
+  return {
+    id,
+    area: 'early-learning',
+    order: 1,
+    bands: ['band-3-5'],
+    goal: strings.goal,
+    title: strings.title,
+    icon: { emoji: 'flower' },
+    inputs: ['click'],
+    spoken: [strings.say],
+    kind: 'rounds',
+    difficulty: { 'band-3-5': { min: 2, max: 5 } },
+    roundsPerSession: 2,
+    generateLevel: (seed: number, difficulty: number) => `seed ${String(seed)} at ${String(difficulty)}`,
+  } as const;
+}
+
+const rounds = defineActivity<string>({ ...roundsFields('run-rounds'), load });
 
 const sequence = defineActivity<string>({
   id: 'run-steps',
@@ -647,5 +652,92 @@ describe('an activity with saved state', () => {
     fireEvent.click(button);
     await screen.findByRole('button', { name: 'taps 1' });
     expect(h.store.getSnapshot().activityStates[withState.id]?.state).toEqual({ taps: 1 });
+  });
+});
+
+/** A rounds activity whose first load is decided by the test, and whose later loads work. */
+function slowToLoad(id: string) {
+  const first: { answer: (module: { default: typeof Fixture }) => void; fail: (error: Error) => void } = {
+    answer: () => undefined,
+    fail: () => undefined,
+  };
+  let calls = 0;
+  const definition = defineActivity<string>({
+    ...roundsFields(id),
+    load: () => {
+      calls += 1;
+      if (calls > 1) return Promise.resolve({ default: Fixture });
+      return new Promise<{ default: typeof Fixture }>((resolve, reject) => {
+        first.answer = resolve;
+        first.fail = reject;
+      });
+    },
+  });
+  return { definition, first, calls: () => calls };
+}
+
+function Broken(): never {
+  throw new Error('a bug in the activity');
+}
+
+describe('an activity whose component does not load', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows a calm screen with the way out and one try again after the deadline, ignores the late load, and plays on try again', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+    const slow = slowToLoad('run-slow');
+    const h = await run(slow.definition);
+    // Real time also moves these timers a little, so the check before the deadline keeps a margin.
+    await act(async () => {
+      vi.advanceTimersByTime(ACTIVITY_LOAD_DEADLINE_MS / 2);
+    });
+    expect(screen.queryByRole('heading', { name: shellStrings.notOpened.text })).toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(ACTIVITY_LOAD_DEADLINE_MS / 2);
+    });
+    await screen.findByRole('heading', { name: shellStrings.notOpened.text });
+    expect(h.spoken()).toContain(shellStrings.notOpened.id);
+    expect(screen.getByRole('button', { name: shellStrings.exitToArea.text })).toBeDefined();
+    expect(screen.getByRole('button', { name: shellStrings.soundOff.text })).toBeDefined();
+
+    // The load that answers after the deadline does not put a game under the screen.
+    await act(async () => {
+      slow.first.answer({ default: Fixture });
+    });
+    expect(screen.queryByTestId('level')).toBeNull();
+
+    click(appShellStrings.tryAgain.text);
+    expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 0))} at 3`);
+    expect(slow.calls()).toBe(2);
+  });
+
+  it('shows the same screen when loading fails, and the way out still goes to the area', async () => {
+    const slow = slowToLoad('run-broken');
+    const h = await run(slow.definition);
+    await act(async () => {
+      slow.first.fail(new Error('chunk missing'));
+    });
+    await screen.findByRole('heading', { name: shellStrings.notOpened.text });
+    click(shellStrings.exitToArea.text);
+    await screen.findByText('landed');
+    expect(h.path()).toBe('/area/early-learning');
+  });
+
+  it('leaves an error that is not a load failure to the router, instead of offering to load again', async () => {
+    const shown: unknown[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => void shown.push(...args));
+    const definition = defineActivity<string>({
+      ...roundsFields('run-buggy'),
+      load: () => Promise.resolve({ default: Broken }),
+    });
+    await run(definition).catch(() => undefined);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    spy.mockRestore();
+    expect(screen.queryByRole('heading', { name: shellStrings.notOpened.text })).toBeNull();
+    expect(shown.some((entry) => String(entry).includes('a bug in the activity'))).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import { startView } from './startView.ts';
 describe('start view', () => {
   it.each([
     ['loading', 3, 'loading'],
+    ['unavailable', 0, 'unavailable'],
     ['needs-first-launch', 0, 'first-launch'],
     ['needs-first-launch', 2, 'first-launch'],
     ['needs-profile', 2, 'choose-profile'],
