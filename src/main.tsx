@@ -26,7 +26,8 @@ bridge.window.onMenuCommand((command) => runMenuCommand(command, document));
 void installTestHook(bridge, window.location);
 
 // The audio test log is chosen when the engine is made, so the engine waits for the bridge info.
-const underTest = await isTestRun(bridge, window.location).catch(() => false);
+// Bounded: a bridge that never answers counts as no test run, so the app still starts.
+const underTest = await isTestRun(bridge, window.location);
 const audio = createAppAudio({ underTest });
 if (underTest) {
   exposeAudioTestLog(audio);
