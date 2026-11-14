@@ -1,0 +1,87 @@
+/*
+ * The picture on the left and the tray on the right share one board, so a piece in the tray is
+ * the same size as its outline. The board keeps its shape and fills the stage.
+ */
+
+.sb-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: var(--wk-space-container);
+  container-type: size;
+}
+
+.sb-board {
+  position: relative;
+  width: min(100cqw, calc((100cqh - var(--wk-space-container)) * 1500 / 640));
+  aspect-ratio: 1500 / 640;
+}
+
+.sb-picture,
+.sb-tray {
+  position: absolute;
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+}
+
+.sb-picture {
+  background: var(--wk-color-surface);
+}
+
+.sb-tray {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--wk-color-surface-sunken);
+}
+
+.sb-part,
+.sb-outline,
+.sb-tile-spot {
+  position: absolute;
+}
+
+.sb-detail {
+  pointer-events: none;
+}
+
+.sb-outline svg,
+.sb-tile svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sb-outline {
+  border-radius: var(--wk-radius-small);
+}
+
+.sb-tile {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wk-radius-small);
+  background: transparent;
+}
+
+.sb-tile:hover svg {
+  scale: calc(1 + 0.04 * var(--wk-motion-scale));
+}
+
+/* After two misses, the piece and its outline stand out with a thick edge and a slow, small grow. */
+.sb-tile[data-hint='true'],
+.sb-outline[data-hint='true'] {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+  outline-offset: var(--wk-focus-offset);
+  animation: sb-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes sb-hint {
+  to {
+    scale: calc(1 + 0.05 * var(--wk-motion-scale));
+  }
+}

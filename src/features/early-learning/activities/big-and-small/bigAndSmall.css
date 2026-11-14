@@ -1,0 +1,100 @@
+/*
+ * Pictures stand on a ground line, so sizes compare from the same base. Every size is a share of
+ * the row's width, so the whole row scales with the window and keeps its proportions.
+ */
+
+.bs-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  padding-bottom: var(--wk-space-container);
+  container-type: size;
+}
+
+/* The row is as wide as the stage allows while the biggest picture still fits its height. */
+.bs-row {
+  --bs-width: min(100cqw, calc(100cqh * 4 / 1.2));
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: calc(var(--bs-width) * 40 / 1200);
+  width: var(--bs-width);
+  margin: 0;
+  padding: 0 0 var(--wk-space-item);
+  border-bottom: calc(var(--wk-border-width) * 3) solid var(--wk-color-border);
+  list-style: none;
+  container-type: inline-size;
+}
+
+.bs-stage[data-mode='order'] .bs-row {
+  --bs-width: min(100cqw, calc(100cqh * 2 / 1.2));
+}
+
+.bs-spot {
+  display: block;
+  flex: none;
+}
+
+.bs-item {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 4%;
+  border: var(--wk-border-width) solid transparent;
+  border-radius: var(--wk-radius-card);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bs-item:hover:not(:disabled) {
+  border-color: var(--wk-color-primary-base);
+  background: var(--wk-color-selected);
+}
+
+.bs-item img,
+.bs-lined img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bs-lined {
+  padding: 4%;
+  box-sizing: border-box;
+}
+
+/* A picture already tried steps back: dashed edge and faded, so it is not color alone. */
+.bs-item[data-tried='true'] {
+  border-style: dashed;
+  border-color: var(--wk-color-border);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bs-item[data-answer='true'] {
+  border-width: calc(var(--wk-border-width) * 2);
+  border-color: var(--wk-color-success);
+  background: var(--wk-color-surface);
+}
+
+.bs-item:disabled:not([data-tried='true'], [data-answer='true']) {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* After two tries the answer stands out with a thick edge and a slow, small grow. */
+.bs-item[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  animation: bs-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes bs-hint {
+  to {
+    scale: calc(1 + 0.05 * var(--wk-motion-scale));
+  }
+}
