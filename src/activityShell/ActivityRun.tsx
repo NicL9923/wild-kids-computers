@@ -22,7 +22,6 @@ import { roundSeed } from '../core/activityKit/random.ts';
 import type { Scope } from '../core/activityKit/scope.ts';
 import { t, type SpokenHandle } from '../core/strings/defineStrings.ts';
 import { Screen } from '../components/ui/Screen.tsx';
-import { allActivityModules } from '../registry/activities.ts';
 import { FeedbackLayer, defaultFeedbackText, type FeedbackMark } from './FeedbackLayer.tsx';
 import { FinishScreen } from './FinishScreen.tsx';
 import {
@@ -57,13 +56,16 @@ function asComponent(value: unknown): LoadedComponent {
   return value;
 }
 
-/** One lazy component per activity, made once at start, so rendering never makes a component. */
-const components: ReadonlyMap<string, LoadedComponent> = new Map(
-  allActivityModules.map(({ definition }) => [
-    definition.id,
-    lazy(() => definition.load().then((module) => ({ default: asComponent(module.default) }))),
-  ]),
-);
+/** One lazy component per definition, made on first use and kept, so a render never remakes it. */
+const components = new WeakMap<ActivityDefinition, LoadedComponent>();
+
+function componentOf(definition: ActivityDefinition): LoadedComponent {
+  const known = components.get(definition);
+  if (known !== undefined) return known;
+  const made = lazy(() => definition.load().then((module) => ({ default: asComponent(module.default) })));
+  components.set(definition, made);
+  return made;
+}
 
 /** A fresh session seed when no test pinned one. Activities never see Math.random. */
 function freshSeed(): number {
@@ -243,24 +245,22 @@ function Round({
     startInstruction();
   }, [scope, host, startInstruction]);
 
-  return <RoundComponent id={definition.id} level={level} band={band} kit={kit} />;
+  return <RoundComponent definition={definition} level={level} band={band} kit={kit} />;
 }
 
-/** Renders the activity's lazy component, which was made once at start. */
+/** Renders the activity's lazy component. */
 function RoundComponent({
-  id,
+  definition,
   level,
   band,
   kit,
 }: {
-  id: string;
+  definition: ActivityDefinition;
   level: unknown;
   band: Band;
   kit: ActivityKit<unknown>;
 }) {
-  const component = components.get(id);
-  if (component === undefined) throw new Error(`Activity ${id} is not in the registry.`);
-  return createElement(component, { level, band, kit });
+  return createElement(componentOf(definition), { level, band, kit });
 }
 
 /** Runs `next` unless the session limit is reached, in which case it goes to the closing screen. */
