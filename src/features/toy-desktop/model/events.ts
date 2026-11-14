@@ -32,6 +32,8 @@ export type RejectReason =
   | 'no-text-field'
   /** The window has no dialog open. */
   | 'no-dialog'
+  /** A save or open dialog is up, so the document under it takes no edits until it closes. */
+  | 'dialog-open'
   /** Open needs a selected file first. */
   | 'nothing-selected'
   /** The item is a folder or a different kind of file than this app opens. */

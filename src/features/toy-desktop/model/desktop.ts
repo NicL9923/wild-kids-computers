@@ -461,6 +461,11 @@ function isDocumentApp(app: AppState): app is DocumentApp {
   return 'dialog' in app;
 }
 
+/** True while a save or open dialog is up in this window. */
+export function hasDialog(app: AppState): boolean {
+  return isDocumentApp(app) && app.dialog !== null;
+}
+
 function documentContent(app: SavableApp): FileContent {
   return app.kind === 'notepad' ? { kind: 'note', text: app.editor.text } : { kind: 'tune', tune: app.tune };
 }
@@ -1033,12 +1038,16 @@ function windowAction(state: DesktopState, action: WindowAction, env: DesktopEnv
       };
     }
     case 'text':
+      // While a dialog is up, only its name field takes typing, never the note under it.
+      if (hasDialog(window.app) && action.field !== 'file-name') return 'dialog-open';
       return editField(state, window, action.field, action.op, env);
     case 'dialog':
       return dialogAction(state, window, action.action);
     case 'explorer':
       return explorerAction(state, window, action.action);
     case 'music-box':
+      // The beat goes on under a dialog, but the grid under it takes no clicks.
+      if (hasDialog(window.app) && action.action.type === 'toggle') return 'dialog-open';
       return musicAction(state, window, action.action);
     case 'calculator':
       return calculatorKey(state, window, action.key);

@@ -1,7 +1,7 @@
 import { useId, useRef, type CSSProperties, type RefObject } from 'react';
 import { useCarry } from '../../../activityShell/carry/useCarry.ts';
 import { t } from '../../../core/strings/defineStrings.ts';
-import { windowFrame } from '../model/desktop.ts';
+import { hasDialog, windowFrame } from '../model/desktop.ts';
 import type { WindowState } from '../model/state.ts';
 import { AppPicture } from './AppPicture.tsx';
 import { AppView } from './apps/AppView.tsx';
@@ -171,7 +171,8 @@ export function DesktopWindow({ window, layer, focused, area }: DesktopWindowPro
           })}
         </div>
       </div>
-      <div className='td-window-body'>
+      {/* A save or open dialog answers for the window, so nothing under it takes a click or a key. */}
+      <div className='td-window-body' inert={hasDialog(window.app)}>
         <AppView window={window} focused={focused} />
       </div>
       {parts.resize && !window.maximized && (

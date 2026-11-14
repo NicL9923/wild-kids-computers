@@ -48,6 +48,12 @@ const dialog = (windowId: string, action: Extract<DesktopAction, { type: 'dialog
   action,
 });
 
+const toggleIn = (windowId: string, step: number, row: number): DesktopAction => ({
+  type: 'music-box',
+  windowId,
+  action: { type: 'toggle', step, note: row },
+});
+
 const files = {
   Notes: { 'Shopping list': note('milk'), Old: { Draft: note('x') } },
   Pictures: { Fox: picture('fox') },
@@ -248,6 +254,27 @@ describe('the notepad and saving', () => {
 });
 
 describe('the open dialog', () => {
+  it.each([
+    [
+      'a note',
+      buildDesktop({ windows: [{ app: 'notepad', text: 'mine' }] }),
+      { type: 'text', windowId: 'w1', field: 'document', op: { type: 'insert', text: 'X' } },
+    ],
+    ['a music box', buildDesktop({ windows: [{ app: 'music-box' }] }), toggleIn('w1', 0, 0)],
+  ] as const satisfies readonly (readonly [string, DesktopState, DesktopAction])[])(
+    'keeps %s under the dialog as it was until the dialog closes',
+    (_label, start, edit) => {
+      const { act } = setup();
+      const opened = act(start, command('w1', 'open')).state;
+      const { state, events } = act(opened, edit);
+      expect(state).toBe(opened);
+      expect(events).toEqual([{ type: 'rejected', action: edit.type, reason: 'dialog-open' }]);
+      // The name field of a save dialog still takes typing.
+      const saving = act(start, command('w1', 'save-as'), ...typing('w1', 'Z', 'file-name'));
+      expect(saving.events.map((event) => event.type)).not.toContain('rejected');
+    },
+  );
+
   it('loads the chosen note into a blank notepad', () => {
     const { act } = setup();
     const start = buildDesktop({ files, windows: [{ app: 'notepad' }] });

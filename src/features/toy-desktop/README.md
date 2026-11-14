@@ -107,6 +107,7 @@ The types and reason codes are in `model/events.ts`.
 - **Files have no extensions.** The kind is shown by its icon and spoken.
 - **Trash.** Restore puts an item back where it came from, or home if that folder is gone or in the trash. A taken name gets the next free one, such as "Fox 2", so restore never fails.
 - **Saving.** Save on a note never saved opens save-as. Save-as onto a note with the same name asks first (`replace-asked`), and a second confirm replaces it. A note has unsaved changes when its text differs from the last save, so typing a letter and deleting it leaves none.
+- **A dialog answers for its window.** While a save or open dialog is up, the document under it takes no typing or clicks (`dialog-open`), and the keyboard moves into the dialog however it opened. The window's frame and Close still work.
 - **Closing never asks.** A window with unsaved changes closes at once, and `window-closed` says so. A screen or lesson decides what to do about it.
 - **Undo.** Typing undoes a word at a time. Undo history and playback are not saved; a loaded desktop starts with empty history and the music box stopped.
 - **Calculator.** Operations run left to right like a pocket calculator, with 10 digits. Dividing by zero shows a friendly `divide-by-zero` problem, and the next key starts over.

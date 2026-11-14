@@ -54,6 +54,28 @@ describe('keyboard focus around save and open dialogs', () => {
     expect(document.activeElement).toBe(get('[data-window] textarea'));
   });
 
+  it.each([
+    ['Open', { key: 'o' }, 'open'],
+    ['Save as', { key: 'S', shiftKey: true }, 'save-as'],
+  ] as const)('puts the keyboard in the dialog after the %s shortcut, typed in the note', (_label, keys, mode) => {
+    const { get } = show();
+    const text = get('[data-window] textarea');
+    text.focus();
+    fireEvent.keyDown(text, { ...keys, ctrlKey: true });
+    expect(get(`[data-file-dialog="${mode}"]`).contains(document.activeElement)).toBe(true);
+  });
+
+  it('leaves the note as it was while a dialog is up, even when the child clicks back into it', () => {
+    const { get } = show();
+    const text = get('[data-window] textarea');
+    text.focus();
+    fireEvent.keyDown(text, { key: 'o', ctrlKey: true });
+    text.focus();
+    fireEvent.keyDown(text, { key: 'X' });
+    expect(text).toHaveProperty('value', 'I like frogs.');
+    expect(get('[data-window] .td-window-body').hasAttribute('inert')).toBe(true);
+  });
+
   it('puts the keyboard in the open dialog after File, then Open', () => {
     const { get } = show();
     fireEvent.click(get('[data-menu="file"]'));

@@ -169,9 +169,13 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
         if (events.length > 0) setNotice((current) => (current === null ? current : null));
         // A window that came forward any way but a click inside it gets keyboard focus.
         const focused = events.findLast((event) => event.type === 'window-focused');
+        // A save or open dialog that opened takes the keyboard, from a menu or a shortcut alike.
+        const openedDialog = events.find((event) => event.type === 'dialog-opened');
         // A save or open dialog that closed hands the keyboard back to its window.
         const closedDialog = events.find((event) => event.type === 'dialog-closed');
-        if (focused !== undefined && action.type !== 'focus-window' && focused.type === 'window-focused') {
+        if (openedDialog !== undefined && openedDialog.type === 'dialog-opened') {
+          setFocusRequest((current) => ({ windowId: openedDialog.windowId, serial: (current?.serial ?? 0) + 1 }));
+        } else if (focused !== undefined && action.type !== 'focus-window' && focused.type === 'window-focused') {
           setFocusRequest((current) => ({ windowId: focused.windowId, serial: (current?.serial ?? 0) + 1 }));
         } else if (closedDialog !== undefined && closedDialog.type === 'dialog-closed') {
           setFocusRequest((current) => ({ windowId: closedDialog.windowId, serial: (current?.serial ?? 0) + 1 }));
