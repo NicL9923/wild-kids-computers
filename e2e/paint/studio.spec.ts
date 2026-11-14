@@ -6,7 +6,11 @@ import { strings as colorNames } from '../../src/core/strings/shared/colors.ts';
 import { strings as effectNames } from '../../src/features/paint-studio/effects/strings.ts';
 import { strings } from '../../src/features/paint-studio/strings.ts';
 import { expectAccessible } from '../support/accessibility.ts';
-import { launchApp, restartApp, type LaunchedApp } from '../support/launchApp.ts';
+import { FIXTURE_PROFILE, launchApp, restartApp, type LaunchedApp } from '../support/launchApp.ts';
+import { advanceClock } from '../support/clock.ts';
+import { savedProfiles } from '../shell/shellSupport.ts';
+import { strings as closingStrings } from '../../src/app/closing/strings.ts';
+import { SESSION_CHECK_MS } from '../../src/features/paint-studio/studio/timing.ts';
 import {
   canvasFingerprint,
   coloringPagePoints,
@@ -90,6 +94,36 @@ test('the pen lifts by itself when the pointer leaves the picture', async () => 
   await expect(page.locator('.wk-paint-frame')).toHaveAttribute('data-pen', 'down');
   await page.mouse.move(5, 5, { steps: 4 });
   await expect(page.locator('.wk-paint-frame')).toHaveAttribute('data-pen', 'up', { timeout: 3000 });
+});
+
+test('when the session length is used up, the studio waits for the pen to lift, then closes calmly', async () => {
+  launched = await launchApp(
+    { band: 'band-3-5' },
+    {
+      documents: savedProfiles([{ ...FIXTURE_PROFILE, band: 'band-3-5' }], FIXTURE_PROFILE.id, {
+        sessionLengthMinutes: 15,
+      }),
+    },
+  );
+  const { page } = launched;
+  await resizeWindow(launched, { width: 1920, height: 1080 });
+  await openStudio(page);
+  await mouseTo(page, 400, 300, 1);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.locator('.wk-paint-frame')).toHaveAttribute('data-pen', 'down');
+
+  await advanceClock(page, 15 * 60_000);
+  // A check passes with the pen down: the child finishes the line first.
+  await page.waitForTimeout(SESSION_CHECK_MS + 500);
+  await expect(page.locator('.wk-paint-screen')).toBeVisible();
+  await mouseTo(page, 900, 300);
+  await page.mouse.down();
+  await page.mouse.up();
+
+  await expect(page.getByRole('heading', { level: 1, name: closingStrings.heading.text })).toBeVisible();
+  // The line was saved before the studio closed.
+  expect(await galleryIds(page)).toHaveLength(1);
 });
 
 test('fill on a coloring page stays inside the region it starts in', async () => {

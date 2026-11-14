@@ -58,12 +58,11 @@ import {
   type StudioToolId,
 } from './studioOptions.ts';
 import { SurfaceImage } from './SurfaceImage.tsx';
+import { SESSION_CHECK_MS } from './timing.ts';
 import { unflattenUnderMask } from './unflatten.ts';
 
 /** How long painting must pause before the picture saves itself. */
 const AUTOSAVE_DELAY_MS = 1500;
-/** How often the studio asks whether the session length is used up. */
-const SESSION_CHECK_MS = 2000;
 /** Brush speed, in document pixels per millisecond, that makes the brush sound loudest. */
 const LOUDEST_SPEED = 3;
 
