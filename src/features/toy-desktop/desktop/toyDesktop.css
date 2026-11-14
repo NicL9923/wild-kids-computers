@@ -1111,6 +1111,15 @@ button.td-resize[data-carry-item] {
   background: var(--td-chrome);
 }
 
+/* The grip draws smaller than a target so it leaves the picture clear, but it takes a click
+   anywhere in a full target around it. */
+.td-item-grip::before {
+  position: absolute;
+  inset: calc(var(--wk-target-min) * -0.125 - var(--wk-border-width));
+  border-radius: inherit;
+  content: '';
+}
+
 .td-item-grip[data-carried='true'] {
   position: absolute;
   scale: none;

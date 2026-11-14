@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { toyClipboard } from '../../../../app/inputGuards.ts';
 import { useCarry } from '../../../../activityShell/carry/useCarry.ts';
 import { Emoji } from '../../../../components/ui/Emoji.tsx';
@@ -39,11 +40,23 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
   const items = explorerItems(state.fs, app);
   const inTrash = app.folderId === TRASH_ID || isTrashed(state.fs, app.folderId);
   const send = (action: ExplorerAction) => dispatch({ type: 'explorer', windowId, action });
+  // The click that places an item lands on the folder or place under it. It puts the item there
+  // and does nothing more, so a drop never also opens the folder.
+  const dropping = useRef(false);
   const carry = useCarry<string, string>(kit, {
     kind: 'targets',
     accepts: (item, target) => item !== target,
-    onDrop: (item, target) => send({ type: 'move', nodeId: item, toId: target }),
+    onDrop: (item, target) => {
+      dropping.current = true;
+      kit.scope.setTimeout(() => {
+        dropping.current = false;
+      }, 0);
+      send({ type: 'move', nodeId: item, toId: target });
+    },
   });
+  const unlessDropping = (run: () => void) => () => {
+    if (!dropping.current) run();
+  };
   const searching = app.search.text.trim() !== '';
   const tools = (inTrash ? TRASH_TOOLS : FOLDER_TOOLS).filter(({ command }) => !parts.hiddenCommands.includes(command));
 
@@ -93,7 +106,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
               aria-current={app.folderId === place.id && !searching ? 'page' : undefined}
               {...carry.target(place.id)}
               {...sayName(place.label)}
-              onClick={() => send({ type: 'open-node', nodeId: place.id })}
+              onClick={unlessDropping(() => send({ type: 'open-node', nodeId: place.id }))}
             >
               <Emoji id={place.emoji} decorative className='td-place-picture' />
               {t(place.label)}
@@ -124,12 +137,12 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
                     onFocus={() => {
                       if (!selected) send({ type: 'select', nodeId: node.id });
                     }}
-                    onClick={() => {
+                    onClick={unlessDropping(() => {
                       // Nothing in the trash opens, so a click there picks the item for Restore.
                       if (inTrash) send({ type: 'select', nodeId: node.id });
                       else if (node.kind === 'folder') send({ type: 'open-node', nodeId: node.id });
                       else open({ type: 'open-file', fileId: node.id });
-                    }}
+                    })}
                   >
                     <Emoji id={nodePicture(node)} decorative className='td-item-picture' />
                     <span className='td-item-name' id={`${windowId}-${node.id}-name`}>
