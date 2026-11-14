@@ -1,0 +1,205 @@
+/*
+ * The parent corner, for adults. It renders in the oldest band's denser tokens. Every value is a
+ * token from src/styles/tokens.css.
+ */
+
+@layer components {
+  .wk-parent {
+    box-sizing: border-box;
+    min-height: 100dvh;
+    padding: var(--wk-space-screen-edge);
+    background: var(--wk-color-page);
+  }
+
+  .wk-parent-head,
+  .wk-parent-main {
+    width: min(100%, 960px);
+    margin-inline: auto;
+  }
+
+  .wk-parent-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--wk-space-container);
+    margin-bottom: var(--wk-space-container);
+  }
+
+  .wk-parent-title {
+    margin: 0;
+    font-size: var(--wk-text-display);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-parent-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-section);
+  }
+
+  .wk-parent-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-container);
+    padding: var(--wk-space-container);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-surface);
+    box-shadow: var(--wk-shadow-raised);
+  }
+
+  .wk-parent-section h2 {
+    margin: 0;
+    font-size: var(--wk-text-title);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-parent-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-item);
+    padding-top: var(--wk-space-container);
+    border-top: var(--wk-border-width) solid var(--wk-color-divider);
+  }
+
+  /* A group heading outranks the field labels under it, which are bold at body size. */
+  .wk-parent-group h3 {
+    margin: 0;
+    font-size: calc(var(--wk-text-body) * 1.15);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-parent-about,
+  .wk-parent-empty {
+    margin: 0;
+    color: var(--wk-color-text-muted);
+  }
+
+  .wk-parent-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--wk-space-item);
+  }
+
+  .wk-parent-alerts:empty {
+    display: none;
+  }
+
+  .wk-parent-problem,
+  .wk-parent-problem-text {
+    display: flex;
+    align-items: center;
+    gap: var(--wk-space-item);
+    margin: 0;
+    color: var(--wk-color-danger);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-parent-problem-text:empty {
+    display: none;
+  }
+
+  .wk-parent-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wk-space-item);
+    min-width: 0;
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-parent-badge-name {
+    overflow-wrap: anywhere;
+  }
+
+  .wk-parent-profiles {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .wk-parent-profile {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--wk-space-container);
+    padding: var(--wk-space-item) 0;
+    border-bottom: var(--wk-border-width) solid var(--wk-color-divider);
+  }
+
+  .wk-parent-profile-band {
+    color: var(--wk-color-text-muted);
+  }
+
+  .wk-parent-profile-actions {
+    display: flex;
+    gap: var(--wk-space-item);
+  }
+
+  .wk-parent-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-container);
+  }
+
+  .wk-parent-preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-item);
+    margin: 0;
+  }
+
+  /* Shows the child's band, text size, and spacing, which this element sets for itself. */
+  .wk-parent-preview-text {
+    margin: 0;
+    padding: var(--wk-space-container);
+    border: var(--wk-border-width) dashed var(--wk-color-border);
+    border-radius: var(--wk-radius-control);
+    background: var(--wk-color-page);
+    font-size: var(--wk-text-body);
+    letter-spacing: var(--wk-letter-spacing);
+    word-spacing: var(--wk-word-spacing);
+  }
+
+  .wk-parent-skills {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-item);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .wk-parent-skill {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-unit);
+  }
+
+  .wk-parent-skill-goal {
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-parent-skill-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wk-space-container);
+    margin: 0;
+    color: var(--wk-color-text-muted);
+    font-size: var(--wk-text-small);
+  }
+
+  .wk-parent-skill-days div {
+    display: flex;
+    gap: calc(var(--wk-space-unit) * 2);
+  }
+
+  .wk-parent-skill-days dt::after {
+    content: ':';
+  }
+
+  .wk-parent-skill-days dd {
+    margin: 0;
+  }
+}

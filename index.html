@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wild Kids - Computers</title>
+    <!--
+      Fixes the order of the cascade layers before any stylesheet loads. Vite can link a CSS chunk
+      that the first screen imports ahead of the Tailwind entry. Without this line, that chunk
+      would declare "components" first, and Tailwind's base reset would then beat every component
+      style. src/styles/layerOrder.test.ts keeps it in step with Tailwind.
+    -->
+    <style>
+      @layer properties, theme, base, components, utilities;
+    </style>
   </head>
   <body>
     <div id="root"></div>

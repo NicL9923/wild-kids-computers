@@ -1,5 +1,6 @@
 import { createRootRoute, type AnyRoute } from '@tanstack/react-router';
 import RootLayout from './RootLayout.tsx';
+import { NotFound } from './shell/NotFound.tsx';
 
 /**
  * The root of the route tree. A feature's `routes.ts` or `routes.tsx` creates its routes with
@@ -7,7 +8,7 @@ import RootLayout from './RootLayout.tsx';
  * those files, and src/app/router.ts adds them to the tree. See "Discovery instead of central
  * lists" in docs/architecture.md.
  */
-export const rootRoute = createRootRoute({ component: RootLayout });
+export const rootRoute = createRootRoute({ component: RootLayout, notFoundComponent: NotFound });
 
 /** What a feature's routes file exports as `routes`: its top-level routes, each with its own children. */
 export type FeatureRoutes = readonly AnyRoute[];

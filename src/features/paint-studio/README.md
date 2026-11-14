@@ -28,7 +28,7 @@ await navigate({ to: openPaintStudioWith({ kind: 'pixels', width, height, data }
 
 Export and print are adult controls on each gallery card. They call `requestParentGate(reason)` from [parentGate.ts](parentGate.ts) and act only when it resolves true. Export saves a PNG through the bridge to a place the adult chooses; print sends the PNG to the bridge's print call.
 
-The default gate resolves true only when the profile's settings say export and print need no gate (`outputNeedsParentGate: false`). With the default settings nothing a child taps exports or prints. The app shell's `useParentGate()` replaces it: change only `useRequestParentGate` in `parentGate.ts` to call the shell's gate when `outputNeedsParentGate` is true.
+While the profile's settings say export and print need the gate (`outputNeedsParentGate`, on by default), `requestParentGate` asks the adult through the app shell's `useParentGate()`. A parent can turn that off in the parent corner; then export and print act at once.
 
 ## How it works
 

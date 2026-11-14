@@ -6,6 +6,7 @@ import { DEFAULT_BAND, type Band } from '../../src/core/bands.ts';
 import {
   documentFileSegments,
   documentNames,
+  isDocumentName,
   parseDocumentName,
   type DocumentName,
 } from '../../src/core/platform/names.ts';
@@ -29,6 +30,12 @@ export interface LaunchOptions {
   activity?: string;
 }
 
+/** Saved data to write before the app starts, beyond the ready profile. */
+export interface LaunchSetup {
+  /** Document text by name, written over anything launchApp wrote for the ready profile. */
+  documents?: Partial<Record<DocumentName, string>>;
+}
+
 export interface LaunchedApp {
   app: ElectronApplication;
   page: Page;
@@ -48,14 +55,35 @@ export interface LaunchedApp {
  * settings and progress, all written through the storage schemas. The seed, difficulty, and
  * activity reach the app through `info().test`.
  */
-export async function launchApp(options?: LaunchOptions): Promise<LaunchedApp> {
+export async function launchApp(options?: LaunchOptions, setup: LaunchSetup = {}): Promise<LaunchedApp> {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'wkc-e2e-'));
   const dataDir = path.join(userDataDir, 'data');
-  let app: ElectronApplication | undefined;
   try {
     const testInfo: TestInfo = testInfoSchema.parse(options === undefined ? {} : { band: DEFAULT_BAND, ...options });
     if (options !== undefined) await writeReadyProfile(dataDir, testInfo.band ?? DEFAULT_BAND);
+    for (const [name, text] of Object.entries(setup.documents ?? {})) {
+      if (!isDocumentName(name) || text === undefined) throw new Error(`Not a document name: ${name}`);
+      await writeDocumentFile(dataDir, name, text);
+    }
+    return await startApp(userDataDir, testInfo);
+  } catch (error) {
+    await rm(userDataDir, { recursive: true, force: true });
+    throw error;
+  }
+}
 
+/**
+ * Closes the app and starts it again on the same saved data, the way a child comes back the next
+ * day. The returned app's `close()` deletes the directory as before.
+ */
+export async function restartApp(launched: LaunchedApp, testInfo: TestInfo = {}): Promise<LaunchedApp> {
+  await closeQuietly(launched.app);
+  return startApp(launched.userDataDir, testInfoSchema.parse(testInfo));
+}
+
+async function startApp(userDataDir: string, testInfo: TestInfo): Promise<LaunchedApp> {
+  let app: ElectronApplication | undefined;
+  try {
     app = await electron.launch({
       args: [projectRoot],
       cwd: projectRoot,
@@ -75,7 +103,7 @@ export async function launchApp(options?: LaunchOptions): Promise<LaunchedApp> {
       app: launched,
       page,
       userDataDir,
-      dataDir,
+      dataDir: path.join(userDataDir, 'data'),
       close: async () => {
         await closeQuietly(launched);
         await rm(userDataDir, { recursive: true, force: true });
@@ -83,7 +111,6 @@ export async function launchApp(options?: LaunchOptions): Promise<LaunchedApp> {
     };
   } catch (error) {
     if (app !== undefined) await closeQuietly(app);
-    await rm(userDataDir, { recursive: true, force: true });
     throw error;
   }
 }

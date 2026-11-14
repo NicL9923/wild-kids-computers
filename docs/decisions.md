@@ -104,6 +104,22 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **401 emoji in 12 categories.** People use the upstream "Default" tone, which is not a human skin color. Flags, alcohol, weapons, tobacco, religious symbols, scary pictures, reward symbols, and timers are left out.
 - **SVGO's default preset optimizes each file only when a 256 px render matches the original.** That saved 28 percent. The worst file changed 0.4 percent of pixel values, all on anti-aliased edges.
 
+### App shell
+
+- **First launch saves the profile after the age band step**, then checks sound and offers kiosk lock. A parent who closes the app after that comes back to the sound check with the profile kept. When profiles exist but setup is not done, first launch asks only about sound and kiosk lock.
+- **First launch and the profile choice always use the youngest band's look.** Before a child is chosen, the person at the computer may be three.
+- **With several profiles, every launch shows the profile choice**, even when a child was active last time, because another child may be at the computer. With one profile the app goes straight to the meadow, and the meadow hides the "change player" control.
+- **The word gate keeps its digits through wrong answers and draws new ones each time it opens.** A typo does not cost the adult a new puzzle. Digits come from `crypto.getRandomValues` with rejection sampling, so each is equally likely.
+- **A wrong gate answer waits 1, 2, 4, then at most 8 seconds** before the next try. It slows guessing and never locks a parent out.
+- **The parent corner asks the gate every time it opens**, however the adult got there, and uses the oldest band's denser look with standard text. The child's text size and spacing show in a preview instead of resizing the corner.
+- **The parent corner edits one child's settings at a time**, and choosing a child there makes that child active. The session holds one profile's settings, and loading every profile's settings for one screen would duplicate the session's write rules.
+- **A forgotten PIN is removed by deleting `app.json`.** A missing or corrupt `app.json` already falls back to defaults without touching profiles, so the reset needs no extra code path a child could reach. The README and the gate's "Forgot the PIN?" link give the steps and the folder.
+- **"A little more time" on the closing screen is ten minutes**, added to the limit in the session store so every feature's check agrees. It lasts until the profile changes or the app restarts.
+- **The shell checks the session limit on every change of screen**, besides the activity kit's check between rounds and the paint studio's check when the pen is up. The back button then cannot leave the closing screen. The closing screen and the parent corner stay open.
+- **Session length choices are off, 15, 30, 45, 60, and 90 minutes.**
+- **The grown-ups' control sits alone in the bottom right corner** of the meadow and the closing screen, away from the places and the child's top bar.
+- **`index.html` declares the cascade layer order** before any stylesheet. A CSS chunk that the first screen imports can load ahead of the Tailwind entry, and its `@layer components` would then lose to Tailwind's base reset. A unit test keeps the statement in step with Tailwind.
+
 ### Process
 
 - **The single pull request opens as a draft once the foundation exists**, so the macOS and Windows installer jobs run early.

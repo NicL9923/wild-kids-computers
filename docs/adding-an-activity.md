@@ -130,7 +130,7 @@ forEachBand(activity.bands, (band) => {
     const { page } = launched;
     const level = generateLevel(roundSeed(SEED, 0), 1, band); // round n uses roundSeed(SEED, n)
     await expectInstructionSpoken(page, strings.instruction);
-    await saveBandScreenshot(page, band, activity.id); // test-results/screens/<band>/<id>.png
+    await saveBandScreenshot(page, band, activity.id); // reports/screens/<band>/<id>.png
     await expectAccessible(page);
     // Real input: page.mouse, page.keyboard, or locator.click(). Then assert what a child would notice.
   });

@@ -5,6 +5,7 @@ import type { GalleryView } from '../src/app/gallery/galleryViews.ts';
 import { BANDS, type Band } from '../src/core/bands.ts';
 import { expectAccessible } from './support/accessibility.ts';
 import { launchApp, type LaunchedApp } from './support/launchApp.ts';
+import { SCREENS_DIR } from './support/screens.ts';
 
 /** The smallest target per band, from src/styles/tokens.css. */
 const TARGET_MIN: Record<Band, number> = { 'band-3-5': 72, 'band-6-8': 56, 'band-9-12': 44 };
@@ -14,7 +15,8 @@ const SIZES = [
   { width: 1280, height: 800 },
 ] as const;
 
-const screensDir = path.resolve(import.meta.dirname, '..', 'test-results', 'screens');
+// Playwright wipes test-results/ on every run, so review screenshots go where it does not.
+const screensDir = SCREENS_DIR;
 
 let launched: LaunchedApp;
 

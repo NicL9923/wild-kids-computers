@@ -314,7 +314,7 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 - A keyboard-only test walks the shell screens: first launch, profile choice, home map, an area screen, and the parent corner.
 - Each activity test completes one round with real input events and asserts something the child would notice, such as the finish screen or a counted object on screen.
 - Each test calls `expectAccessible(page)`, which runs axe with WCAG 2.2 AA tags.
-- Each test saves a screenshot per band it serves to `test-results/screens/<band>/<activity-id>.png` for review, with `saveBandScreenshot(page, band, id, variant?)`.
+- Each test saves a screenshot per band it serves to `reports/screens/<band>/<activity-id>.png` for review, with `saveBandScreenshot(page, band, id, variant?)`. Shell and studio tests use `saveScreen` from `e2e/support/screens.ts`. Playwright empties `test-results/` on every run, so screenshots never go there.
 - The app exposes test hooks only when `WKC_TEST=1`: a log of voice clips and sounds played, and the pinned clock.
 
 Build activities from DOM and SVG elements with real buttons and labels. Use `<canvas>` only where the content is a picture, such as the paint studio and the robot's drawing.

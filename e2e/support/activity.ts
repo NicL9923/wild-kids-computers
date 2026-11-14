@@ -5,13 +5,12 @@ import type { Band } from '../../src/core/bands.ts';
 import type { SpokenHandle } from '../../src/core/strings/defineStrings.ts';
 import { readAudioLog } from './audioLog.ts';
 import { launchApp, type LaunchedApp } from './launchApp.ts';
+import { SCREENS_DIR } from './screens.ts';
 
 /**
  * Helpers for activity end-to-end tests. See "End-to-end tests" in docs/architecture.md and
  * docs/adding-an-activity.md.
  */
-
-const projectRoot = path.resolve(import.meta.dirname, '..', '..');
 
 /** The app's own window size, and the size of the screenshots for review. */
 const DEFAULT_SIZE = { width: 1280, height: 800 } as const;
@@ -130,7 +129,8 @@ export function kitTime(page: Page) {
 }
 
 /**
- * Writes a screenshot for review to test-results/screens/<band>/<activity-id>.png. Pass a
+ * Writes a screenshot for review to reports/screens/<band>/<activity-id>.png. Playwright empties
+ * test-results/ on every run, so screenshots never go there. Pass a
  * `variant` such as `1920x1080` to keep more than one per band. Waits for fonts and pictures.
  */
 export async function saveBandScreenshot(
@@ -144,7 +144,7 @@ export async function saveBandScreenshot(
     await Promise.all([...document.images].map((image) => image.decode().catch(() => undefined)));
   });
   const name = variant === undefined ? `${activityId}.png` : `${activityId}@${variant}.png`;
-  const file = path.join(projectRoot, 'test-results', 'screens', band, name);
+  const file = path.join(SCREENS_DIR, band, name);
   await mkdir(path.dirname(file), { recursive: true });
   await page.screenshot({ path: file });
   return file;
