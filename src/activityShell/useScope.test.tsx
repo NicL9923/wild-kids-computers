@@ -1,6 +1,9 @@
+// @vitest-environment jsdom
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { createManualScheduler } from '../core/activityKit/scheduler.ts';
-import { createScopeLifetime } from './useScope.ts';
+import { createScope } from '../core/activityKit/scope.ts';
+import { createScopeLifetime, useChildScope } from './useScope.ts';
 
 describe('createScopeLifetime', () => {
   it('cancels everything on close, and opens a fresh scope after, as on a second mount', () => {
@@ -33,5 +36,36 @@ describe('createScopeLifetime', () => {
     lifetime.open();
     scheduler.advance(10);
     expect(ran).toEqual(['kept']);
+  });
+});
+
+describe('useChildScope', () => {
+  function setup() {
+    const clock = createManualScheduler({ wall: 0 });
+    const parent = createScope(clock);
+    const hook = renderHook(() => useChildScope({ scope: parent, clock }));
+    return { clock, parent, hook, child: hook.result.current };
+  }
+
+  it('runs its timers on the parent clock, and cancels only its own when it unmounts', () => {
+    const { clock, parent, hook, child } = setup();
+    const ran: string[] = [];
+    child.setTimeout(() => ran.push('child, early'), 10);
+    child.setTimeout(() => ran.push('child, late'), 30);
+    parent.setTimeout(() => ran.push('parent'), 30);
+    clock.advance(10);
+    hook.unmount();
+    clock.advance(30);
+    expect(ran).toEqual(['child, early', 'parent']);
+  });
+
+  it('stops with the parent, as when the child leaves the activity', () => {
+    const { clock, parent, child } = setup();
+    const ran: string[] = [];
+    child.setTimeout(() => ran.push('child'), 10);
+    child.requestFrame(() => ran.push('frame'));
+    parent.dispose();
+    clock.advance(30);
+    expect(ran).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useActivityKeys } from '../../../../activityShell/activityKeys.ts';
 import { toyClipboard } from '../../../../app/inputGuards.ts';
 import type { ActivityKit, ActivityProps } from '../../../../activityShell/kit.ts';
+import { useChildScope } from '../../../../activityShell/useScope.ts';
 import { Button } from '../../../../components/ui/Button.tsx';
 import type { OsFamily } from '../../../../core/platform/bridge.ts';
 import { t } from '../../../../core/strings/defineStrings.ts';
@@ -66,6 +67,9 @@ function WorkshopStepView({
   });
   const note = useRef<HTMLDivElement>(null);
   const editorField = useRef<EditorFieldHandle>(null);
+  // This attempt's own timers and subscriptions. Starting the step again unmounts the attempt,
+  // which cancels its pause before the round ends, so it cannot finish the attempt after it.
+  const attempt = useChildScope(kit);
 
   // A shortcut pressed while focus is elsewhere, such as on the replay control, still reaches the note.
   useActivityKeys(kit, (event) => editorField.current?.takeKey(event));
@@ -84,7 +88,7 @@ function WorkshopStepView({
     latest.current = { ...latest.current, done: true };
     setDone(true);
     kit.feedback.correct({ at: note.current ?? undefined, say: feedback.youDidIt });
-    kit.scope.setTimeout(() => kit.roundComplete(), STEP_DONE_PAUSE_MS);
+    attempt.setTimeout(() => kit.roundComplete(), STEP_DONE_PAUSE_MS);
   }
 
   // Each step starts with its own clipboard, so an earlier copy cannot finish it.
@@ -95,10 +99,10 @@ function WorkshopStepView({
 
   // A copy can also arrive from the app's clipboard guard, such as from the Edit menu on a Mac.
   useEffect(
-    () => kit.scope.own(toyClipboard.subscribe(() => check(latest.current.editor, latest.current.savedText))),
+    () => attempt.own(toyClipboard.subscribe(() => check(latest.current.editor, latest.current.savedText))),
     // The check reads the latest state through the ref.
     // oxlint-disable-next-line react/exhaustive-deps
-    [kit],
+    [attempt],
   );
 
   function onEdit(result: TextOpResult): void {
