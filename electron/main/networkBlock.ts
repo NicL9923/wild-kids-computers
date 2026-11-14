@@ -68,6 +68,7 @@ export interface SessionControls {
   setPermissionCheckHandler(handler: () => boolean): void;
   setDevicePermissionHandler(handler: () => boolean): void;
   setDisplayMediaRequestHandler(handler: (request: unknown, callback: (streams: null) => void) => void): void;
+  onWillDownload(listener: (event: { preventDefault(): void }) => void): void;
 }
 
 export function sessionControls(session: Session): SessionControls {
@@ -81,6 +82,7 @@ export function sessionControls(session: Session): SessionControls {
     setPermissionCheckHandler: (handler) => session.setPermissionCheckHandler(handler),
     setDevicePermissionHandler: (handler) => session.setDevicePermissionHandler(handler),
     setDisplayMediaRequestHandler: (handler) => session.setDisplayMediaRequestHandler(handler),
+    onWillDownload: (listener) => session.on('will-download', listener),
   };
 }
 
@@ -107,4 +109,9 @@ export async function hardenSession(session: SessionControls, policy: NetworkPol
   session.setPermissionCheckHandler(() => false);
   session.setDevicePermissionHandler(() => false);
   session.setDisplayMediaRequestHandler((_request, callback) => callback(null));
+
+  // No file reaches the disk except through the bridge, which checks the bytes and sits behind
+  // the parent gate. A link with a download attribute, a navigation to a downloadable response,
+  // or anything else that starts Chromium's own download is cancelled before a file exists.
+  session.onWillDownload((event) => event.preventDefault());
 }

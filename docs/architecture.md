@@ -21,10 +21,10 @@ The main process registers `app` as a privileged scheme with `standard`, `secure
 The `app://` handler sends this policy as a response header. The production renderer build also carries it as a `<meta>` tag, so the browser build has it too. The dev server does not carry it.
 
 ```
-default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; sandbox allow-scripts allow-same-origin allow-forms
 ```
 
-Inline styles are allowed because Radix adds `<style>` tags for scroll locking. No source outside the bundle is allowed anywhere.
+Inline styles are allowed because Radix adds `<style>` tags for scroll locking. No source outside the bundle is allowed anywhere. `frame-ancestors` and `sandbox` work only as a header, so the `<meta>` tag leaves them out. The sandbox leaves out `allow-downloads` and `allow-modals`, so the page cannot start a download, print with `window.print()`, or open `alert`, `confirm`, or `prompt`.
 
 ### Keyboard and clipboard ownership
 
@@ -44,9 +44,12 @@ All of these apply at once. Each has a test.
 5. The content security policy above.
 6. `will-navigate`, `will-redirect`, `setWindowOpenHandler`, and `will-attach-webview` deny everything.
 7. Every permission request and permission check is denied.
-8. `tools/checkDependencies.ts` fails when `package.json` or the lockfile contains a denied package. The deny list covers HTTP clients, analytics, crash reporting, and auto-update packages. It also fails when a production dependency has a license outside a permissive allow list.
+8. The session cancels every download in `will-download`, so a file reaches the disk only through the bridge's export, which checks the bytes and sits behind the parent gate.
+9. `tools/checkDependencies.ts` fails when `package.json` or the lockfile contains a denied package. The deny list covers HTTP clients, analytics, crash reporting, and auto-update packages. It also fails when a production dependency has a license outside a permissive allow list.
 
 The end-to-end no-network test starts a local HTTP server on a free port. From the renderer it tries `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, an `<img>`, a `<link rel="dns-prefetch">`, a fetch from a Worker, a WebRTC peer connection, `window.open`, and a navigation. It asserts that each fails and that the server saw zero requests.
+
+The page also cannot write a file or open a system dialog outside the bridge. A link with a `download` attribute or a navigation to a downloadable response meets the sandbox and then the download cancel. Print and alert meet the sandbox. The Chromium switch `--disable-blink-features=FileSystemAccessLocal` removes `showOpenFilePicker`, `showSaveFilePicker`, and `showDirectoryPicker`. `src/app/inputGuards.ts` cancels a click on a file input, which would open the system file chooser, and every native drag, which could drop a file on the desktop. The no-network test offers every download a save path and checks that no file appears, and the isolation test checks each dialog.
 
 A second end-to-end test asserts hard rule 8: `process` and `require` are undefined in the page, `window.wkBridge` holds only the bridge functions, and the renderer process is sandboxed. On Linux the test reads the renderer's seccomp status from `/proc`.
 

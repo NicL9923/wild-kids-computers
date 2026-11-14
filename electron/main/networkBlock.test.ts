@@ -81,6 +81,7 @@ function fakeSession() {
     setPermissionCheckHandler: (...args) => void (calls.setPermissionCheckHandler = args),
     setDevicePermissionHandler: (...args) => void (calls.setDevicePermissionHandler = args),
     setDisplayMediaRequestHandler: (...args) => void (calls.setDisplayMediaRequestHandler = args),
+    onWillDownload: (...args) => void (calls.onWillDownload = args),
   };
   return { session, calls };
 }
@@ -136,5 +137,13 @@ describe('hardenSession', () => {
     const streams: unknown[] = [];
     registered(calls.setDisplayMediaRequestHandler)[0]({}, (value) => streams.push(value));
     expect(streams).toEqual([null]);
+  });
+
+  it('cancels every download, so no file reaches the disk outside the bridge', async () => {
+    const { session, calls } = fakeSession();
+    await hardenSession(session, packaged);
+    let cancelled = false;
+    registered(calls.onWillDownload)[0]({ preventDefault: () => void (cancelled = true) });
+    expect(cancelled).toBe(true);
   });
 });

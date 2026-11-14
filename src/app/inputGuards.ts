@@ -4,7 +4,9 @@
  * - Copy, cut, and paste go to an in-app toy clipboard and never touch the system clipboard.
  *   An adult's copied password cannot land in a toy app, and a child's text cannot leave.
  * - Every native drag is cancelled. Moving things uses the activity kit's useCarry, and a drop
- *   from another program would carry system data in.
+ *   from another program would carry system data in. A drag out of the window would also leave
+ *   a file on the desktop.
+ * - A click on a file input is cancelled, so no system file chooser opens.
  */
 
 /**
@@ -51,6 +53,15 @@ export const toyClipboard: ToyClipboard = createToyClipboard();
 type TextControl = HTMLInputElement | HTMLTextAreaElement;
 
 const DRAG_EVENTS = ['dragstart', 'dragover', 'drop'] as const;
+
+/**
+ * A click on a file input, from the pointer, a label, the keyboard, or script, opens the
+ * system's file chooser. Nothing in the app needs one, and a chooser is a system dialog outside
+ * the bridge, so the click is cancelled before the input sees it.
+ */
+function cancelFileChooser(event: Event): void {
+  if (event.target instanceof HTMLInputElement && event.target.type === 'file') event.preventDefault();
+}
 
 /** Input types whose value supports selection and setRangeText. */
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', 'password', '']);
@@ -119,7 +130,9 @@ export function installInputGuards(doc: Document, clipboard: ToyClipboard = toyC
   doc.addEventListener('cut', onCopyOrCut, capture);
   doc.addEventListener('paste', onPaste, capture);
   for (const type of DRAG_EVENTS) doc.addEventListener(type, cancel, capture);
+  doc.addEventListener('click', cancelFileChooser, capture);
   return () => {
+    doc.removeEventListener('click', cancelFileChooser, capture);
     doc.removeEventListener('copy', onCopyOrCut, capture);
     doc.removeEventListener('cut', onCopyOrCut, capture);
     doc.removeEventListener('paste', onPaste, capture);

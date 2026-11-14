@@ -18,10 +18,15 @@ const CONTENT_SECURITY_POLICY_DIRECTIVES: ReadonlyArray<readonly [string, string
   ['base-uri', "'none'"],
   ['form-action', "'none'"],
   ['frame-ancestors', "'none'"],
+  // The page keeps scripts, its own origin, and form events, and loses everything else a
+  // sandbox can take away. Without allow-downloads no link or navigation can start a download,
+  // and without allow-modals window.print() and alert() open nothing. Pictures leave the app only
+  // through the bridge's export and print.
+  ['sandbox', 'allow-scripts allow-same-origin allow-forms'],
 ];
 
 // Browsers ignore these in a <meta> policy and log a warning, so the tag leaves them out.
-const HEADER_ONLY_DIRECTIVES = new Set(['frame-ancestors']);
+const HEADER_ONLY_DIRECTIVES = new Set(['frame-ancestors', 'sandbox']);
 
 function serialize(directives: ReadonlyArray<readonly [string, string]>): string {
   return directives.map(([name, value]) => `${name} ${value}`).join('; ');
