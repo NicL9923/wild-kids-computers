@@ -5,9 +5,8 @@ import type { Band } from '../../src/core/bands.ts';
 import { documentNames } from '../../src/core/platform/names.ts';
 import { saveDocument } from '../../src/core/storage/document.ts';
 import { progressDocument } from '../../src/core/storage/schemas.ts';
-import { resizeWindow } from './activity.ts';
+import { goToActivity, resizeWindow } from './activity.ts';
 import { FIXTURE_PROFILE, launchApp, type LaunchedApp } from './launchApp.ts';
-import { ACTIVITY_PATH } from '../../src/activityShell/paths.ts';
 
 /**
  * Helpers for sequence activities, such as the typing course and the shortcut workshop: open an
@@ -47,12 +46,7 @@ export async function openSequenceStep(options: OpenStepOptions): Promise<Launch
   const launched = await launchApp({ band: options.band, seed: 7, activity: options.activity }, { documents });
   try {
     await resizeWindow(launched, options.size ?? { width: 1280, height: 800 });
-    await launched.page.evaluate(
-      (hash) => {
-        window.location.hash = hash;
-      },
-      `#${ACTIVITY_PATH(options.activity)}`,
-    );
+    await goToActivity(launched.page, options.activity);
     if (options.step > 0) await launched.page.locator(`[data-step="${String(options.step)}"]`).click();
     await expect(launched.page.locator(`[data-activity="${options.activity}"] .wk-activity-stage`)).toBeVisible();
     await expect(launched.page.locator('html')).toHaveAttribute('data-band', options.band);

@@ -10,9 +10,8 @@ import { toDraft, type Block, type BlockDraft, type Program } from '../../src/fe
 import type { ToolboxItem } from '../../src/features/robot-painter/engine/toolbox.ts';
 import type { ValidProgram } from '../../src/features/robot-painter/engine/validate.ts';
 import { stepPause } from '../../src/features/robot-painter/timing.ts';
-import { kitTime, resizeWindow } from './activity.ts';
+import { goToActivity, kitTime, resizeWindow } from './activity.ts';
 import { FIXTURE_PROFILE, launchApp, type LaunchedApp } from './launchApp.ts';
-import { ACTIVITY_PATH } from '../../src/activityShell/paths.ts';
 
 /**
  * Helpers for the robot painter's end-to-end specs. Every answer comes from a puzzle module's
@@ -60,12 +59,7 @@ export async function openRobot(options: OpenRobotOptions): Promise<LaunchedApp>
   try {
     await resizeWindow(launched, options.size ?? { width: 1280, height: 800 });
     await kitTime(launched.page).pin(PINNED_AT);
-    await launched.page.evaluate(
-      (hash) => {
-        window.location.hash = hash;
-      },
-      `#${ACTIVITY_PATH(options.activity)}`,
-    );
+    await goToActivity(launched.page, options.activity);
     if (options.step !== undefined && options.step > 0) {
       await launched.page.locator(`[data-step="${String(options.step)}"]`).click();
     }

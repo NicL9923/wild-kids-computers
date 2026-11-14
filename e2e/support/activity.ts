@@ -40,6 +40,30 @@ export interface OpenActivityOptions {
  * `close()` in `afterEach`. Pass the same seed and difficulty to `generateLevel` to compute the
  * answers; never read them from the page.
  */
+/**
+ * Goes to an activity's route and waits until its screen or its step picker shows. The start
+ * screen sends a ready profile to the meadow, and under load that can land after the hash
+ * changed, so the route is asked for again until the activity is on screen.
+ */
+export async function goToActivity(page: Page, activityId: string): Promise<void> {
+  const arrived = page.locator(`[data-activity="${activityId}"], [data-step]`).first();
+  await expect
+    .poll(
+      async () => {
+        if (await arrived.isVisible()) return true;
+        await page.evaluate(
+          (hash) => {
+            if (window.location.hash !== hash) window.location.hash = hash;
+          },
+          `#${ACTIVITY_PATH(activityId)}`,
+        );
+        return false;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+}
+
 export async function openActivity(options: OpenActivityOptions): Promise<LaunchedApp> {
   const launched = await launchApp({
     band: options.band,
@@ -51,12 +75,7 @@ export async function openActivity(options: OpenActivityOptions): Promise<Launch
     // Always set the size: a virtual display's default screen is smaller than the app's window.
     await resizeWindow(launched, options.size ?? DEFAULT_SIZE);
     if (options.pinClockAt !== undefined) await kitTime(launched.page).pin(options.pinClockAt);
-    await launched.page.evaluate(
-      (hash) => {
-        window.location.hash = hash;
-      },
-      `#${ACTIVITY_PATH(options.activity)}`,
-    );
+    await goToActivity(launched.page, options.activity);
     await expect(launched.page.locator(`[data-activity="${options.activity}"] .wk-activity-stage`)).toBeVisible();
     await expect(launched.page.locator('html')).toHaveAttribute('data-band', options.band);
     return launched;
