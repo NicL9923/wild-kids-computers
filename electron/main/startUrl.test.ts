@@ -20,4 +20,14 @@ describe('resolveStartUrl', () => {
   ])('loads the bundle when %s', (_label, isPackaged, devServerUrl) => {
     expect(resolveStartUrl({ isPackaged, devServerUrl })).toBe(BUNDLE_INDEX_URL);
   });
+
+  it('opens the activity route a test names', () => {
+    expect(resolveStartUrl({ isPackaged: false, devServerUrl: undefined, activity: 'find-the-key' })).toBe(
+      `${BUNDLE_INDEX_URL}#/activity/find-the-key`,
+    );
+  });
+
+  it('ignores an activity that is not a safe id', () => {
+    expect(resolveStartUrl({ isPackaged: false, devServerUrl: undefined, activity: '../x' })).toBe(BUNDLE_INDEX_URL);
+  });
 });

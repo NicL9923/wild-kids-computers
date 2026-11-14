@@ -53,22 +53,40 @@ export function applyNetworkSwitches(commandLine: Pick<CommandLine, 'appendSwitc
   commandLine.appendSwitch('host-resolver-rules', `MAP * ~NOTFOUND${exclude}`);
 }
 
-type HardenedSession = Pick<
-  Session,
-  | 'webRequest'
-  | 'setProxy'
-  | 'forceReloadProxyConfig'
-  | 'setSpellCheckerEnabled'
-  | 'setSpellCheckerDictionaryDownloadURL'
-  | 'setPermissionRequestHandler'
-  | 'setPermissionCheckHandler'
-  | 'setDevicePermissionHandler'
-  | 'setDisplayMediaRequestHandler'
->;
+/** The session settings the network block uses. `sessionControls` adapts an Electron session. */
+export interface SessionControls {
+  onBeforeRequest(
+    listener: (details: { url: string }, callback: (response: { cancel: boolean }) => void) => void,
+  ): void;
+  setProxy(config: { mode: 'fixed_servers'; proxyRules: string; proxyBypassRules: string }): Promise<void>;
+  forceReloadProxyConfig(): Promise<void>;
+  setSpellCheckerEnabled(enabled: boolean): void;
+  setSpellCheckerDictionaryDownloadURL(url: string): void;
+  setPermissionRequestHandler(
+    handler: (contents: unknown, permission: string, callback: (granted: boolean) => void) => void,
+  ): void;
+  setPermissionCheckHandler(handler: () => boolean): void;
+  setDevicePermissionHandler(handler: () => boolean): void;
+  setDisplayMediaRequestHandler(handler: (request: unknown, callback: (streams: null) => void) => void): void;
+}
+
+export function sessionControls(session: Session): SessionControls {
+  return {
+    onBeforeRequest: (listener) => session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, listener),
+    setProxy: (config) => session.setProxy(config),
+    forceReloadProxyConfig: () => session.forceReloadProxyConfig(),
+    setSpellCheckerEnabled: (enabled) => session.setSpellCheckerEnabled(enabled),
+    setSpellCheckerDictionaryDownloadURL: (url) => session.setSpellCheckerDictionaryDownloadURL(url),
+    setPermissionRequestHandler: (handler) => session.setPermissionRequestHandler(handler),
+    setPermissionCheckHandler: (handler) => session.setPermissionCheckHandler(handler),
+    setDevicePermissionHandler: (handler) => session.setDevicePermissionHandler(handler),
+    setDisplayMediaRequestHandler: (handler) => session.setDisplayMediaRequestHandler(handler),
+  };
+}
 
 /** Layers 1, 3, 4, and 7 on the session the window uses. */
-export async function hardenSession(session: HardenedSession, policy: NetworkPolicy): Promise<void> {
-  session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
+export async function hardenSession(session: SessionControls, policy: NetworkPolicy): Promise<void> {
+  session.onBeforeRequest((details, callback) => {
     callback({ cancel: !isAllowedRequestUrl(details.url, policy) });
   });
 

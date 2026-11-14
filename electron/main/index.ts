@@ -7,7 +7,7 @@ import { BUNDLE_SCHEME, registerBundleProtocol } from './bundleProtocol.ts';
 import { guardContents } from './contentsGuard.ts';
 import { createFileStore } from './fileStore.ts';
 import { createMainWindow } from './mainWindow.ts';
-import { applyNetworkSwitches, hardenSession } from './networkBlock.ts';
+import { applyNetworkSwitches, hardenSession, sessionControls } from './networkBlock.ts';
 import { exportPicture, printPicture } from './pictureOutput.ts';
 import { osFamily } from './platformInfo.ts';
 import { resolveStartUrl } from './startUrl.ts';
@@ -51,7 +51,7 @@ app.on('window-all-closed', () => app.quit());
 
 async function start(): Promise<void> {
   await app.whenReady();
-  await hardenSession(session.defaultSession, networkPolicy);
+  await hardenSession(sessionControls(session.defaultSession), networkPolicy);
   registerBundleProtocol(protocol, rendererRoot);
   Menu.setApplicationMenu(Menu.buildFromTemplate(appMenuTemplate(os, app.getName())));
 
