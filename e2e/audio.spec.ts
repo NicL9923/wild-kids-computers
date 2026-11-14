@@ -34,6 +34,7 @@ test('decodes and plays a voice clip and a synthesized tone with no sound device
         source.addEventListener('ended', () => resolve(true), { once: true });
         window.setTimeout(() => resolve(false), (seconds + 2) * 1000);
         source.start();
+        if (source instanceof OscillatorNode) source.stop(context.currentTime + seconds);
       });
 
     const voice = context.createBufferSource();
@@ -43,7 +44,6 @@ test('decodes and plays a voice clip and a synthesized tone with no sound device
 
     const tone = context.createOscillator();
     tone.connect(context.destination);
-    tone.stop(context.currentTime + 0.1);
     const toneEnded = await playToEnd(tone, 0.1);
 
     const state = context.state;

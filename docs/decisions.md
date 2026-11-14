@@ -51,6 +51,24 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Sound effects are synthesized at runtime with the Web Audio API.** They are original work and add no files.
 - **Stamps and activity art use the Fluent Emoji "Color" SVG style**, a curated subset. The upstream LICENSE file is MIT. Checked 2026-11-13.
 
+### Strings, voice, and audio
+
+- **The voice is Kokoro `af_bella` at speed 0.9.** On short words `af_heart` added a trailing vowel that two recognizers heard ("bee" as "B.A.", "cat" as "hot"). `af_bella` decoded the same words cleanly. 0.9 is unhurried without sounding slowed.
+- **Every clip is generated after the lead-in "Ready?" and cut at the pause.** Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" came out "lag", "eight" "wait"). After a lead-in it does not. "Ready?" gave the longest, steadiest pause of six leads tried. The cut fails loudly when the pause is missing.
+- **Letter sounds are Kokoro phonemes between slashes.** As text, "mmm" reaches the model as "em em em". Stops carry a light schwa ("buh"), because the model cannot release a stop alone. A person should still listen to them; see docs/voice-round-trip.md.
+- **Clips are mono Opus at 24 kbit/s in voice mode, evened to -20 dBFS voiced RMS.** Speech stays clear and a word is about 3 KB.
+- **The round trip runs Whisper large-v3-turbo and a wav2vec2 phoneme recognizer** in a Python environment outside the repository. Whisper hallucinates on clips under half a second, so letter sounds use the phoneme recognizer.
+- **The voice and emoji tools have their own `package.json` files** in `tools/voice` and `tools/emoji`. Their packages never enter the app's dependency tree or license check.
+- **`check:voice` and `voice:generate` run as Vitest tasks under `tools/tasks/`**, not in `npm test`, because a feature branch adds strings before its clips exist.
+- **The content rules go beyond the spec's list** to pressure words (hurry, one more) and scolding words (wrong, oh no, sad). An honest use opts in per string.
+- **Sound effect names are one typed list** in `src/audio/sfx/sfxNames.ts`. A typo in `play('pop')` is then a compile error. The list is short and the audio layer owns it, so it is an exception to discovery by file.
+- **Generated clips are licensed MIT**, like the rest of the project's own work. The model's Apache-2.0 license covers the model, not its output.
+
+### Emoji
+
+- **401 emoji in 12 categories.** People use the upstream "Default" tone, which is not a human skin color. Flags, alcohol, weapons, tobacco, religious symbols, scary pictures, reward symbols, and timers are left out.
+- **SVGO's default preset optimizes each file only when a 256 px render matches the original.** That saved 28 percent. The worst file changed 0.4 percent of pixel values, all on anti-aliased edges.
+
 ### Process
 
 - **The single pull request opens as a draft once the foundation exists**, so the macOS and Windows installer jobs run early.
