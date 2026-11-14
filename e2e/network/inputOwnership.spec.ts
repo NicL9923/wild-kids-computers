@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { SHORTCUTS } from '../../src/features/toy-desktop/model/commands.ts';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
 import {
   readSystemClipboard as readClipboard,
@@ -78,21 +79,9 @@ interface Press {
  * before-input-event. Playwright's keyboard goes over the DevTools protocol, which skips that
  * event, so it cannot show the block.
  */
-async function pressNative(presses: Press[]): Promise<void> {
-  await launched.app.evaluate(({ BrowserWindow }, keys) => {
-    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
-    if (contents === undefined) throw new Error('No window.');
-    contents.focus();
-    for (const { keyCode, modifiers } of keys) {
-      contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
-      contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
-    }
-  }, presses);
-}
-
-test('reload, close, zoom, and DevTools shortcuts never reach the page', async () => {
-  const { page } = launched;
-  await page.evaluate(() => {
+/** Starts recording every non-modifier key the page sees, as "Control+Shift+s". */
+async function recordKeys(): Promise<void> {
+  await launched.page.evaluate(() => {
     const seen: string[] = [];
     Reflect.set(window, 'wkcSeenKeys', seen);
     window.addEventListener('keydown', (event) => {
@@ -106,7 +95,35 @@ test('reload, close, zoom, and DevTools shortcuts never reach the page', async (
       seen.push([...mods.filter(Boolean), event.key.toLowerCase()].join('+'));
     });
   });
+}
 
+const seenKeys = () => launched.page.evaluate(() => Reflect.get(window, 'wkcSeenKeys') as unknown);
+
+async function windowFacts() {
+  return launched.app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return {
+      windows: BrowserWindow.getAllWindows().length,
+      zoom: window?.webContents.getZoomFactor(),
+      devtools: window?.webContents.isDevToolsOpened(),
+    };
+  });
+}
+
+async function pressNative(presses: Press[]): Promise<void> {
+  await launched.app.evaluate(({ BrowserWindow }, keys) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    if (contents === undefined) throw new Error('No window.');
+    contents.focus();
+    for (const { keyCode, modifiers } of keys) {
+      contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+    }
+  }, presses);
+}
+
+test('reload, quit, zoom, and DevTools shortcuts never reach the page', async () => {
+  await recordKeys();
   const mod = process.platform === 'darwin' ? 'meta' : 'control';
   const devtools: Press =
     process.platform === 'darwin'
@@ -115,30 +132,49 @@ test('reload, close, zoom, and DevTools shortcuts never reach the page', async (
   await pressNative([
     { keyCode: 'R', modifiers: [mod] },
     { keyCode: 'F5', modifiers: [] },
-    { keyCode: 'W', modifiers: [mod] },
     { keyCode: 'Q', modifiers: [mod] },
+    { keyCode: 'F4', modifiers: ['alt'] },
     { keyCode: '=', modifiers: [mod] },
     { keyCode: '-', modifiers: [mod] },
     { keyCode: '0', modifiers: [mod] },
     { keyCode: 'F12', modifiers: [] },
     devtools,
-    // These reach the page, because the shortcut workshop teaches them.
+    // These reach the page, because the shortcut workshop and the toy desktop teach them.
     { keyCode: 'Z', modifiers: [mod] },
     { keyCode: 'S', modifiers: [mod] },
+    { keyCode: 'W', modifiers: [mod] },
   ]);
-  await expect
-    .poll(() => page.evaluate(() => Reflect.get(window, 'wkcSeenKeys') as unknown))
-    .toEqual([`${primary}+z`, `${primary}+s`]);
+  await expect.poll(seenKeys).toEqual([`${primary}+z`, `${primary}+s`, `${primary}+w`]);
+  // The toy desktop's Close reached the page, and the real window is still open.
+  expect(await windowFacts()).toEqual({ windows: 1, zoom: 1, devtools: false });
+});
 
-  const after = await launched.app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0];
-    return {
-      windows: BrowserWindow.getAllWindows().length,
-      zoom: window?.webContents.getZoomFactor(),
-      devtools: window?.webContents.isDevToolsOpened(),
-    };
-  });
-  expect(after).toEqual({ windows: 1, zoom: 1, devtools: false });
+/** The keyCode sendInputEvent takes for a KeyboardEvent.key the toy desktop names. */
+const NATIVE_KEY_CODES: Record<string, string> = {
+  ' ': 'Space',
+  ArrowUp: 'Up',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
+};
+
+test('every shortcut the toy desktop menus show reaches the page, and the window stays open', async () => {
+  await recordKeys();
+  const mod = process.platform === 'darwin' ? ('meta' as const) : ('control' as const);
+  const shortcuts = Object.values(SHORTCUTS);
+  await pressNative(
+    shortcuts.map((shortcut) => ({
+      keyCode: NATIVE_KEY_CODES[shortcut.key] ?? shortcut.key,
+      modifiers: [...(shortcut.primary ? [mod] : []), ...(shortcut.shift ? ['shift' as const] : [])],
+    })),
+  );
+  await expect
+    .poll(seenKeys)
+    .toEqual(
+      shortcuts.map((shortcut) =>
+        [shortcut.primary && primary, shortcut.shift && 'Shift', shortcut.key.toLowerCase()].filter(Boolean).join('+'),
+      ),
+    );
+  expect(await windowFacts()).toEqual({ windows: 1, zoom: 1, devtools: false });
 });
 
 test('the application menu holds only the edit commands', async () => {

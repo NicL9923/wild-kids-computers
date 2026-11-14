@@ -8,7 +8,7 @@ import { expectAccessible } from '../support/accessibility.ts';
 import { expectInstructionSpoken, forEachBand, openActivity, REVIEW_SIZES, spokenIds } from '../support/activity.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
 import { clickCenter, desktopIcon, saveReviewScreenshot, windowControl, windowOf } from '../support/toyDesktop.ts';
-import { expectTargetsAtLeast, lessonRange, PRIMARY } from '../support/toyLessons.ts';
+import { expectTargetsAtLeast, lessonRange, PRIMARY, pressShortcut } from '../support/toyLessons.ts';
 
 const SEED = 8_120;
 const NAME = 'My day';
@@ -116,7 +116,8 @@ forEachBand(activity.bands, (band) => {
     await page.keyboard.type(NAME);
     await page.keyboard.press('Enter');
     await expect(dialog(page, 'save-as')).toHaveCount(0);
-    await page.keyboard.press(`${PRIMARY}+W`);
+    // Native input, the path a real keyboard takes, so the main process's shortcut block sees it.
+    await pressShortcut(launched, 'W');
     await expect(page.locator('[data-window]')).toHaveCount(0);
 
     // Focus goes to the desktop when the last window closes. Enter opens the notepad.
