@@ -64,9 +64,13 @@ export type CarryMode<I extends string, T extends string> =
       readonly onDrop?: (item: I, value: number) => void;
     };
 
-/** How the item is being carried. */
+/**
+ * How the item is being carried.
+ * @public
+ */
 export type CarryHow = 'held' | 'clicked' | 'keyboard';
 
+/** @public */
 export interface CarryItemProps {
   readonly ref: (element: HTMLElement | null) => void;
   readonly 'data-carry-item': string;
@@ -77,6 +81,7 @@ export interface CarryItemProps {
   readonly style: CSSProperties;
 }
 
+/** @public */
 export interface CarryTargetProps {
   readonly ref: (element: HTMLElement | null) => void;
   readonly 'data-carry-target': string;
@@ -97,7 +102,7 @@ export interface Carry<I extends string, T extends string> {
 }
 
 /** Movement under this many pixels is a click, not a drag. Small hands wobble. */
-export const DRAG_THRESHOLD = 8;
+const DRAG_THRESHOLD = 8;
 const DEFAULT_KEY_STEP = 24;
 
 interface Active<I> {

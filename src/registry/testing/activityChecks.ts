@@ -33,7 +33,7 @@ export interface ActivityFacts {
  * Activities that teach double-click or right-click, and so may handle them. Every other file in
  * src/ may not. Add an activity here only when its learning goal is that click.
  */
-export const POINTER_TEACHING_ACTIVITIES = ['knock-knock', 'two-buttons'] as const;
+const POINTER_TEACHING_ACTIVITIES = ['knock-knock', 'two-buttons'] as const;
 
 /** Files activity.ts, level.ts, and strings.ts may not import, so Playwright can import them. */
 const FORBIDDEN_IN_PLAIN_FILES: readonly { pattern: RegExp; what: string }[] = [

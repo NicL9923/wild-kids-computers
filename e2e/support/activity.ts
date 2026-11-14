@@ -14,7 +14,7 @@ import { launchApp, type LaunchedApp } from './launchApp.ts';
 const projectRoot = path.resolve(import.meta.dirname, '..', '..');
 
 /** The app's own window size, and the size of the screenshots for review. */
-export const DEFAULT_SIZE = { width: 1280, height: 800 } as const;
+const DEFAULT_SIZE = { width: 1280, height: 800 } as const;
 
 /** The two window sizes every activity is reviewed at. */
 export const REVIEW_SIZES = [
@@ -63,7 +63,10 @@ export async function openActivity(options: OpenActivityOptions): Promise<Launch
   }
 }
 
-/** Resizes the window's content area, as a person resizing the window would. */
+/**
+ * Resizes the window's content area, as a person resizing the window would.
+ * @public
+ */
 export async function resizeWindow(launched: LaunchedApp, size: { width: number; height: number }): Promise<void> {
   await launched.app.evaluate(({ BrowserWindow }, { width, height }) => {
     BrowserWindow.getAllWindows()[0]?.setContentSize(width, height);
@@ -74,7 +77,7 @@ export async function resizeWindow(launched: LaunchedApp, size: { width: number;
 }
 
 /** The replay control every activity has, top center. */
-export function replayControl(page: Page) {
+function replayControl(page: Page) {
   return page.locator('[data-control="replay"]');
 }
 

@@ -40,7 +40,7 @@ export const MAX_FLOWER_DIFFICULTY = TIERS.length;
 export const FLOWERS = ['flower', 'tulip', 'sunflower', 'rose', 'cherry-blossom'] as const satisfies readonly EmojiId[];
 
 /** Flowers in a row before the next row starts, like a ten frame. */
-export const PER_ROW = 5;
+const PER_ROW = 5;
 
 export interface Flower {
   readonly id: string;

@@ -15,6 +15,7 @@ import { assertDifficultyRange, type DifficultyRange } from './difficulty.ts';
  * import it and compute a level's answer from its `generateLevel`.
  */
 
+/** @public */
 export const AREAS = ['computer-skills', 'toy-desktop', 'early-learning', 'robot-painter'] as const;
 export type AreaId = (typeof AREAS)[number];
 
@@ -22,6 +23,7 @@ export function isArea(value: unknown): value is AreaId {
   return (AREAS as readonly unknown[]).includes(value);
 }
 
+/** @public */
 export const ACTIVITY_INPUTS = [
   'pointer-move',
   'click',
@@ -33,6 +35,7 @@ export const ACTIVITY_INPUTS = [
   'keyboard',
   'text-entry',
 ] as const;
+/** @public */
 export type ActivityInput = (typeof ACTIVITY_INPUTS)[number];
 
 /** The picture on the activity's tile: a bundled emoji, or original art under assets/art/activities/. */
@@ -43,6 +46,7 @@ export type ActivityIcon = { readonly emoji: EmojiId } | { readonly art: string 
  * `ActivityProps` in src/activityShell/kit.ts. Only `level` is checked here, so a component for
  * another level type does not compile. (The method form keeps parameters bivariant, so a
  * component that wants the full kit still fits.)
+ * @public
  */
 export type ActivityComponent<L> = {
   render(props: { readonly level: L; readonly band: Band; readonly kit: unknown }): unknown;
@@ -98,6 +102,7 @@ export interface SequenceActivityInput<L, S, P extends ActivityStep> extends Def
   readonly generateLevel: (seed: number, stepIndex: number, band: Band) => L;
 }
 
+/** @public */
 export interface FreeActivityInput<L, S> extends DefinitionBase<L, S> {
   readonly kind: 'free';
   /** Pure. Builds the starting state of open play. */
@@ -120,7 +125,7 @@ export type ActivityDefinition<
 };
 
 /** The most rounds a session can ask for before the finish screen. */
-export const MAX_ROUNDS_PER_SESSION = 20;
+const MAX_ROUNDS_PER_SESSION = 20;
 
 function fail(id: unknown, message: string): never {
   throw new Error(`Activity ${String(id)}: ${message}`);

@@ -12,7 +12,10 @@ import type { SpokenHandle } from '../core/strings/defineStrings.ts';
  * the replay, exit, and mute controls, so an activity cannot leave them out.
  */
 
-/** A spot on screen for feedback: an element (its center), or a point in window coordinates. */
+/**
+ * A spot on screen for feedback: an element (its center), or a point in window coordinates.
+ * @public
+ */
 export type FeedbackSpot = { getBoundingClientRect(): DOMRectReadOnly } | { readonly x: number; readonly y: number };
 
 export interface FeedbackOptions {
@@ -24,6 +27,7 @@ export interface FeedbackOptions {
   readonly silent?: boolean;
 }
 
+/** @public */
 export interface KitFeedback {
   /** A gentle confirmation: a soft chime and a check mark. */
   readonly correct: (options?: FeedbackOptions) => void;
@@ -34,6 +38,7 @@ export interface KitFeedback {
   readonly wrong: (options?: FeedbackOptions) => void;
 }
 
+/** @public */
 export interface RoundOutcomeInput {
   readonly mistakes?: number;
   readonly hintsUsed?: number;
