@@ -301,14 +301,14 @@ Build activities from DOM and SVG elements with real buttons and labels. Use `<c
 - **Brush tips.** A tip is a small module that produces dabs. Rainbow and pattern tips are tips, not tools.
 - **Effects.** Each effect is a module with one interface and a group: `distort`, `color`, `paint-on`, or `whole-picture`. A paint-on effect behaves like a brush. A whole-picture effect is a pure function from source pixels to result pixels with a fixed cost per pixel, such as a precomputed sample map or a separable kernel.
 - **Stamps and line art.** The engine receives decoded RGBA bitmaps. The renderer decodes SVG and PNG. Tests load PNG fixtures.
-- **Text.** The text tool fills glyph outlines with the engine's own path filler. A build tool reads the font with a parser that only `tools/` uses and writes `assets/fonts/<face>.glyphs.json`. The app ships the glyph table and no font parser.
+- **Text.** The text tool fills glyph outlines with the engine's own path filler. A build tool reads the font with a parser that only `tools/` uses and writes `assets/paint-fonts/<face>.glyphs.json`. The app ships the glyph table and no font parser.
 - **Random effects.** Effects that scatter things take a seed.
 - **Undo.** The canvas is divided into 64 px tiles. An operation copies a tile the first time it touches it, so a stroke stores only the tiles it changed. Undo swaps the saved tiles with the current pixels, so a step holds one copy. A step that replaces the document, such as "Start over" or opening a coloring page, also saves the mask. The cap is set in bytes, and a test proves that 30 full-canvas steps fit under it.
 - **Input.** The studio reads `getCoalescedEvents()` and feeds every point to the tool. Once per animation frame it calls `putImageData` with the document-sized `ImageData` and the changed rectangle, so no pixels are copied to build a frame.
 - **Worker.** The studio runs whole-picture effects in a Web Worker so the screen never freezes. The engine itself stays synchronous, and tests call it directly.
 - **Sticky pen.** A click without movement puts the pen down, and the next click lifts it. Press, drag, and release also works. This is the click alternative to drag for every paint tool.
 
-A registry test fails when a tool, tip, or effect has no golden image test.
+A registry test fails when a tool, tip, or effect has no golden image test. [src/core/paint/README.md](../src/core/paint/README.md) explains the API and how to add a tool, tip, or effect.
 
 ### Image comparison method
 

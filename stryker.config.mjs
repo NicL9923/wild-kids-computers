@@ -4,8 +4,18 @@ const config = {
   plugins: ['@stryker-mutator/vitest-runner'],
   vitest: { configFile: 'vite.config.ts' },
   // docs/architecture.md: paint math, level generators, the difficulty model, and storage
-  // validation. All of them live in src/core.
-  mutate: ['src/core/**/*.ts', '!src/core/**/*.test.ts'],
+  // validation. All of them live in src/core. From the paint engine, that means the math and the
+  // pixel arithmetic: the golden image tests cover the tools, tips, and effects built on them.
+  mutate: [
+    'src/core/**/*.ts',
+    '!src/core/**/*.test.ts',
+    '!src/core/**/testing/**',
+    '!src/core/paint/**',
+    'src/core/paint/math.ts',
+    'src/core/paint/color.ts',
+    'src/core/paint/rect.ts',
+    'src/core/paint/raster.ts',
+  ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },

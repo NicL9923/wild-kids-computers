@@ -68,11 +68,11 @@ Node 24.22.2 is pinned in `.node-version` and `engines`. `.npmrc` sets `engine-s
 | `npm run check`                                                   | Dependency deny list and license allow list, Node pins, then the license, voice, and strings checks            |
 | `npm run e2e`                                                     | Build, then Playwright against Electron                                                                        |
 | `npm run e2e:browser`                                             | Build, then Playwright against the static renderer build in Chromium                                           |
-| `npm run mutation`                                                | Stryker on `src/core/**`. Fails below an 80% mutation score.                                                   |
+| `npm run mutation`                                                | Stryker on `src/core/**`, and only the math and pixel arithmetic of the paint engine. Fails below 80%.         |
 | `npm run dist`                                                    | Build, then an unsigned installer for this operating system in `release/`                                      |
-| `npm run perf`, `npm run paint:goldens`, `npm run voice:generate` | Not implemented yet. Each prints a notice.                                                                     |
+| `npm run perf`, `npm run paint:goldens`, `npm run voice:generate` | `perf` prints paint timings. `paint:goldens` rewrites changed goldens. `voice:generate` is not built yet.      |
 
-`check:licenses`, `check:voice`, and `check:strings` are placeholders. Each one passes only while the files it would check do not exist yet, so the first asset, clip, or string catalog fails the check until someone writes the real one.
+`check:voice` and `check:strings` are placeholders. Each one passes only while the files it would check do not exist yet, so the first clip or string catalog fails the check until someone writes the real one.
 
 Electron tests need a display. On a machine without one, run them under `xvfb-run -a`. The first `npm run e2e:browser` on a machine needs `npx playwright install chromium`.
 

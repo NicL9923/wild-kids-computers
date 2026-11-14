@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "import", "jsx-a11y", "unicorn", "oxc", "vitest", "promise"],
+  "jsPlugins": ["./tools/oxlintPlugin.ts"],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -31,6 +32,12 @@
       "error",
       {
         "allow": ["**/*.css"]
+      }
+    ],
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": ["expect", "expectGolden"]
       }
     ],
     "vitest/valid-expect": [
@@ -80,6 +87,130 @@
             "object": "Math",
             "property": "random",
             "message": "Randomness comes from the level seed. Use createRandom(seed) from the activity kit."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/core/paint/**"],
+      "rules": {
+        "wkc/no-exponent-operator": "error",
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "Randomness comes from a seed. Use createRandom from src/core/paint/random.ts."
+          },
+          {
+            "object": "Math",
+            "property": "sin",
+            "message": "The paint engine needs exact math. Use sin from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "cos",
+            "message": "The paint engine needs exact math. Use cos from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "tan",
+            "message": "The paint engine needs exact math. Use tan from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "asin",
+            "message": "The paint engine needs exact math. Use asin from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "acos",
+            "message": "The paint engine needs exact math. Use acos from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "atan",
+            "message": "The paint engine needs exact math. Use atan from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "atan2",
+            "message": "The paint engine needs exact math. Use atan2 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "sinh",
+            "message": "The paint engine needs exact math. Use sinh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "cosh",
+            "message": "The paint engine needs exact math. Use cosh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "tanh",
+            "message": "The paint engine needs exact math. Use tanh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "asinh",
+            "message": "The paint engine needs exact math. Use asinh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "acosh",
+            "message": "The paint engine needs exact math. Use acosh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "atanh",
+            "message": "The paint engine needs exact math. Use atanh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "pow",
+            "message": "The paint engine needs exact math. Use pow from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "exp",
+            "message": "The paint engine needs exact math. Use exp from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "expm1",
+            "message": "The paint engine needs exact math. Use expm1 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log",
+            "message": "The paint engine needs exact math. Use log from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log1p",
+            "message": "The paint engine needs exact math. Use log1p from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log2",
+            "message": "The paint engine needs exact math. Use log2 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log10",
+            "message": "The paint engine needs exact math. Use log10 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "cbrt",
+            "message": "The paint engine needs exact math. Use cbrt from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "hypot",
+            "message": "The paint engine needs exact math. Use hypot from src/core/paint/math.ts, or add it there from exactly rounded operations."
           }
         ]
       }

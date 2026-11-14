@@ -49,6 +49,12 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Undo copies 64 px tiles on first touch.** Thirty full-canvas steps cost about 192 MB at worst, which fits under the cap.
 - **Whole-picture effects run in a Web Worker.** A measured kaleidoscope took 100 ms and a blur 200 ms on a fast laptop CPU, which would freeze a slow one.
 - **The text tool fills glyph outlines from a table built at build time.** The app ships no font parser.
+- **The paint text face is Andika Bold 7.000, shipped as the glyph table "Meadow Sans".** Bold strokes read better on a painting. "Andika" is a Reserved Font Name under the OFL, and a subset table is a modified version, so it takes another name.
+- **Within one stroke, a pixel keeps the highest coverage any dab gave it.** Overlapping dabs never darken each other, so a see-through marker stays even and a soft brush shows no beads.
+- **Outlines and lines are stroked by distance to the polyline, not by filling overlapping pieces.** Summing the coverage of overlapping pieces doubles their antialiased edges.
+- **The fill bucket grows one pixel under line art and unmixes antialiased painted edges.** Neither leaves a pale fringe between the paint and a line.
+- **A change that left every pixel as it was adds no undo step.** A fill in the color already there, or a stamp with no visible pixels, does not cost the child an undo.
+- **The undo cap is 256 MiB and at most 100 steps.** Thirty full-canvas steps take about 197 MB, and the step limit keeps many tiny steps from piling up.
 
 ### Activities
 
