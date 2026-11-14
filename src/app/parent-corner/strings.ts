@@ -116,4 +116,13 @@ export const strings = defineStrings('parent-corner', {
   'area-early-learning': { text: 'Early learning', silent: 'parent' },
   'area-robot-painter': { text: 'Robot painter', silent: 'parent' },
   'area-other': { text: 'Other activities', silent: 'parent' },
+
+  notices: { text: 'Licenses and credits', silent: 'parent' },
+  noticesAbout: {
+    text: 'The licenses of the software, art, fonts, and voice this app is made with.',
+    silent: 'parent',
+  },
+  showNotices: { text: 'Show licenses', silent: 'parent' },
+  noticesLoading: { text: 'Loading the licenses', silent: 'parent' },
+  noticesProblem: { text: 'The licenses could not be loaded.', silent: 'parent' },
 });

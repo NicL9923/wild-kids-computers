@@ -4,7 +4,7 @@ import { createAudioEngine, type AudioEngine } from '../../audio/audioEngine.ts'
 import { AudioProvider } from '../../audio/AudioProvider.tsx';
 import { CONTINUOUS } from '../../audio/sfx/continuous.ts';
 import { ONE_SHOTS } from '../../audio/sfx/oneShots.ts';
-import type { PlatformBridge } from '../../core/platform/bridge.ts';
+import type { CloseRequest, PlatformBridge } from '../../core/platform/bridge.ts';
 import { documentNames, type DocumentName } from '../../core/platform/names.ts';
 import { appDocument, settingsDocument, type Profile, type Settings } from '../../core/storage/schemas.ts';
 import { createAppRouter } from '../router.ts';
@@ -26,8 +26,8 @@ export interface ShellHarness {
   clock: { wall: number; mono: number };
   /** The ids of the strings spoken so far. */
   spoken: () => string[];
-  /** Calls the close request listener the shell registered, as the main process would. */
-  requestClose: () => void;
+  /** Calls the close request listener the shell registered, as the main process would. Kiosk lock by default. */
+  requestClose: (request?: CloseRequest) => void;
   /** Window calls in order: acknowledge, quit, kiosk. */
   windowCalls: string[];
 }
@@ -57,7 +57,7 @@ export function savedProfiles(
 
 export async function renderShell(path: string, options: FakeBridgeOptions = {}): Promise<ShellHarness> {
   const windowCalls: string[] = [];
-  let closeListener: (() => void) | null = null;
+  let closeListener: ((request: CloseRequest) => void) | null = null;
   const window: Partial<PlatformBridge['window']> = {
     onCloseRequest: (listener) => {
       closeListener = listener;
@@ -113,9 +113,9 @@ export async function renderShell(path: string, options: FakeBridgeOptions = {})
     clock,
     windowCalls,
     spoken: () => (audio.testLog ?? []).filter((entry) => entry.kind === 'voice').map((entry) => entry.name),
-    requestClose: () => {
+    requestClose: (request = { kioskLock: true }) => {
       if (closeListener === null) throw new Error('The shell registered no close request listener.');
-      closeListener();
+      closeListener(request);
     },
   };
 }

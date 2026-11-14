@@ -72,7 +72,10 @@ describe('defaults', () => {
 });
 
 describe('app schema', () => {
-  const pin = { algorithm: 'PBKDF2-SHA256', iterations: 600_000, salt: 'c2FsdA==', hash: 'aGFzaA==' };
+  // 16 salt bytes and 32 hash bytes, the sizes hashParentPin writes.
+  const salt = btoa('s'.repeat(16));
+  const hash = btoa('h'.repeat(32));
+  const pin = { algorithm: 'PBKDF2-SHA256', iterations: 600_000, salt, hash };
 
   it('accepts a PIN hash record', () => {
     expect(issuePaths(appDocument.schema, app({ parentPin: pin }))).toEqual([]);
@@ -81,7 +84,20 @@ describe('app schema', () => {
   it.each([
     ['a plain PIN instead of a record', { parentPin: '1234' }, 'parentPin'],
     ['a salt that is not base64', { parentPin: { ...pin, salt: 'not base64!' } }, 'parentPin.salt'],
-    ['a hash with a bad prefix', { parentPin: { ...pin, hash: '!!aGFzaA==' } }, 'parentPin.hash'],
+    ['a hash with a bad prefix', { parentPin: { ...pin, hash: `!!${hash.slice(2)}` } }, 'parentPin.hash'],
+    // Each of these once passed and then made the gate's PIN check throw.
+    ['a one-letter salt', { parentPin: { ...pin, salt: 'a' } }, 'parentPin.salt'],
+    ['a one-letter hash', { parentPin: { ...pin, hash: 'a' } }, 'parentPin.hash'],
+    ['a salt one byte short', { parentPin: { ...pin, salt: btoa('s'.repeat(15)) } }, 'parentPin.salt'],
+    ['a hash one byte long', { parentPin: { ...pin, hash: btoa('h'.repeat(33)) } }, 'parentPin.hash'],
+    ['a salt without its padding', { parentPin: { ...pin, salt: salt.replace(/=+$/, '') } }, 'parentPin.salt'],
+    // The last letter carries padding bits that must be zero; atob ignores them, btoa never sets them.
+    ['a salt with nonzero padding bits', { parentPin: { ...pin, salt: `${salt.slice(0, 21)}B==` } }, 'parentPin.salt'],
+    [
+      'a hash with a line break',
+      { parentPin: { ...pin, hash: `${hash.slice(0, 20)}\n${hash.slice(20)}` } },
+      'parentPin.hash',
+    ],
     ['too few iterations', { parentPin: { ...pin, iterations: 99_999 } }, 'parentPin.iterations'],
     ['another algorithm', { parentPin: { ...pin, algorithm: 'MD5' } }, 'parentPin.algorithm'],
     ['an unsafe profile id', { lastActiveProfileId: 'A/B' }, 'lastActiveProfileId'],
@@ -242,9 +258,9 @@ describe('validation messages', () => {
       appDocument.schema,
       {
         ...appDocument.defaults(),
-        parentPin: { algorithm: 'PBKDF2-SHA256', iterations: 600_000, salt: '*', hash: 'aA==' },
+        parentPin: { algorithm: 'PBKDF2-SHA256', iterations: 600_000, salt: '*', hash: btoa('h'.repeat(32)) },
       },
-      'must be base64',
+      'must be base64 of 16 bytes',
     ],
   ])('explains %s', (_label, schema, value, message) => {
     const result = schema.safeParse(value);

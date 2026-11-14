@@ -29,6 +29,8 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Known limit: on Linux, text selected in the app may reach the X primary selection,** which a middle click pastes into other programs. Chromium writes that buffer itself when a selection changes, no Chromium switch turns it off, and the renderer cannot reach it. Clearing it from the main process would need a polling timer and would also wipe what an adult selected in another program. A probe under Xvfb with Playwright's input, which bypasses the X server, selected text by keyboard and by double-click and left the primary selection unchanged, so no fix could be verified in CI. The exposure is a child's own words in the app, never adult data, and the system clipboard stays untouched. Checked 2026-11-14.
 - **Root guards also cancel `dragover` and `drop`**, so text or files dropped from another program cannot carry system data in. Every drag in the app uses `useCarry`, so nothing needs native drops.
 - **A close request that gets no answer within 3 seconds destroys the window.** A plain close waits for the page's unload handlers, which a hung page never finishes. A test measured 39 seconds with a plain close.
+- **Ctrl or Command plus W reaches the page.** The toy desktop teaches it as Close, a convention of real computers. The application menu has no close accelerator, so the key never closes the app window, and every other close goes through a close request. Blocking it left the toy menu promising a key that did nothing.
+- **Every window close goes to the renderer as a close request, with or without kiosk lock.** Without kiosk lock the renderer saves unsaved work and quits with no parent gate. Holding the close with `beforeunload` alone lost work, because Chromium ignores a cancelled unload on a page the user never clicked.
 - **The renderer must answer a close request explicitly.** The preload does not answer for it, because a renderer that is alive but showing an error screen would then trap the child behind a gate that never appears.
 - **Test runs reach the bridge through `window.wkcTest.bridge`.** The contract suite then exercises the exact object the app uses, in both builds.
 
@@ -39,6 +41,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Pictures have no index file.** The gallery lists the PNG files and sorts by modification time, so there is no index to fall out of step.
 - **Bad saved data and a future version are both set aside.** A newer app's document stays on disk under the `.corrupt-<timestamp>` name, so a parent can recover it after updating again.
 - **The parent PIN is 4 to 8 digits, hashed with PBKDF2-SHA256 at 600,000 iterations and a 16-byte salt.** That is OWASP's current minimum. The record stores the iteration count, so a later build can raise it. A short PIN stays guessable by anyone who can read the file; the hash only keeps it from being read in plain text.
+- **A parent PIN record the gate cannot verify is corrupt saved data.** The schema accepts only the exact base64 of a 16-byte salt and a 32-byte hash, so a damaged record sets the whole `app.json` aside like any other corrupt document, and the app falls back to the word gate and the first-launch sound and kiosk steps. If checking a PIN still fails at run time, the open gate switches to the word gate with a note. Refusing every answer instead would lock the adult out of the parent corner and, under kiosk lock, out of quitting. A child cannot damage the file or make Web Crypto fail, so the fallback opens nothing a child can reach.
 - **Settings defaults:** voice volume 1, effects volume 0.6, not muted, standard text size and letter spacing, reduced motion follows the system, no session limit, and export and print behind the parent gate.
 
 ### Paint
@@ -121,6 +124,9 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **The content rules go beyond the spec's list** to pressure words (hurry, one more) and scolding words (wrong, oh no, sad). An honest use opts in per string.
 - **Sound effect names are one typed list** in `src/audio/sfx/sfxNames.ts`. A typo in `play('pop')` is then a compile error. The list is short and the audio layer owns it, so it is an exception to discovery by file.
 - **Generated clips are licensed MIT**, like the rest of the project's own work. The model's Apache-2.0 license covers the model, not its output.
+
+- **Third-party notices are one generated text file**, built from the license files the dependencies and assets already carry. A package with no license file needs a fallback notice in `tools/notices.ts`, which states the license and holder its package.json names; react-remove-scroll-bar is the one case. Electron and Chromium keep their own notice files, which electron-builder ships beside the program, because the Chromium notices alone are several megabytes.
+- **The Kokoro-82M notice lives in `assets/voice/NOTICE.txt`**, one folder above the clips, because `check:voice` allows only clips in `assets/voice/en/`. The clips stay MIT; the notice credits the model and carries its Apache-2.0 text. The model's repository has no NOTICE file, so the attribution names the model, its author, and its model card.
 
 ### Emoji
 

@@ -191,6 +191,18 @@ jobs:
         env:
           # No signing in milestone 1. This stops electron-builder looking for a certificate.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # The third-party notices ship inside app.asar for the parent corner and beside the program
+      # files. On Linux the check also opens the AppImage itself.
+      - name: Check the packaged notices
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            extracted="$(mktemp -d)"
+            appimages=("$GITHUB_WORKSPACE"/release/*.AppImage)
+            (cd "$extracted" && "${appimages[0]}" --appimage-extract > /dev/null)
+            npm run check:packaged-notices -- "$extracted/squashfs-root"
+          fi
+          npm run check:packaged-notices
       - name: Upload the installer
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

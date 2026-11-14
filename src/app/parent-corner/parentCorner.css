@@ -57,6 +57,20 @@
     font-weight: var(--wk-font-weight-bold);
   }
 
+  /* The notices are long plain text: a scrolling box that keyboard users can focus and scroll. */
+  .wk-parent-notices {
+    max-height: 60dvh;
+    margin: 0;
+    overflow: auto;
+    padding: var(--wk-space-item);
+    border: var(--wk-border-width) solid var(--wk-color-divider);
+    border-radius: var(--wk-radius-card);
+    font-family: inherit;
+    font-size: var(--wk-text-small);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   .wk-parent-group {
     display: flex;
     flex-direction: column;

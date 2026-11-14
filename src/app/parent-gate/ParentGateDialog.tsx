@@ -19,16 +19,19 @@ export interface ParentGateDialogProps {
   onSettle: (passed: boolean) => void;
 }
 
-type Feedback = 'none' | 'waiting' | 'no-match';
+type Feedback = 'none' | 'waiting' | 'no-match' | 'pin-unusable';
 
 /**
  * The gate itself. With no parent PIN it shows three digits as words and asks for them as
  * digits; with a PIN it asks for the PIN. A wrong answer gets a neutral message and a short delay
- * that grows with each try, and never a lockout. Nothing here is ever spoken.
+ * that grows with each try, and never a lockout. A PIN that cannot be checked falls back to the
+ * words, because a gate that never answers would also keep the adult from quitting under kiosk
+ * lock. Nothing here is ever spoken.
  */
 export function ParentGateDialog({ reason, opener, onSettle }: ParentGateDialogProps) {
   const { app } = useAppDocument();
-  const pin = app.parentPin;
+  const [pinUnusable, setPinUnusable] = useState(false);
+  const pin = pinUnusable ? null : app.parentPin;
   // New digits each time the gate opens. The same digits stay through wrong answers, so a typo
   // does not cost the adult a new puzzle.
   const [digits] = useState<Digit[]>(() => newChallenge());
@@ -55,7 +58,17 @@ export function ParentGateDialog({ reason, opener, onSettle }: ParentGateDialogP
     event.preventDefault();
     if (checking || feedback === 'waiting') return;
     setChecking(true);
-    const passed = pin === null ? isChallengeAnswer(typed, digits) : await verifyParentPin(typed, pin);
+    let passed: boolean;
+    try {
+      passed = pin === null ? isChallengeAnswer(typed, digits) : await verifyParentPin(typed, pin);
+    } catch {
+      setChecking(false);
+      setPinUnusable(true);
+      setTyped('');
+      setFeedback('pin-unusable');
+      input.current?.focus();
+      return;
+    }
     setChecking(false);
     if (passed) {
       settle(true);
@@ -67,7 +80,13 @@ export function ParentGateDialog({ reason, opener, onSettle }: ParentGateDialogP
     input.current?.focus();
   };
 
-  const message = feedback === 'waiting' ? t(strings.waiting) : feedback === 'no-match' ? t(strings.noMatch) : '';
+  const messages: Record<Feedback, string> = {
+    none: '',
+    waiting: t(strings.waiting),
+    'no-match': t(strings.noMatch),
+    'pin-unusable': t(strings.pinUnusable),
+  };
+  const message = messages[feedback];
   const prompt = pin === null ? strings.wordPrompt : strings.pinPrompt;
 
   return (

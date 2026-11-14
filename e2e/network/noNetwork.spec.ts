@@ -1,3 +1,6 @@
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
 import { startProbeServer, type ProbeServer } from './probeServer.ts';
@@ -156,4 +159,52 @@ test('no request of any kind leaves the renderer', async () => {
   // Give anything still in flight time to arrive.
   await page.waitForTimeout(1_500);
   expect(probe.seen(), `beacon queued: ${String(outcomes.beaconQueued)}`).toEqual([]);
+});
+
+// A file leaves the app only through the bridge's export, which checks the bytes and sits behind
+// the parent gate. Chromium's own downloads would skip both. The test adds a main-process
+// listener that saves any download it is offered into an empty folder, as an adult clicking
+// Save in a download dialog would, so a download that got through leaves a file there.
+test('no link or navigation in the page writes a file', async () => {
+  const { app, page } = launched;
+  const folder = await mkdtemp(path.join(os.tmpdir(), 'wkc-downloads-'));
+  try {
+    await app.evaluate(({ session }, into) => {
+      session.defaultSession.on('will-download', (event, item) => {
+        if (!event.defaultPrevented) item.setSavePath(`${into}/${item.getFilename() || 'download'}`);
+      });
+    }, folder);
+    const startUrl = page.url();
+
+    await page.evaluate(() => {
+      for (const [href, name] of [
+        [URL.createObjectURL(new Blob(['from a blob'], { type: 'text/plain' })), 'blob.txt'],
+        ['data:text/plain,from%20a%20data%20link', 'data.txt'],
+      ] as const) {
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+      }
+      const frame = document.createElement('iframe');
+      frame.src = URL.createObjectURL(new Blob(['in a frame'], { type: 'application/octet-stream' }));
+      document.body.append(frame);
+    });
+    for (const href of [
+      'data:application/octet-stream,navigated',
+      await page.evaluate(() => URL.createObjectURL(new Blob(['navigated'], { type: 'application/octet-stream' }))),
+    ]) {
+      await page.evaluate((target) => {
+        window.location.href = target;
+      }, href);
+    }
+    // A download that got through takes a few frames to reach the disk.
+    await page.waitForTimeout(1_500);
+    expect(await readdir(folder)).toEqual([]);
+    expect(page.url()).toBe(startUrl);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });

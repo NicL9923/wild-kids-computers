@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { CloseRequest } from '../../src/core/platform/bridge.ts';
 import { createWindowControl, type LockableWindow } from './windowControl.ts';
 
 /** A window that records what happens to it. A close goes through its close listeners first. */
@@ -57,7 +58,7 @@ function setup() {
   const timers = manualTimers();
   const notices: string[] = [];
   const control = createWindowControl(window, {
-    notifyCloseRequest: () => notices.push('close requested'),
+    notifyCloseRequest: (request: CloseRequest) => notices.push(request.kioskLock ? 'kiosk close' : 'close'),
     setTimeout: timers.setTimeout,
     clearTimeout: timers.clearTimeout,
     ackTimeoutMs: 3_000,
@@ -66,11 +67,26 @@ function setup() {
 }
 
 describe('window control', () => {
-  it('closes at once when kiosk lock is off', () => {
-    const { window, state, notices } = setup();
+  // Without kiosk lock the renderer still gets the close, so it can save unsaved work first.
+  it('holds a close without kiosk lock too, and closes once the renderer confirms', () => {
+    const { window, state, timers, notices, control } = setup();
     window.close();
-    expect(state.closed).toBe(true);
-    expect(notices).toEqual([]);
+    expect(state.closed).toBe(false);
+    expect(notices).toEqual(['close']);
+    control.acknowledgeCloseRequest();
+    timers.advance(60_000);
+    expect(state.closed).toBe(false);
+    control.allowClose();
+    expect(state).toMatchObject({ closed: true, destroyed: false });
+  });
+
+  it('destroys an unlocked window whose renderer does not answer in time', () => {
+    const { window, state, timers } = setup();
+    window.close();
+    timers.advance(2_999);
+    expect(state.closed).toBe(false);
+    timers.advance(1);
+    expect(state).toMatchObject({ closed: true, destroyed: true });
   });
 
   it('holds a close while locked, tells the renderer, and closes after the answer timeout', () => {
@@ -78,7 +94,7 @@ describe('window control', () => {
     control.setKioskLock(true);
     window.close();
     expect(state.closed).toBe(false);
-    expect(notices).toEqual(['close requested']);
+    expect(notices).toEqual(['kiosk close']);
     timers.advance(2_999);
     expect(state.closed).toBe(false);
     timers.advance(1);
@@ -125,14 +141,15 @@ describe('window control', () => {
   });
 
   it('drops a pending close when the lock turns off', () => {
-    const { window, state, timers, control } = setup();
+    const { window, state, timers, notices, control } = setup();
     control.setKioskLock(true);
     window.close();
     control.setKioskLock(false);
     timers.advance(3_000);
     expect(state.closed).toBe(false);
+    // The next attempt asks the renderer again, now without the parent gate.
     window.close();
-    expect(state.closed).toBe(true);
+    expect(notices).toEqual(['kiosk close', 'close']);
   });
 
   it('reports kiosk lock as fullscreen and keeps it fullscreen until unlocked', () => {

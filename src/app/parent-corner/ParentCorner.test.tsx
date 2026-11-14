@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { documentNames } from '../../core/platform/names.ts';
 import { verifyParentPin } from '../../core/storage/parentPin.ts';
 import { strings as seedPodStrings } from '../../features/computer-skills/activities/pop-the-seed-pods/strings.ts';
@@ -194,5 +194,33 @@ describe('parent corner', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: OWL.name }));
     await within(skills).findByText(strings.skillsEmpty.text);
+  });
+});
+
+const notices = () => within(screen.getByRole('region', { name: strings.notices.text }));
+
+describe('licenses and credits', () => {
+  it('loads the notices the build ships only when the adult asks, and shows them', async () => {
+    const requested: string[] = [];
+    vi.stubGlobal('fetch', async (url: URL) => {
+      requested.push(url.pathname);
+      return new Response('react 19.3.1 (MIT)\nPermission is hereby granted');
+    });
+    await openCorner();
+    expect(requested).toEqual([]);
+    fireEvent.click(notices().getByRole('button', { name: strings.showNotices.text }));
+    await notices().findByText(/Permission is hereby granted/);
+    expect(requested).toEqual(['/third-party-notices.txt']);
+  });
+
+  it.each([
+    ['a missing file', async () => new Response('', { status: 404 })],
+    ['a failed read', async () => Promise.reject(new TypeError('Failed to fetch'))],
+  ])('says so when the notices cannot be loaded: %s', async (_label, answer) => {
+    vi.stubGlobal('fetch', answer);
+    await openCorner();
+    fireEvent.click(notices().getByRole('button', { name: strings.showNotices.text }));
+    await waitFor(() => expect(notices().getByRole('alert').textContent).toBe(strings.noticesProblem.text));
+    expect(notices().getByRole('button', { name: strings.showNotices.text })).toHaveProperty('disabled', false);
   });
 });

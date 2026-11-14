@@ -17,6 +17,7 @@ export const strings = defineStrings('parent-gate', {
   noMatch: { text: 'That does not match. Try again.', silent: 'parent' },
   waiting: { text: 'That does not match. Wait a moment, then try again.', silent: 'parent' },
   checking: { text: 'Checking', silent: 'parent' },
+  pinUnusable: { text: 'The saved PIN could not be checked. Type these numbers as digits instead.', silent: 'parent' },
   cancel: { text: 'Cancel', silent: 'parent' },
   close: { text: 'Close', silent: 'parent' },
   continue: { text: 'Continue', silent: 'parent' },

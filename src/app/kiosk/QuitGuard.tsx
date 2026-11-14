@@ -9,10 +9,10 @@ import { quitWork } from './quitWork.ts';
 const QuitFlowContext = createContext<QuitFlow | null>(null);
 
 /**
- * Owns quitting for the whole app. With kiosk lock on, the main process sends a close request and
- * the parent gate decides. With it off, the window closes on its own, so the guard holds the
- * close back while a picture or a session write is unsaved, finishes it, and then quits. Mounted
- * once by RootLayout.
+ * Owns quitting for the whole app. The main process sends a close request on every close attempt.
+ * With kiosk lock on the parent gate decides; with it off the guard finishes any unsaved picture
+ * or session write and then quits. The browser build cannot hold a close request, so there the
+ * guard holds the page's unload while work is unsaved. Mounted once by RootLayout.
  */
 export function QuitGuard({ children }: { children: ReactNode }) {
   const platform = useShellPlatform();
@@ -30,7 +30,7 @@ export function QuitGuard({ children }: { children: ReactNode }) {
     });
   }, [platform, askParent, store]);
 
-  useEffect(() => platform.window.onCloseRequest(() => void flow.closeRequested()), [platform, flow]);
+  useEffect(() => platform.window.onCloseRequest((request) => void flow.closeRequested(request)), [platform, flow]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent): void => {

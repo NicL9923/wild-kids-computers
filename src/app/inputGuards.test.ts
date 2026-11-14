@@ -174,16 +174,33 @@ describe('drag and drop', () => {
   });
 });
 
+describe('file choosers', () => {
+  it.each([
+    ['a file input', 'file', true],
+    ['a text field', 'text', false],
+    ['a checkbox', 'checkbox', false],
+  ])('cancels a click on %s only when it would open a file chooser', (_label, type, cancelled) => {
+    const input = document.createElement('input');
+    input.type = type;
+    document.body.append(input);
+    expect(fire(input, 'click')).toBe(cancelled);
+  });
+});
+
 describe('uninstall', () => {
   it('removes every handler', () => {
     uninstall();
     const input = textField('fern', 0, 4);
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    document.body.append(fileInput);
     expect(['copy', 'cut', 'paste', 'dragstart'].map((type) => fire(input, type))).toEqual([
       false,
       false,
       false,
       false,
     ]);
+    expect(fire(fileInput, 'click')).toBe(false);
     expect(clipboard.read()).toBeNull();
   });
 });

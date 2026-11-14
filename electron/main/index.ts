@@ -13,6 +13,7 @@ import { guardContents } from './contentsGuard.ts';
 import { createFileStore } from './fileStore.ts';
 import { createMainWindow } from './mainWindow.ts';
 import { applyNetworkSwitches, hardenSession, sessionControls } from './networkBlock.ts';
+import { applyPageSwitches } from './pageSwitches.ts';
 import { exportPicture, printPicture } from './pictureOutput.ts';
 import { osFamily } from './platformInfo.ts';
 import { resolveStartUrl } from './startUrl.ts';
@@ -36,6 +37,7 @@ const networkPolicy = { devServer };
 // Every renderer runs sandboxed, including any window a later change forgets to configure.
 app.enableSandbox();
 applyNetworkSwitches(app.commandLine, networkPolicy);
+applyPageSwitches(app.commandLine);
 
 // Must run before the ready event. Module scripts, fetch of voice clips, and media playback
 // need these privileges.
@@ -67,7 +69,7 @@ async function start(): Promise<void> {
     ),
   );
   const windowControl = createWindowControl(window, {
-    notifyCloseRequest: () => window.webContents.send(CLOSE_REQUEST_CHANNEL),
+    notifyCloseRequest: (request) => window.webContents.send(CLOSE_REQUEST_CHANNEL, request),
     setTimeout: (callback, ms) => setTimeout(callback, ms),
     clearTimeout: (timer) => clearTimeout(timer),
   });

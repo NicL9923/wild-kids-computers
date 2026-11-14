@@ -57,3 +57,53 @@ test('the renderer process runs inside the operating system sandbox', async () =
   expect(status).toMatch(/^Seccomp:\s+2$/m);
   expect(status).toMatch(/^NoNewPrivs:\s+1$/m);
 });
+
+// The page reaches the system only through the bridge, so no page code can open a system dialog.
+// Print and alert are blocked by the sandbox the content security policy sets, the File System
+// Access pickers are switched off, and a click on a file input is cancelled at the root.
+test('the page opens no print, alert, file chooser, or save dialog of its own', async () => {
+  const { app, page } = launched;
+  const ignored: string[] = [];
+  page.on('console', (message) => {
+    if (message.text().includes('sandboxed')) ignored.push(message.text());
+  });
+
+  const pickers = await page.evaluate(() => {
+    // Each returns at once when blocked. A print dialog would hold the page here.
+    window.print();
+    window.alert('a dialog');
+    return ['showOpenFilePicker', 'showSaveFilePicker', 'showDirectoryPicker'].map(
+      (name) => typeof Reflect.get(window, name),
+    );
+  });
+  expect(pickers).toEqual(['undefined', 'undefined', 'undefined']);
+  await expect.poll(() => ignored.length).toBe(2);
+  expect(ignored.join('\n')).toMatch(/print\(\)[\s\S]*allow-modals[\s\S]*alert\(\)[\s\S]*allow-modals/);
+
+  // A real pointer click on a file input, sent the way the operating system would.
+  const box = await page.evaluate(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.style.cssText = 'position:fixed;left:20px;top:20px;width:200px;height:60px;z-index:9999';
+    document.body.append(input);
+    const clicks: boolean[] = [];
+    Reflect.set(window, 'wkcFileClicks', clicks);
+    input.addEventListener('click', (event) => clicks.push(event.defaultPrevented));
+    return { x: 120, y: 50 };
+  });
+  await app.evaluate(({ BrowserWindow }, point) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    contents?.sendInputEvent({ type: 'mouseDown', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    contents?.sendInputEvent({ type: 'mouseUp', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+  }, box);
+  await expect.poll(() => page.evaluate(() => Reflect.get(window, 'wkcFileClicks') as unknown)).toEqual([true]);
+
+  // A drag out of the window would leave a file on the desktop.
+  const dragCancelled = await page.evaluate(() => {
+    const image = document.querySelector('img') ?? document.body.appendChild(document.createElement('img'));
+    const drag = new DragEvent('dragstart', { bubbles: true, cancelable: true });
+    image.dispatchEvent(drag);
+    return drag.defaultPrevented;
+  });
+  expect(dragCancelled).toBe(true);
+});

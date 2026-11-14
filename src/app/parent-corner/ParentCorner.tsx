@@ -8,9 +8,10 @@ import { AppSettings } from './AppSettings.tsx';
 import { ChildSettings } from './ChildSettings.tsx';
 import { ProfilesSection } from './ProfilesSection.tsx';
 import { SkillsPracticed } from './SkillsPracticed.tsx';
+import { ThirdPartyNotices } from './ThirdPartyNotices.tsx';
 import { strings } from './strings.ts';
 
-/** The parent corner: children, one child's settings and skills, and settings for the whole app. */
+/** The parent corner: children, one child's settings and skills, settings for the whole app, and licenses. */
 export function ParentCorner() {
   const navigate = useNavigate();
   const { saveProblem, loadProblems } = useStorageProblems();
@@ -34,6 +35,7 @@ export function ParentCorner() {
         <ChildSettings />
         <SkillsPracticed />
         <AppSettings />
+        <ThirdPartyNotices />
       </main>
     </div>
   );

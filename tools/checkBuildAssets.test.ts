@@ -24,6 +24,12 @@ describe('findForeignBuildFiles', () => {
     expect(findForeignBuildFiles(build, assets)).toEqual(['assets/fox-a1b2c3.svg', 'assets/logo-123.png']);
   });
 
+  it('accepts the generated notices at the build root only', () => {
+    const notices = { path: 'third-party-notices.txt', bytes: bytes('notices') };
+    const elsewhere = { path: 'assets/third-party-notices.txt', bytes: bytes('notices') };
+    expect(findForeignBuildFiles([notices, elsewhere], assets)).toEqual(['assets/third-party-notices.txt']);
+  });
+
   it('treats an upper-case code extension as code', () => {
     expect(findForeignBuildFiles([{ path: 'X.JS', bytes: bytes('x') }], assets)).toEqual([]);
   });

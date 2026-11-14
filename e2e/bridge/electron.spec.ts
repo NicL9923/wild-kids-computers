@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
@@ -73,5 +73,10 @@ defineBridgeContract({
       return typeof width === 'number' ? width : null;
     });
     return { outcome, printedWidth };
+  },
+
+  async damageThumbnail(session, profileId, id, stored) {
+    const file = path.join(appOf(session).dataDir, 'profile', profileId, 'pictures', `${id}.thumb.png`);
+    await writeFile(file, Uint8Array.from(stored));
   },
 });

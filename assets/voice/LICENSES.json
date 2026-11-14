@@ -1,0 +1,8 @@
+[
+  {
+    "files": "NOTICE.txt",
+    "source": "Attribution for Kokoro-82M from its model card at https://huggingface.co/hexgrad/Kokoro-82M, which states Apache-2.0, followed by the Apache License 2.0 text from https://www.apache.org/licenses/LICENSE-2.0.txt",
+    "author": "hexgrad (Kokoro-82M) and The Apache Software Foundation (license text)",
+    "license": "Apache-2.0"
+  }
+]

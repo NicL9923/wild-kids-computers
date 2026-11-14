@@ -21,14 +21,14 @@ The main process registers `app` as a privileged scheme with `standard`, `secure
 The `app://` handler sends this policy as a response header. The production renderer build also carries it as a `<meta>` tag, so the browser build has it too. The dev server does not carry it.
 
 ```
-default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; sandbox allow-scripts allow-same-origin allow-forms
 ```
 
-Inline styles are allowed because Radix adds `<style>` tags for scroll locking. No source outside the bundle is allowed anywhere.
+Inline styles are allowed because Radix adds `<style>` tags for scroll locking. No source outside the bundle is allowed anywhere. `frame-ancestors` and `sandbox` work only as a header, so the `<meta>` tag leaves them out. The sandbox leaves out `allow-downloads` and `allow-modals`, so the page cannot start a download, print with `window.print()`, or open `alert`, `confirm`, or `prompt`.
 
 ### Keyboard and clipboard ownership
 
-- The main process sets an application menu with only the edit commands, which macOS needs for text fields. On macOS, Undo and Redo from the menu bar go to the page over `MENU_COMMAND_CHANNEL`, and `src/app/menuCommands.ts` replays them as the shortcut on the focused element, so an activity's own text model handles them instead of the browser's undo. Windows and Linux hide the menu bar and keep the plain edit role. It blocks reload, close, quit, zoom, and developer tools shortcuts in `before-input-event` unless the app runs unpackaged in dev. It fixes the zoom factor at 1.
+- The main process sets an application menu with only the edit commands, which macOS needs for text fields. On macOS, Undo and Redo from the menu bar go to the page over `MENU_COMMAND_CHANNEL`, and `src/app/menuCommands.ts` replays them as the shortcut on the focused element, so an activity's own text model handles them instead of the browser's undo. Windows and Linux hide the menu bar and keep the plain edit role. It blocks reload, quit, zoom, developer tools, and the Windows close keys Alt+F4 and Ctrl+F4 in `before-input-event` unless the app runs unpackaged in dev. Ctrl or Command plus W reaches the page, because the toy desktop teaches it as Close; the menu has no close accelerator, so the real window never closes from it. A unit test checks every shortcut the toy desktop menus show against the block on each system. It fixes the zoom factor at 1, and limits pinch zoom to 1 after each page load, because Electron rejects the limit before the page has a frame.
 - The app never reads or writes the system clipboard. `src/app/` handles `copy`, `cut`, and `paste` events at the document root and routes them to an in-app toy clipboard. An adult's copied password cannot land in a toy app, and a child's text cannot leave the app. Text inside an element marked `data-no-copy`, such as the pretend password in Secrets stay secret, is never copied or cut, even by a Select all that reaches over it.
 - The app root cancels every `dragstart`, so images do not produce ghost drags.
 - Spellcheck is off.
@@ -44,9 +44,12 @@ All of these apply at once. Each has a test.
 5. The content security policy above.
 6. `will-navigate`, `will-redirect`, `setWindowOpenHandler`, and `will-attach-webview` deny everything.
 7. Every permission request and permission check is denied.
-8. `tools/checkDependencies.ts` fails when `package.json` or the lockfile contains a denied package. The deny list covers HTTP clients, analytics, crash reporting, and auto-update packages. It also fails when a production dependency has a license outside a permissive allow list.
+8. The session cancels every download in `will-download`, so a file reaches the disk only through the bridge's export, which checks the bytes and sits behind the parent gate.
+9. `tools/checkDependencies.ts` fails when `package.json` or the lockfile contains a denied package. The deny list covers HTTP clients, analytics, crash reporting, and auto-update packages. It also fails when a production dependency has a license outside a permissive allow list.
 
 The end-to-end no-network test starts a local HTTP server on a free port. From the renderer it tries `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, an `<img>`, a `<link rel="dns-prefetch">`, a fetch from a Worker, a WebRTC peer connection, `window.open`, and a navigation. It asserts that each fails and that the server saw zero requests.
+
+The page also cannot write a file or open a system dialog outside the bridge. A link with a `download` attribute or a navigation to a downloadable response meets the sandbox and then the download cancel. Print and alert meet the sandbox. The Chromium switch `--disable-blink-features=FileSystemAccessLocal` removes `showOpenFilePicker`, `showSaveFilePicker`, and `showDirectoryPicker`. `src/app/inputGuards.ts` cancels a click on a file input, which would open the system file chooser, and every native drag, which could drop a file on the desktop. The no-network test offers every download a save path and checks that no file appears, and the isolation test checks each dialog.
 
 A second end-to-end test asserts hard rule 8: `process` and `require` are undefined in the page, `window.wkBridge` holds only the bridge functions, and the renderer process is sandboxed. On Linux the test reads the renderer's seccomp status from `/proc`.
 
@@ -171,7 +174,8 @@ export const strings = defineStrings('pop-the-seed-pods', {
 - Fluent Emoji files live in `assets/emoji/`. Import them with `tools/importEmoji.ts`, which copies from a local clone of the upstream repository and keeps the upstream MIT notice in `assets/emoji/LICENSE`.
 - Sound effects are synthesized at runtime with the Web Audio API in `src/audio/sfx/`. They are original work and add no files.
 - Original art is SVG, authored in this repository, and licensed MIT.
-- A build check fails when a non-code file in the renderer output did not come from `assets/`. `npm run build` runs it as `check:build-assets` after the renderer build. It matches files by content, because Vite renames them.
+- The app ships third-party notices. `tools/notices.ts` collects the license text of every production dependency and of Electron, every `LICENSES.json` entry with its license text, and the project's own license into one plain text file. A license text file in an asset folder covers that folder and the folders below it, so `assets/voice/NOTICE.txt` carries the Kokoro-82M attribution for the clips in `assets/voice/en/`. The renderer build writes the file as `third-party-notices.txt`, the parent corner shows it, and electron-builder puts a copy beside the program files. `npm run check:notices` fails when a shipped package or an asset entry by someone else has no license text, and `npm run check:packaged-notices` checks a packaged app for both copies.
+- A build check fails when a non-code file in the renderer output did not come from `assets/`. The generated notices file is the one exception. `npm run build` runs it as `check:build-assets` after the renderer build. It matches files by content, because Vite renames them.
 
 ## Platform bridge
 
@@ -181,7 +185,7 @@ The contract covers:
 
 - **Documents.** Read, write, and set aside a named JSON document, and remove everything of one profile. Names come from a fixed set of patterns in `src/core/platform/names.ts`, such as `profiles` and `profile/<id>/progress`.
 - **Pictures.** Save a PNG with its thumbnail, list, read, copy, move to trash, restore, and purge, per profile. Purge works only on a trashed picture.
-- **Window.** Fullscreen, kiosk lock, close request, and quit. With kiosk lock on, a close attempt calls the renderer's `onCloseRequest` listener. The renderer calls `acknowledgeCloseRequest()` at once and `quit()` after the parent gate passes. Without an answer within 3 seconds, the main process destroys the window, because a hung page never finishes its unload handlers. Before it calls `quit()`, the renderer's quit flow (`src/app/kiosk/closeRequest.ts`) finishes the work screens hold in its registry, such as an unsaved picture, and the session's queued writes. With kiosk lock off the window closes without asking, so the page holds the close back with `beforeunload` while anything is unsaved, finishes it, and quits. Work that has not finished after 5 seconds no longer holds the app open.
+- **Window.** Fullscreen, kiosk lock, close request, and quit. Every close attempt calls the renderer's `onCloseRequest` listener with `{ kioskLock }`. The renderer calls `acknowledgeCloseRequest()` at once and `quit()` when it is done: under kiosk lock after the parent gate passes, and without it right after saving. Without an answer within 3 seconds, the main process destroys the window, because a hung page never finishes its unload handlers. Before it calls `quit()`, the renderer's quit flow (`src/app/kiosk/closeRequest.ts`) finishes the work screens hold in its registry, such as an unsaved picture, and the session's queued writes. The browser build cannot hold a close request, so there the page holds the close back with `beforeunload` while anything is unsaved. Work that has not finished after 5 seconds no longer holds the app open.
 - **Export and print.** Save a PNG to a place the adult chooses, and print a PNG.
 - **Info.** Operating system family, app version, and whether the app runs in Electron. With `WKC_TEST=1` it also returns the `test` object that `launchApp` passed in `WKC_TEST_INFO`.
 
@@ -191,6 +195,8 @@ Rules:
 
 - The main process validates every IPC argument with Zod and rejects calls from any frame that is not the app's own page.
 - The main process writes files atomically: write a temporary file, flush it, then rename. Writes to one file run in call order.
+- A picture and its thumbnail commit as a pair. Both are staged complete and flushed, then the picture's rename commits the save and the thumbnail's rename follows. Before any picture call, the store finishes a commit that stopped after the picture's rename and discards one that stopped before it, so a listing never pairs a picture with another save's thumbnail.
+- The main process follows no link under the data directory. A path with a symbolic link or junction anywhere below `<userData>/data/` is refused with `forbidden`, and a linked picture file is left out of a listing. Reads stop at the size cap of their kind.
 - The Electron build keeps data under `<userData>/data/`: `app.json`, `profiles.json`, and `profile/<id>/` with `settings.json`, `progress.json`, `activity/<activity-id>.json`, and `pictures/` with a `trash/` folder. The browser build keeps the same names in IndexedDB.
 - In a test run the page exposes the bridge it uses as `window.wkcTest.bridge`. The Electron app does this only with `WKC_TEST=1`. The browser build does it with a `wkc-test` query parameter, which grants nothing the page could not already do.
 - The bridge moves bytes and text. Schema validation of documents happens in `src/core/storage/`, so both implementations share it.
@@ -368,7 +374,7 @@ Each page has an entry, `src/features/paint-studio/coloringPages/<pageId>.ts`, f
 | `npm run typecheck`    | The type checker over `src`, `electron`, `e2e`, and `tools`                                                  |
 | `npm test`             | Vitest unit tests, including paint goldens and the registry test                                             |
 | `npm run test:tz`      | The unit tests again under a timezone east of UTC                                                            |
-| `npm run check`        | Licenses, voice, dependencies, and strings checks                                                            |
+| `npm run check`        | Licenses, voice, dependencies, strings, and third-party notices checks                                       |
 | `npm run e2e`          | Playwright against Electron                                                                                  |
 | `npm run e2e:browser`  | Bridge contract tests and a load test against the browser build                                              |
 | `npm run mutation`     | Stryker on paint math, level generators, the difficulty model, and storage validation                        |

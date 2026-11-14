@@ -67,6 +67,18 @@ test('layer 3: every address, loopback included, goes to the dead proxy', async 
   expect(proxies).toEqual(Array.from({ length: 4 }, () => 'PROXY 127.0.0.1:9'));
 });
 
+test('the session cancels a download, even one the main process starts', async () => {
+  const outcome = await launched.app.evaluate(({ BrowserWindow, session }) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    if (contents === undefined) throw new Error('No window.');
+    return new Promise<boolean>((resolve) => {
+      session.defaultSession.once('will-download', (event) => resolve(event.defaultPrevented));
+      contents.downloadURL('data:text/plain,not%20saved');
+    });
+  });
+  expect(outcome).toBe(true);
+});
+
 test('layer 4: the spellchecker is off', async () => {
   const enabled = await launched.app.evaluate(({ session }) => session.defaultSession.isSpellCheckerEnabled());
   expect(enabled).toBe(false);

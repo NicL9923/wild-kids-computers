@@ -52,7 +52,7 @@ export type WkBridgeIpc = {
     ...args: Parameters<MethodSignature<M>>
   ) => Promise<IpcResult<Awaited<ReturnType<MethodSignature<M>>>>>;
 } & {
-  onCloseRequest(listener: () => void): () => void;
+  onCloseRequest(listener: (request: unknown) => void): () => void;
   onMenuCommand(listener: (command: unknown) => void): () => void;
 };
 
@@ -60,7 +60,7 @@ export function channelFor(method: BridgeMethod): `wkc:${BridgeMethod}` {
   return `wkc:${method}`;
 }
 
-/** Main to renderer: someone tried to close the app while kiosk lock is on. */
+/** Main to renderer: someone tried to close the window. Carries a CloseRequest. */
 export const CLOSE_REQUEST_CHANNEL = 'wkc:close-request';
 
 /** Main to renderer: Undo or Redo was chosen from the macOS Edit menu. */

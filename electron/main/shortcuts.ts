@@ -22,6 +22,11 @@ const DEVTOOLS_CODES = new Set(['KeyI', 'KeyJ', 'KeyC']);
  * Everything else reaches the page, including the copy, paste, undo, and save shortcuts that
  * the shortcut workshop teaches.
  *
+ * Ctrl or Command plus W reaches the page, because the toy desktop teaches it as Close. The real
+ * window never closes from it: the application menu has no close accelerator, and any close goes
+ * to the renderer as a close request first. Alt+F4 and Ctrl+F4 stay blocked, because Windows
+ * closes the window from them itself.
+ *
  * Letters match on `key`, not `code`, so a layout where Z sits on the W key keeps its undo.
  */
 export function blockedShortcut(input: KeyInput, os: OsFamily): BlockedShortcut | null {
@@ -36,7 +41,6 @@ export function blockedShortcut(input: KeyInput, os: OsFamily): BlockedShortcut 
 
   if (input.key === 'F5' || (primary && letter === 'r')) return 'reload';
   if (input.key === 'F4' && (input.alt || input.control)) return 'close';
-  if (primary && letter === 'w') return 'close';
   if (primary && letter === 'q') return 'quit';
   if (primary && (ZOOM_KEYS.has(input.key) || ZOOM_CODES.has(input.code))) return 'zoom';
   return null;

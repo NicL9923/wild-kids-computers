@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hashParentPin } from '../../core/storage/parentPin.ts';
 import { strings as parentCornerStrings } from '../parent-corner/strings.ts';
 import { renderShell, savedProfiles, wordGateAnswer } from '../testing/shellHarness.tsx';
@@ -90,6 +90,43 @@ describe('PIN gate', () => {
     await gate();
     fireEvent.click(screen.getByText(strings.forgotPin.text));
     expect(screen.getByText(strings.forgotPinSteps.text)).toBeTruthy();
+  });
+});
+
+describe('a PIN record the gate cannot use', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sets a corrupt record aside and asks for the words, so the adult can still quit', async () => {
+    // Once accepted by the schema, this record made the PIN check throw and the gate hang.
+    const parentPin = { algorithm: 'PBKDF2-SHA256', iterations: 100_000, salt: 'a', hash: 'a' } as const;
+    const { fake, requestClose, windowCalls } = await renderShell('/home', {
+      documents: savedProfiles([FOX], FOX.id, {}, { parentPin, kioskLock: true }),
+    });
+    expect(fake.setAside).toEqual(['app']);
+    act(() => requestClose());
+    await screen.findByRole('dialog', { name: strings['title-quit'].text });
+    expect(wordGateAnswer()).toMatch(/^\d{3}$/);
+    type(strings.wordLabel.text, wordGateAnswer());
+    submit();
+    await waitFor(() => expect(windowCalls).toEqual(['acknowledge', 'quit']));
+  });
+
+  it('falls back to the words when checking the PIN fails', async () => {
+    const parentPin = await hashParentPin('2468', 100_000);
+    await renderShell('/parent', { documents: savedProfiles([FOX], FOX.id, {}, { parentPin }) });
+    await gate();
+    // Web Crypto is the platform edge the PIN check depends on.
+    vi.spyOn(globalThis.crypto.subtle, 'deriveBits').mockRejectedValue(new DOMException('failed', 'OperationError'));
+    type(strings.pinLabel.text, '2468');
+    submit();
+    await screen.findByTestId('gate-words');
+    expect(screen.getByRole('status').textContent).toBe(strings.pinUnusable.text);
+    expect(screen.getByRole('button', { name: strings.continue.text })).toHaveProperty('disabled', false);
+    type(strings.wordLabel.text, wordGateAnswer());
+    submit();
+    await screen.findByRole('heading', { level: 1, name: parentCornerStrings.title.text });
   });
 });
 
