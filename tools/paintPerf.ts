@@ -64,6 +64,9 @@ function measureFill(): Stats {
   return stats(samples.slice(2));
 }
 
+/** A looping scribble across most of the canvas. */
+const pointAt = (a: number): ToolPoint => ({ x: 800 + 650 * cos(a) * cos(a * 0.37), y: 500 + 400 * sin(a * 1.3) });
+
 /**
  * Fast scribbles: the pointer travels `speed` pixels per 120 Hz frame along a looping path,
  * reported as four coalesced points per frame. Each sample is one frame's work, undo tiles
@@ -74,7 +77,6 @@ function measureStroke(tip: BrushTip, size: number, speed: number, painter: Stro
   const history = new History(doc);
   const samples: number[] = [];
   let angle = 0;
-  const pointAt = (a: number): ToolPoint => ({ x: 800 + 650 * cos(a) * cos(a * 0.37), y: 500 + 400 * sin(a * 1.3) });
   for (let strokeIndex = 0; strokeIndex < 6; strokeIndex++) {
     const stroke = startStroke(history, painter, settings({ tip, size }));
     stroke.begin(pointAt(angle));
@@ -96,11 +98,16 @@ function measureStroke(tip: BrushTip, size: number, speed: number, painter: Stro
   return stats(samples.slice(60));
 }
 
+function isEffectModule(value: unknown): value is { default: PaintEffect } {
+  return typeof value === 'object' && value !== null && 'default' in value;
+}
+
 async function measureEffects(): Promise<{ id: string; first: number; steady: number }[]> {
   const dir = path.join(process.cwd(), 'src/core/paint/effects');
   const results: { id: string; first: number; steady: number }[] = [];
   for (const id of readdirSync(dir).toSorted()) {
-    const module = (await import(pathToFileURL(path.join(dir, id, 'index.ts')).href)) as { default: PaintEffect };
+    const module: unknown = await import(pathToFileURL(path.join(dir, id, 'index.ts')).href);
+    if (!isEffectModule(module)) throw new Error(`${id} has no default export.`);
     const effect = module.default;
     if (effect.group !== 'whole-picture') continue;
     const doc = createDocument();
