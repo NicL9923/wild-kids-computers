@@ -1,0 +1,132 @@
+/*
+ * Memory pairs: a grid of square cards as big as the stage allows. A face-down card shows the
+ * same leaf on the primary color; a face-up card shows its picture on white. A matched card rests
+ * with a success edge and a check, so a match is never color alone. Every value is a token.
+ */
+
+.mp-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: var(--wk-space-container);
+  container-type: size;
+}
+
+.mp-cards {
+  --mp-gap: var(--wk-space-container);
+  --mp-card: min(
+    calc((100cqw - (var(--mp-columns) - 1) * var(--mp-gap)) / var(--mp-columns)),
+    calc((100cqh - var(--wk-space-container) - (var(--mp-rows) - 1) * var(--mp-gap)) / var(--mp-rows)),
+    360px
+  );
+  display: grid;
+  grid-template-columns: repeat(var(--mp-columns), var(--mp-card));
+  grid-auto-rows: var(--mp-card);
+  gap: var(--mp-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-band='band-9-12'] .mp-cards,
+[data-band='band-6-8'] .mp-cards {
+  --mp-gap: var(--wk-space-item);
+}
+
+.mp-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-primary);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+  transition: background-color calc(var(--wk-duration-quick)) var(--wk-ease-out);
+}
+
+.mp-card:hover:not([data-up='true']) {
+  background: var(--wk-color-primary-hover);
+}
+
+.mp-card[data-up='true'] {
+  background: var(--wk-color-surface);
+  cursor: default;
+  animation: mp-turn var(--wk-duration-base) var(--wk-ease-out);
+}
+
+/* Turning over: the card narrows and opens again, which reduced motion turns off. */
+@keyframes mp-turn {
+  from {
+    scale: calc(1 - 0.9 * var(--wk-motion-scale)) 1;
+  }
+}
+
+.mp-back {
+  width: 70%;
+  height: 70%;
+}
+
+.mp-back-ring {
+  fill: none;
+  stroke: var(--wk-color-on-primary);
+  stroke-width: 4;
+  opacity: 0.5;
+}
+
+.mp-back-leaf {
+  fill: var(--wk-color-on-primary);
+}
+
+.mp-back-vein {
+  fill: none;
+  stroke: var(--wk-color-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.mp-picture {
+  width: 74%;
+  height: 74%;
+}
+
+.mp-card[data-matched='true'] {
+  border-color: var(--wk-color-success);
+  border-width: calc(var(--wk-border-width) * 2);
+  box-shadow: none;
+}
+
+/* After two misses, the match of the turned card glows with a thick edge and a slow grow. */
+.mp-card[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-accent);
+  animation: mp-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes mp-hint {
+  to {
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+}
+
+.mp-check {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  display: grid;
+  place-items: center;
+  width: 26%;
+  height: 26%;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-success);
+  color: var(--wk-color-on-success);
+}
+
+.mp-check svg {
+  width: 60%;
+  height: 60%;
+}

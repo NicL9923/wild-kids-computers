@@ -1,0 +1,126 @@
+/*
+ * Mazes: the maze fills the stage with square cells. The animal glides cell to cell; reduced
+ * motion makes the move instant. Walked cells keep a small dot. Every value is a token.
+ */
+
+.mz-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  padding: 0 var(--wk-space-container) var(--wk-space-container);
+}
+
+.mz-board-area {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  container-type: size;
+}
+
+.mz-board {
+  position: relative;
+  border-radius: var(--wk-radius-small);
+  touch-action: none;
+  cursor: pointer;
+}
+
+.mz-drawing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mz-floor {
+  fill: var(--wk-color-surface);
+}
+
+.mz-wall {
+  fill: none;
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.mz-trail {
+  fill: var(--wk-color-primary);
+  opacity: 0.45;
+}
+
+/* The next cell on the way, after two bumps: a soft filled square with a thick edge that breathes. */
+.mz-hint {
+  fill: var(--wk-color-selected);
+  stroke: var(--wk-color-primary);
+  stroke-width: 6;
+  animation: mz-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes mz-hint {
+  to {
+    opacity: 0.5;
+  }
+}
+
+.mz-piece {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  transition:
+    left calc(var(--wk-duration-base) * var(--wk-motion-scale)) var(--wk-ease-out),
+    top calc(var(--wk-duration-base) * var(--wk-motion-scale)) var(--wk-ease-out);
+}
+
+.mz-piece img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mz-snack {
+  outline: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  outline-offset: calc(var(--wk-border-width) * 2);
+  border-radius: var(--wk-radius-round);
+}
+
+.mz-snack img {
+  scale: 0.8;
+}
+
+.mz-snack[data-arrived='true'] {
+  opacity: 0;
+}
+
+.mz-critter {
+  z-index: 1;
+}
+
+/* A bump: a small shake that the motion scale turns off. */
+.mz-critter[data-wobble='1'] img {
+  animation: mz-wobble-a var(--wk-duration-base) var(--wk-ease-out);
+}
+
+.mz-critter[data-wobble='0'] img {
+  animation: mz-wobble-b var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes mz-wobble-a {
+  30% {
+    rotate: calc(-8deg * var(--wk-motion-scale));
+  }
+
+  70% {
+    rotate: calc(6deg * var(--wk-motion-scale));
+  }
+}
+
+@keyframes mz-wobble-b {
+  30% {
+    rotate: calc(8deg * var(--wk-motion-scale));
+  }
+
+  70% {
+    rotate: calc(-6deg * var(--wk-motion-scale));
+  }
+}

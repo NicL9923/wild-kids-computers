@@ -31,6 +31,10 @@ const config = {
     // The choice and scatter helpers the number and math level generators share.
     'src/features/early-learning/math/choices.ts',
     'src/features/early-learning/math/scatter.ts',
+    // The picture sets, scenes, and picture check the memory and logic level generators build on.
+    'src/features/early-learning/logic/pictures.ts',
+    'src/features/early-learning/logic/scene.ts',
+    'src/features/early-learning/logic/pieceDetail.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
