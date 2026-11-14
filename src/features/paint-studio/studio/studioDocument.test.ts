@@ -110,6 +110,29 @@ describe('StudioDocument', () => {
     }
   });
 
+  it('refuses an effect result worked out before the picture changed, and keeps its undo and redo', () => {
+    const studio = new StudioDocument(40, 20);
+    const red = createSurface(40, 20, rgba(200, 0, 0)).data;
+    studio.replacePaint(red);
+    const blue = createSurface(40, 20, rgba(0, 0, 200)).data;
+
+    // The effect started at this version, then the child undid the red before it finished.
+    const started = studio.version;
+    studio.undo();
+    expect(studio.replacePaintFrom(started, blue)).toBe(false);
+    expect(pixel(studio, 5, 5)).toEqual([255, 255, 255, 255]);
+    expect(studio.canRedo).toBe(true);
+
+    // A stroke still open is a change too.
+    const before = studio.version;
+    studio.begin(brush, RED, { x: 2, y: 2 });
+    expect(studio.replacePaintFrom(before, blue)).toBe(false);
+    studio.cancel();
+
+    expect(studio.replacePaintFrom(studio.version, blue)).toBe(true);
+    expect(pixel(studio, 5, 5)).toEqual([0, 0, 200, 255]);
+  });
+
   it('notifies listeners on changes', () => {
     const studio = new StudioDocument(40, 20);
     const seen: number[] = [];

@@ -156,6 +156,18 @@ export class StudioDocument {
     this.emit();
   }
 
+  /**
+   * Lands a whole-picture effect that was worked out from the picture at `version`, as one
+   * undoable step. A worker takes a while, and the picture may have changed meanwhile, such as by
+   * an undo. Applying the old result then would wipe that change and its redo, so it is refused.
+   * Returns whether it landed.
+   */
+  replacePaintFrom(version: number, pixels: Uint8ClampedArray): boolean {
+    if (this.stroke !== null || this.version !== version) return false;
+    this.replacePaint(pixels);
+    return true;
+  }
+
   /** Marks everything for repainting, such as after the canvas element is replaced. */
   invalidate(): void {
     this.paint({ x: 0, y: 0, width: this.doc.width, height: this.doc.height });
