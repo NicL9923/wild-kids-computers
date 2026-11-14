@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toyClipboard } from '../../../app/inputGuards.ts';
 import type { SfxName } from '../../../audio/sfx/sfxNames.ts';
 import type { Band } from '../../../core/bands.ts';
@@ -289,7 +289,7 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const layers = new Map(state.windows.map((window, index) => [window.id, index + 1]));
   return (
     <DesktopContext.Provider value={context}>
-      <div className='td-monitor' data-band={band} style={{ '--wk-zoom': zoom } as CSSProperties}>
+      <div className='td-monitor' data-band={band} style={{ '--wk-zoom': zoom }}>
         <section
           className='td-screen'
           aria-label={t(strings.screen)}
