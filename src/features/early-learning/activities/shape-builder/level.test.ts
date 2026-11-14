@@ -17,7 +17,9 @@ function problems(level: ShapeBuilderLevel): string[] {
   }
   for (const tile of tiles) {
     if (tile.piece === null) {
-      if (picture.pieces.some((piece) => piece.shape === tile.shape)) found.push(`spare ${tile.id} looks like a piece`);
+      if ([...picture.pieces, ...picture.details].some((part) => part.shape === tile.shape)) {
+        found.push(`spare ${tile.id} looks like a part of the picture`);
+      }
     } else if (!missing.includes(tile.piece)) found.push(`${tile.id} belongs to a piece already drawn`);
     if (tile.left < 0 || tile.top < 0 || tile.left + tile.width > TRAY.width || tile.top + tile.height > TRAY.height) {
       found.push(`${tile.id} leaves the tray`);

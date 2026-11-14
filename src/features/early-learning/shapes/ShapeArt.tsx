@@ -18,6 +18,9 @@ const PAINT: Readonly<Record<ShapePaint, string>> = {
 
 const OUTLINE = '#2b2420';
 
+/** Half the width of a shape's edge, in the units of its box. */
+const EDGE = 4;
+
 /**
  * One shape, drawn to fill its box. A piece is painted with a dark edge. A hole is a dark,
  * sunken shape. An outline is a dashed edge that shows where a piece goes. Decorative: the
@@ -43,7 +46,8 @@ export function ShapeArt({
   className?: string;
   style?: CSSProperties;
 }) {
-  const edge = Math.max(3, Math.min(width, height) * 0.045);
+  // One edge width for every shape, so big and small shapes read as one set.
+  const edge = Math.min(EDGE, Math.min(width, height) / 6);
   const d = shapePath(kind, width, height, turn, edge);
   return (
     <svg

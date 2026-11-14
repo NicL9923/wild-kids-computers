@@ -11,7 +11,7 @@ import { createRandom, type Random } from '../../../../core/activityKit/random.t
  */
 
 export type Cycle = 'days' | 'months';
-export type Mode = 'after' | 'before' | 'order';
+type Mode = 'after' | 'before' | 'order';
 
 export const CYCLE_LENGTH: Readonly<Record<Cycle, number>> = { days: 7, months: 12 };
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Random } from '../../../../core/activityKit/random.ts';
 import { ANIMALS, HOMES, livesIn } from './homes.ts';
-import { animalsFor, generateLevel, MAX_DIFFICULTY, type AnimalHomesLevel } from './level.ts';
+import { animalOrder, animalsFor, generateLevel, MAX_DIFFICULTY, type AnimalHomesLevel } from './level.ts';
 
 const SEEDS = Array.from({ length: 300 }, (_, index) => index * 8_191 + 4);
 
@@ -87,5 +87,25 @@ describe('animalsFor', () => {
     expect(animalsFor(inOrder, ['ocean'], true)?.map((animal) => animal.id)).toEqual(['whale']);
     expect(animalsFor(inOrder, ['cave', 'burrow'], true)).toBeNull();
     expect(animalsFor(inOrder, ['cave', 'burrow'], false)?.map((animal) => animal.id)).toEqual(['bat', 'rabbit']);
+  });
+});
+
+describe('animalOrder', () => {
+  const still: Random = {
+    next: () => 0,
+    int: (min) => min,
+    pick: (items) => {
+      for (const item of items) return item;
+      throw new RangeError('empty');
+    },
+    shuffle: (items) => [...items],
+    sample: (items, count) => items.slice(0, count),
+  };
+
+  it('moves every animal off its own home by one place when shuffling keeps failing', () => {
+    const homes = ['nest', 'ocean', 'barn'] as const;
+    const animals = animalsFor(still, homes, true);
+    if (animals === null) throw new Error('The table has familiar animals for these homes.');
+    expect(animalOrder(still, animals, homes).map((animal) => animal.home)).toEqual(['ocean', 'barn', 'nest']);
   });
 });

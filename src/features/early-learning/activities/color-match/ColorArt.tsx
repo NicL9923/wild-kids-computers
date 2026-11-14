@@ -5,7 +5,7 @@ import type { MatchColor, ToyKind } from './level.ts';
  * The paint for each color, and a pattern of its own for a child who sees some colors alike.
  * Each pattern differs in direction or mark, not just density, so no two read the same.
  */
-export const PAINT: Readonly<Record<MatchColor, string>> = {
+const PAINT: Readonly<Record<MatchColor, string>> = {
   red: '#d93a3a',
   orange: '#f08a24',
   yellow: '#f5cf2f',

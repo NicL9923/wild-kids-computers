@@ -26,9 +26,9 @@ export const KINDS = [
   'tree',
 ] as const satisfies readonly EmojiId[];
 
-export type Mode = 'pick' | 'order';
+type Mode = 'pick' | 'order';
 /** Which end the child looks for: the biggest first, or the smallest first. */
-export type Direction = 'big' | 'small';
+type Direction = 'big' | 'small';
 
 interface Tier {
   readonly mode: Mode;
@@ -79,7 +79,7 @@ function tierFor(difficulty: number): Tier {
 }
 
 /** The biggest picture, smaller when more share the row. */
-export function biggestSize(count: number): number {
+function biggestSize(count: number): number {
   if (count <= 3) return 300;
   if (count === 4) return 260;
   return 230;

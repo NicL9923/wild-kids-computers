@@ -6,7 +6,7 @@ export const strings = defineStrings('tell-the-time', {
   whatTime: { text: 'What time does the clock show?' },
   setTo: { text: 'Turn the hands to show' },
   setShown: { text: 'Turn the hands to show this time.', silent: 'decorative' },
-  oclock: { text: "o'clock", speech: 'oh clock' },
+  oclock: { text: "o'clock" },
   halfPast: { text: 'half past' },
   quarterPast: { text: 'quarter past' },
   quarterTo: { text: 'quarter to' },

@@ -47,12 +47,18 @@
   border: 0;
 }
 
+.tt-stage {
+  /* Times and buttons grow with tall windows, never below the band's sizes. */
+  --tt-time: max(var(--wk-text-display), 6.5vh);
+  --tt-label: max(var(--wk-text-body), 2.6vh);
+}
+
 .tt-choice,
 .tt-target {
-  min-width: calc(var(--wk-target-large) * 1.6);
-  min-height: calc(var(--wk-target-min) * 1.4);
+  min-width: calc(var(--tt-time) * 4);
+  min-height: max(calc(var(--wk-target-min) * 1.4), calc(var(--tt-time) * 1.9));
   font: inherit;
-  font-size: var(--wk-text-display);
+  font-size: var(--tt-time);
   font-weight: var(--wk-font-weight-bold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -133,7 +139,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--wk-space-item);
-  min-height: var(--wk-target-min);
+  min-height: max(var(--wk-target-min), calc(var(--tt-label) * 2.6));
   padding: var(--wk-space-item) var(--wk-space-container);
   border: var(--wk-border-width) solid var(--wk-color-primary-base);
   border-radius: var(--wk-radius-control);
@@ -141,7 +147,7 @@
   color: var(--wk-color-text);
   box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
   font: inherit;
-  font-size: var(--wk-text-body);
+  font-size: var(--tt-label);
   font-weight: var(--wk-font-weight-bold);
   cursor: pointer;
 }
@@ -153,8 +159,8 @@
 
 .tt-turn-icon {
   flex: none;
-  width: var(--wk-icon-size);
-  height: var(--wk-icon-size);
+  width: max(var(--wk-icon-size), calc(var(--tt-label) * 1.4));
+  height: max(var(--wk-icon-size), calc(var(--tt-label) * 1.4));
 }
 
 /* Forward turns clockwise: the back arrow, mirrored. */

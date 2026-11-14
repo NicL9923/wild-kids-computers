@@ -9,10 +9,10 @@ import { PICTURES, type MirrorPicture } from './pictures.ts';
  * mirror line to lie flat.
  */
 
-export type Axis = 'vertical' | 'horizontal';
+type Axis = 'vertical' | 'horizontal';
 /** Which half the child sees filled: the left or top, or the right or bottom. */
-export type Given = 'first' | 'second';
-export type GridSize = 4 | 6 | 8 | 10;
+type Given = 'first' | 'second';
+type GridSize = 4 | 6 | 8 | 10;
 
 interface Tier {
   readonly size: GridSize;

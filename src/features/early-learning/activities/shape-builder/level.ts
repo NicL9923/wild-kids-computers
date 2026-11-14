@@ -14,7 +14,7 @@ import { PICTURES, type Part, type Picture } from './pictures.ts';
 
 export const TRAY = { width: 460, height: 640 } as const;
 /** The space between two pieces in the tray. */
-export const TRAY_GAP = 30;
+const TRAY_GAP = 30;
 
 interface Tier {
   readonly missing: number;
@@ -113,9 +113,12 @@ function rowWidth(row: readonly { box: Box }[]): number {
   return row.reduce((sum, { box }) => sum + box.width, 0) + TRAY_GAP * (row.length - 1);
 }
 
-/** Spares whose kind is not in the picture, so a spare never looks like it might fit. */
+/**
+ * Spares whose kind is nowhere in the picture, not even in a detail such as a heart on a kite,
+ * so a spare never looks like it might fit.
+ */
 function sparesFor(random: Random, picture: Picture, count: number): Omit<Part, 'x' | 'y'>[] {
-  const kinds = new Set<ShapeKind>(picture.pieces.map((piece) => piece.shape));
+  const kinds = new Set<ShapeKind>([...picture.pieces, ...picture.details].map((part) => part.shape));
   return random
     .sample(
       SPARES.filter((spare) => !kinds.has(spare.shape)),

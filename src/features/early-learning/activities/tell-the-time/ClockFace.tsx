@@ -10,7 +10,7 @@ function at(radius: number, turn: number): { x: number; y: number } {
 }
 
 /** The hands' angles, clockwise from twelve. The hour hand moves on between the hours. */
-export function handAngles(time: ClockTime): { hour: number; minute: number } {
+function handAngles(time: ClockTime): { hour: number; minute: number } {
   return { hour: (time.hour % 12) * 30 + time.minute / 2, minute: time.minute * 6 };
 }
 

@@ -120,7 +120,7 @@ export function shapePath(kind: ShapeKind, width: number, height: number, by: Tu
 }
 
 /** The paints a shape piece can wear, by name, so levels stay plain data. */
-export const SHAPE_PAINTS = [
+const SHAPE_PAINTS = [
   'red',
   'orange',
   'yellow',

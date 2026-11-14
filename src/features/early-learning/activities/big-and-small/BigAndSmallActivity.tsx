@@ -6,7 +6,7 @@ import { feedback } from '../../../../core/strings/shared/index.ts';
 import { ANSWER_PAUSE_MS, HINT_AFTER_TRIES, useChoiceRound } from '../../reading/useChoiceRound.ts';
 import { useRoundInstruction } from '../../reading/useRoundInstruction.ts';
 import './bigAndSmall.css';
-import { ROW_WIDTH, type BigAndSmallLevel, type Item, type ItemId } from './level.ts';
+import { GAP, type BigAndSmallLevel, type Item, type ItemId } from './level.ts';
 import { strings } from './strings.ts';
 
 /** The instruction for the round. */
@@ -16,11 +16,24 @@ function instructionFor(level: BigAndSmallLevel): SpokenHandle {
   return level.direction === 'big' ? strings.biggest : strings.smallest;
 }
 
+/**
+ * The row's measures for CSS: its width in board units and its tallest picture, so the row fills
+ * the stage as far as the tallest picture's height allows.
+ */
+const rowUnits = (items: readonly Item[]) => items.reduce((sum, item) => sum + item.size, 0) + GAP * (items.length - 1);
+
+function rowStyle(items: readonly Item[]): CSSProperties {
+  return {
+    '--bs-units': rowUnits(items),
+    '--bs-tallest': Math.max(...items.map((item) => item.size)),
+  } as CSSProperties;
+}
+
 /** A picture's box as a share of the row's width, so every size scales together. */
-const sizeStyle = (item: Item): CSSProperties => {
-  const share = `${String((item.size / ROW_WIDTH) * 100)}cqw`;
+function sizeStyle(item: Item, items: readonly Item[]): CSSProperties {
+  const share = `${String((item.size / rowUnits(items)) * 100)}cqw`;
   return { width: share, height: share };
-};
+}
 
 /**
  * The same picture in a few sizes, standing on one line so sizes compare fairly. "Pick" rounds
@@ -36,10 +49,10 @@ function Pick({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
   const [answer] = level.answer;
   const round = useChoiceRound<ItemId>(kit, answer, { onRight: [feedback.thatsIt] });
   return (
-    <div className='bs-stage' data-mode='pick'>
+    <div className='bs-stage' data-mode='pick' style={rowStyle(level.items)}>
       <ul className='bs-row' aria-label={t(strings.pictures)}>
         {level.items.map((item) => (
-          <li key={item.id} className='bs-spot' style={sizeStyle(item)}>
+          <li key={item.id} className='bs-spot' style={sizeStyle(item, level.items)}>
             <button
               type='button'
               className='bs-item'
@@ -68,6 +81,7 @@ function Order({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
   const wanted = level.answer[placed];
   const hinted = !done && tries >= HINT_AFTER_TRIES;
   const row = useRef<HTMLUListElement | null>(null);
+  const line = useRef<HTMLOListElement | null>(null);
   const lined = level.answer.slice(0, placed);
   const byId = new Map(level.items.map((item) => [item.id, item]));
 
@@ -86,12 +100,12 @@ function Order({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
       const next = placed + 1;
       setPlaced(next);
       setTries(0);
-      kit.feedback.correct({ at: element });
+      kit.play('tap');
       if (next === level.answer.length) {
+        // The check mark goes on the finished line, where the child is looking.
+        kit.feedback.correct({ at: line.current ?? element });
         void kit.speak(feedback.youDidIt);
         kit.scope.setTimeout(() => kit.roundComplete(), ANSWER_PAUSE_MS);
-      } else {
-        kit.play('tap');
       }
       return;
     }
@@ -103,10 +117,10 @@ function Order({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
   }
 
   return (
-    <div className='bs-stage' data-mode='order'>
+    <div className='bs-stage' data-mode='order' style={rowStyle(level.items)}>
       <ul ref={row} className='bs-row' aria-label={t(strings.pictures)}>
         {level.items.map((item) => (
-          <li key={item.id} className='bs-spot' style={sizeStyle(item)}>
+          <li key={item.id} className='bs-spot' style={sizeStyle(item, level.items)}>
             {!lined.includes(item.id) && (
               <button
                 type='button'
@@ -122,11 +136,11 @@ function Order({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
           </li>
         ))}
       </ul>
-      <ol className='bs-row bs-line' aria-label={t(strings.line)}>
+      <ol ref={line} className='bs-row bs-line' aria-label={t(strings.line)}>
         {lined.map((id) => {
           const item = byId.get(id);
           return item === undefined ? null : (
-            <li key={id} className='bs-spot bs-lined' data-lined={id} style={sizeStyle(item)}>
+            <li key={id} className='bs-spot bs-lined' data-lined={id} style={sizeStyle(item, level.items)}>
               <Emoji id={level.kind} />
             </li>
           );

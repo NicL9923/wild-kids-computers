@@ -5,8 +5,8 @@
  */
 
 .cm-stage {
-  --cm-toy: max(var(--wk-target-large), min(20vh, 12vw));
-  --cm-box: max(calc(var(--wk-target-large) * 1.2), min(26vh, 16vw));
+  --cm-toy: max(var(--wk-target-large), min(24vh, 14vw));
+  --cm-box: max(calc(var(--wk-target-large) * 1.2), min(30vh, 17vw));
   position: absolute;
   inset: 0;
   display: grid;

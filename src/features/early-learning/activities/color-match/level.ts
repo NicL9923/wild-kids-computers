@@ -12,7 +12,7 @@ export const MATCH_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple
 export type MatchColor = (typeof MATCH_COLORS)[number];
 
 /** Neighbors on the color wheel, or colors close in lightness, that young children mix up. */
-export const NEAR_COLORS: readonly (readonly [MatchColor, MatchColor])[] = [
+const NEAR_COLORS: readonly (readonly [MatchColor, MatchColor])[] = [
   ['red', 'orange'],
   ['red', 'pink'],
   ['red', 'brown'],
@@ -53,7 +53,7 @@ export const MAX_DIFFICULTY = TIERS.length;
 
 export type ToyId = `toy-${number}`;
 
-export interface Toy {
+interface Toy {
   readonly id: ToyId;
   readonly color: MatchColor;
   readonly kind: ToyKind;

@@ -15,7 +15,7 @@ const COMMON: readonly ShapeKind[] = [...BASIC, 'rectangle', 'heart', 'star'];
 const ALL: readonly ShapeKind[] = [...COMMON, 'oval', 'diamond', 'hexagon'];
 
 /** Shapes a young child mixes up. */
-export const ALIKE: readonly (readonly [ShapeKind, ShapeKind])[] = [
+const ALIKE: readonly (readonly [ShapeKind, ShapeKind])[] = [
   ['circle', 'oval'],
   ['circle', 'hexagon'],
   ['square', 'rectangle'],
@@ -68,7 +68,7 @@ export const MAX_DIFFICULTY = TIERS.length;
 
 export type PieceId = `piece-${number}`;
 
-export interface Piece {
+interface Piece {
   readonly id: PieceId;
   readonly shape: ShapeKind;
   readonly paint: ShapePaint;

@@ -14,7 +14,7 @@ export interface ClockTime {
   readonly minute: number;
 }
 
-export type Mode = 'read' | 'set';
+type Mode = 'read' | 'set';
 /** Minutes between the times a round uses. */
 export type Step = 60 | 30 | 15 | 5;
 

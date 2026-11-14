@@ -1,23 +1,16 @@
 /*
  * Day and month names are long words, so their boxes are wide and their text sized for a word.
- * The rest of the look comes from the shared reading styles.
+ * Five names fit in one row at 1280 by 800. The rest of the look comes from the shared reading
+ * styles; these selectors are stronger than theirs on purpose.
  */
 
 .dm-stage {
-  --rd-size: max(var(--wk-target-large), min(16vh, 10vw));
+  --rd-size: max(var(--wk-target-large), min(14vh, 8vw));
 }
 
-.dm-name {
-  min-width: calc(var(--rd-size) * 2.1);
-  font-size: calc(var(--rd-size) * 0.26);
-}
-
-.dm-stage .rd-shown.dm-name,
-.dm-stage .rd-slot.dm-name {
-  font-size: calc(var(--rd-size) * 0.26);
+.dm-stage .dm-name:is(.rd-slot, .rd-tile, .rd-shown, .rd-tile-home) {
+  box-sizing: border-box;
+  min-width: calc(var(--rd-size) * 1.9);
   padding: 0 var(--wk-space-item);
-}
-
-.dm-stage[data-mode='order'] .dm-boxes {
-  flex-wrap: wrap;
+  font-size: calc(var(--rd-size) * 0.26);
 }

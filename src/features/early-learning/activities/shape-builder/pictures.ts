@@ -20,7 +20,7 @@ export interface Part {
   readonly paint: ShapePaint;
 }
 
-export interface Detail extends Part {
+interface Detail extends Part {
   /** The index of the piece it is drawn on. */
   readonly on: number;
 }

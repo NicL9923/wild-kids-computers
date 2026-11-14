@@ -14,13 +14,17 @@
   container-type: size;
 }
 
-/* The row is as wide as the stage allows while the biggest picture still fits its height. */
+/*
+ * The row is as wide as the stage allows while its tallest picture stays within the row's
+ * height: most of the stage for one row, a little under half for two.
+ */
 .bs-row {
-  --bs-width: min(100cqw, calc(100cqh * 4 / 1.2));
+  --bs-height: 62cqh;
+  --bs-width: min(100cqw, calc(var(--bs-height) * var(--bs-units) / var(--bs-tallest)));
   display: flex;
   align-items: end;
   justify-content: center;
-  gap: calc(var(--bs-width) * 40 / 1200);
+  gap: calc(var(--bs-width) * 40 / var(--bs-units));
   width: var(--bs-width);
   margin: 0;
   padding: 0 0 var(--wk-space-item);
@@ -30,7 +34,7 @@
 }
 
 .bs-stage[data-mode='order'] .bs-row {
-  --bs-width: min(100cqw, calc(100cqh * 2 / 1.2));
+  --bs-height: 36cqh;
 }
 
 .bs-spot {
