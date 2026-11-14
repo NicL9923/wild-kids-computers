@@ -75,6 +75,13 @@
   animation: jg-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
 }
 
+/* The piece that goes there stands out in the tray too, so "Here it is" always has something to show. */
+.jg-piece[data-hint='true'] {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-accent);
+  outline-offset: var(--wk-focus-offset);
+  animation: jg-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
 @keyframes jg-hint {
   to {
     background: rgb(from var(--wk-color-accent) r g b / 0.35);

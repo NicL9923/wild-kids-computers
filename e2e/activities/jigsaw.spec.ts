@@ -66,6 +66,11 @@ forEachBand(activity.bands, (band) => {
     await expect(place(page, wrong)).toHaveAttribute('data-filled', 'false');
     await expect(piece(page, first)).toBeVisible();
     await expect.poll(() => spokenIds(page)).toContain(feedback.goesSomewhereElse.id);
+    // A second miss says "Here it is", so the piece and its place light up while it waits in the tray.
+    await drag(page, first, wrong);
+    await expect.poll(() => spokenIds(page)).toContain(feedback.hereItIs.id);
+    await expect(piece(page, first)).toHaveAttribute('data-hint', 'true');
+    await expect(place(page, first)).toHaveAttribute('data-hint', 'true');
 
     for (const index of level.tray) {
       await drag(page, index, index);
