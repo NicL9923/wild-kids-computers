@@ -24,10 +24,11 @@ import { roundSeed } from '../core/activityKit/random.ts';
 import { documentNames } from '../core/platform/names.ts';
 import { appDocument, progressDocument, settingsDocument } from '../core/storage/schemas.ts';
 import { defineStrings } from '../core/strings/defineStrings.ts';
-import { ActivityRun, BETWEEN_ROUNDS_MS } from './ActivityRun.tsx';
+import { ActivityRun } from './ActivityRun.tsx';
 import type { ActivityProps } from './kit.ts';
 import { kitScheduler } from './kitTime.ts';
 import { strings as shellStrings } from './strings.ts';
+import { BETWEEN_ROUNDS_MS } from './timing.ts';
 
 const strings = defineStrings('run-fixture', {
   title: { text: 'Fixture' },

@@ -39,13 +39,9 @@ import { AREA_PATH, SESSION_CLOSING_PATH } from './paths.ts';
 import { ExitControl, InstructionControl, MuteControl } from './ShellControls.tsx';
 import { StepPicker } from './StepPicker.tsx';
 import { strings } from './strings.ts';
+import { BETWEEN_ROUNDS_MS, FEEDBACK_MARK_MS } from './timing.ts';
 import { useScope } from './useScope.ts';
 import { WithActivityState } from './WithActivityState.tsx';
-
-/** How long a feedback mark stays on screen. */
-const FEEDBACK_MARK_MS = 900;
-/** The calm pause between a finished round and the next one. */
-export const BETWEEN_ROUNDS_MS = 1200;
 
 type LoadedComponent = ComponentType<{ level: unknown; band: Band; kit: ActivityKit<unknown> }>;
 

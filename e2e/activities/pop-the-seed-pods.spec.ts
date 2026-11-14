@@ -1,11 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { strings as shellStrings } from '../../src/activityShell/strings.ts';
+import { BETWEEN_ROUNDS_MS } from '../../src/activityShell/timing.ts';
 import { nextDifficulty } from '../../src/core/activityKit/difficulty.ts';
 import { roundSeed } from '../../src/core/activityKit/random.ts';
 import activity from '../../src/features/computer-skills/activities/pop-the-seed-pods/activity.ts';
 import {
   BOARD,
   generateLevel,
+  LAST_POP_PAUSE_MS,
   type PodsLevel,
 } from '../../src/features/computer-skills/activities/pop-the-seed-pods/level.ts';
 import { strings } from '../../src/features/computer-skills/activities/pop-the-seed-pods/strings.ts';
@@ -14,6 +16,7 @@ import {
   centerOf,
   expectInstructionSpoken,
   forEachBand,
+  kitTime,
   openActivity,
   REVIEW_SIZES,
   saveBandScreenshot,
@@ -105,6 +108,30 @@ forEachBand(activity.bands, (band) => {
 
     await finish.getByRole('button', { name: shellStrings.playAgain.text }).click();
     await expect(board(page)).toBeVisible();
+  });
+
+  test('waits for the calm pause before the next round, on a pinned kit clock', async () => {
+    launched = await openActivity({
+      activity: activity.id,
+      band,
+      seed: SEED,
+      difficulty: START,
+      pinClockAt: Date.UTC(2026, 10, 14, 9),
+    });
+    const { page } = launched;
+    const [first, second] = sessionLevels(band);
+    if (first === undefined || second === undefined) throw new Error('A session has at least two rounds');
+    await popAll(page, first);
+    // Time stands still: the popped pods stay until the kit clock moves.
+    await page.waitForTimeout(500);
+    await expect(board(page)).toHaveAttribute('data-pods-left', '0');
+    // The last pod's pause, then the rest between rounds.
+    await kitTime(page).advance(LAST_POP_PAUSE_MS);
+    await expect(page.locator('.wk-activity-stage')).toHaveAttribute('data-resting', 'true');
+    await kitTime(page).advance(BETWEEN_ROUNDS_MS - 1);
+    await expect(board(page)).toHaveAttribute('data-pods-left', '0');
+    await kitTime(page).advance(1);
+    await expect(board(page)).toHaveAttribute('data-pods-left', String(second.pods.length));
   });
 
   test('a click on empty ground shows a soft ring and pops nothing', async () => {

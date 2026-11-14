@@ -11,6 +11,9 @@ import { createRandom, type Random } from '../../../../core/activityKit/random.t
 
 export const BOARD = { width: 1000, height: 600 } as const;
 
+/** The wait after the last pod pops, so the child sees it burst before the round ends. */
+export const LAST_POP_PAUSE_MS = 700;
+
 /**
  * The corner of the board nearest the exit control, top left. No pod comes within KEEP_OUT_GAP
  * of it, so a child reaching for a pod never lands on the way out.

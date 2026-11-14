@@ -3,12 +3,9 @@ import type { ActivityProps } from '../../../../activityShell/kit.ts';
 import { t } from '../../../../core/strings/defineStrings.ts';
 import podArt from '../../../../../assets/art/activities/pop-the-seed-pods/pod.svg';
 import poppedArt from '../../../../../assets/art/activities/pop-the-seed-pods/popped.svg';
-import { BOARD, type PodsLevel } from './level.ts';
+import { BOARD, LAST_POP_PAUSE_MS, type PodsLevel } from './level.ts';
 import './popTheSeedPods.css';
 import { strings } from './strings.ts';
-
-/** The wait after the last pod pops, so the child sees it burst before the round ends. */
-const LAST_POP_PAUSE_MS = 700;
 
 /**
  * Large pods that stay still on a calm board. A click on a pod pops it. A click on empty ground
