@@ -221,7 +221,6 @@ export class History {
   private readonly undoStack: Change[] = [];
   private readonly redoStack: Change[] = [];
   private open: Change | null = null;
-  private storedBytes = 0;
 
   constructor(doc: PaintDocument, options: HistoryOptions = {}) {
     this.doc = doc;
@@ -248,9 +247,15 @@ export class History {
     return this.redoStack.length;
   }
 
-  /** Bytes held by every undo and redo step. */
+  /**
+   * Bytes held by every undo and redo step. Summed from the steps each time, never kept as a
+   * running total: undo and redo swap a saved mask in and out, which changes a step's size.
+   */
   get bytes(): number {
-    return this.storedBytes;
+    let total = 0;
+    for (const step of this.undoStack) total += step.bytes;
+    for (const step of this.redoStack) total += step.bytes;
+    return total;
   }
 
   /** Opens a change. Only one change is open at a time, so two tools cannot interleave. */
@@ -265,15 +270,9 @@ export class History {
     this.close(change);
     change.prune();
     if (change.isEmpty) return false;
-    for (const step of this.redoStack) this.storedBytes -= step.bytes;
     this.redoStack.length = 0;
     this.undoStack.push(change);
-    this.storedBytes += change.bytes;
-    // Drop the oldest steps over the cap, but always keep the newest one.
-    while (this.undoStack.length > 1 && (this.storedBytes > this.byteCap || this.undoStack.length > this.maxSteps)) {
-      const oldest = this.undoStack.shift();
-      if (oldest !== undefined) this.storedBytes -= oldest.bytes;
-    }
+    this.trim(change);
     return true;
   }
 
@@ -288,7 +287,10 @@ export class History {
     const step = this.undoStack.pop();
     if (step === undefined) return EMPTY_RECT;
     this.redoStack.push(step);
-    return step.swap();
+    const area = step.swap();
+    // Swapping a mask in can make the step larger, so the cap applies here too.
+    this.trim(step);
+    return area;
   }
 
   redo(): Rect {
@@ -296,6 +298,8 @@ export class History {
     const step = this.redoStack.pop();
     if (step === undefined) return EMPTY_RECT;
     this.undoStack.push(step);
+    // No trim: redo returns to a point undo already passed through, holding the same steps or
+    // fewer, so the total there already fit the cap.
     return step.swap();
   }
 
@@ -336,6 +340,24 @@ export class History {
     doc.paint.data.set(pixels);
     this.commit(change);
     return all;
+  }
+
+  /**
+   * Drops steps until the history fits the byte cap and the step limit: the oldest undo steps
+   * first, then the redo steps furthest from now. The step the child just made or undid always
+   * stays, so it can be reversed even when it alone is over the cap.
+   */
+  private trim(keep: Change): void {
+    let bytes = this.bytes;
+    while (bytes > this.byteCap || this.undoStack.length > this.maxSteps) {
+      let dropped: Change | undefined;
+      const oldest = this.undoStack[0];
+      const furthest = this.redoStack[0];
+      if (oldest !== undefined && oldest !== keep) dropped = this.undoStack.shift();
+      else if (furthest !== undefined && furthest !== keep) dropped = this.redoStack.shift();
+      if (dropped === undefined) return;
+      bytes -= dropped.bytes;
+    }
   }
 
   private close(change: Change): void {
