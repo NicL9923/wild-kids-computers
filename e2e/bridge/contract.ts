@@ -221,6 +221,31 @@ export function defineBridgeContract(target: BridgeTarget): void {
         });
       });
 
+      test('saving under a new id the caller chose creates it, so a retried save stays one picture', async () => {
+        const first = { id: 'chosen-id', png: bytes(PICTURE), thumbnail: bytes(THUMBNAIL) };
+        expect(unwrap(await call(page, 'pictures.save', 'p1', first))).toMatchObject({ id: 'chosen-id' });
+        unwrap(await call(page, 'pictures.save', 'p1', { ...first, png: bytes(OTHER_PICTURE) }));
+        expect(await pictureIds(page, 'gallery')).toEqual(['chosen-id']);
+        expect(await call(page, 'pictures.read', 'p1', 'chosen-id', 'picture')).toEqual({
+          ok: true,
+          value: OTHER_PICTURE,
+        });
+      });
+
+      test('saving under the id of a trashed picture fails and leaves it in the trash', async () => {
+        const saved = await savePicture(page);
+        unwrap(await call(page, 'pictures.trash', 'p1', saved.id));
+        expect(
+          await call(page, 'pictures.save', 'p1', {
+            id: saved.id,
+            png: bytes(OTHER_PICTURE),
+            thumbnail: bytes(THUMBNAIL),
+          }),
+        ).toEqual(failure('not-found'));
+        expect(await pictureIds(page, 'gallery')).toEqual([]);
+        expect(await call(page, 'pictures.read', 'p1', saved.id, 'picture')).toEqual({ ok: true, value: PICTURE });
+      });
+
       test('a copy gets a new id and the same image', async () => {
         const saved = await savePicture(page);
         const copy = pictureSummary.parse(unwrap(await call(page, 'pictures.copy', 'p1', saved.id)));
@@ -254,9 +279,6 @@ export function defineBridgeContract(target: BridgeTarget): void {
         expect(await call(page, 'pictures.read', 'p1', 'ghost', 'picture')).toEqual(failure('not-found'));
         expect(await call(page, 'pictures.copy', 'p1', 'ghost')).toEqual(failure('not-found'));
         expect(await call(page, 'pictures.trash', 'p1', 'ghost')).toEqual(failure('not-found'));
-        expect(
-          await call(page, 'pictures.save', 'p1', { id: 'ghost', png: bytes(PICTURE), thumbnail: bytes(THUMBNAIL) }),
-        ).toEqual(failure('not-found'));
         expect(await call(page, 'pictures.list', 'nobody', 'gallery')).toEqual({ ok: true, value: [] });
       });
 
@@ -273,6 +295,9 @@ export function defineBridgeContract(target: BridgeTarget): void {
         );
         expect(await call(page, 'pictures.list', '../p1', 'gallery')).toEqual(failure('invalid-argument'));
         expect(await call(page, 'pictures.read', 'p1', '../../app', 'picture')).toEqual(failure('invalid-argument'));
+        expect(
+          await call(page, 'pictures.save', 'p1', { id: '../app', png: bytes(PICTURE), thumbnail: bytes(THUMBNAIL) }),
+        ).toEqual(failure('invalid-argument'));
         expect(await call(page, 'pictures.list', 'p1', 'recycle')).toEqual(failure('invalid-argument'));
         expect(await pictureIds(page, 'gallery')).toEqual([]);
       });

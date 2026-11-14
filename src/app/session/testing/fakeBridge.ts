@@ -191,6 +191,9 @@ export function createFakeBridge(options: FakeBridgeOptions = {}): FakeBridge {
     pictures: {
       save: (profileId, input: SavePictureInput) => {
         calls.push(`pictures.save ${profileId}`);
+        if (input.id !== undefined && place(profileId, 'trash').has(input.id)) {
+          return Promise.reject(new BridgeError('not-found', `Picture ${input.id} is in the trash.`));
+        }
         const id = input.id ?? `picture-${nextPictureId++}`;
         const picture = { png: input.png, thumbnail: input.thumbnail, updatedAt: now() };
         place(profileId, 'gallery').set(id, picture);

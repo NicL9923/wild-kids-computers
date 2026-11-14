@@ -1,6 +1,7 @@
 import type { PictureSummary, SavePictureInput } from '../../../core/platform/bridge.ts';
 import type { BridgeResult } from '../../../app/session/sessionStore.ts';
 import type { Scope } from '../../../core/activityKit/scope.ts';
+import { newPictureId } from '../../../core/storage/ids.ts';
 import type { StudioDocument } from './studioDocument.ts';
 
 export interface EncodedPicture {
@@ -31,9 +32,10 @@ export interface AutosaveOptions {
 
 /**
  * Keeps the studio's picture safe. It saves on its own, with no button and no file dialog: after
- * painting pauses, and before the studio lets go of the picture. The first save creates a gallery
- * picture and later saves overwrite it. Saves never overlap, and a change made during a save is
- * saved right after it.
+ * painting pauses, and before the studio lets go of the picture. A new picture gets its id before
+ * its first save, and every save sends it, so the first save creates the gallery picture and later
+ * saves overwrite it, even a retry after a save that landed but answered too late. Saves never
+ * overlap, and a change made during a save is saved right after it.
  *
  * The saver holds exactly one picture, and the only way to put another in its place is
  * `switchTo`, which first saves the one it holds. So a picture is never dropped unsaved: when a
@@ -44,7 +46,10 @@ export interface AutosaveOptions {
  */
 export class Autosaver {
   private picture: StudioDocument;
-  private id: string | null;
+  /** The gallery id every save of this picture uses. */
+  private id: string;
+  /** Whether a save of this picture has landed, so the gallery has it. */
+  private inGallery: boolean;
   private saved: number;
   private failingNow = false;
   private cancelTimer: () => void = () => undefined;
@@ -55,7 +60,8 @@ export class Autosaver {
   constructor(options: AutosaveOptions, picture: KeptPicture) {
     this.options = options;
     this.picture = picture.studio;
-    this.id = picture.id;
+    this.id = picture.id ?? newPictureId();
+    this.inGallery = picture.id !== null;
     this.saved = picture.savedVersion;
     this.watch();
   }
@@ -67,7 +73,7 @@ export class Autosaver {
 
   /** The gallery picture this one saves to, or null before its first save. */
   get pictureId(): string | null {
-    return this.id;
+    return this.inGallery ? this.id : null;
   }
 
   /** A committed change the gallery does not have, or a stroke still open. */
@@ -110,7 +116,8 @@ export class Autosaver {
     this.unsubscribe();
     this.cancelTimer();
     this.picture = next.studio;
-    this.id = next.id;
+    this.id = next.id ?? newPictureId();
+    this.inGallery = next.id !== null;
     this.saved = next.savedVersion;
     this.watch();
     return true;
@@ -172,14 +179,14 @@ export class Autosaver {
     }
     let result: BridgeResult<PictureSummary>;
     try {
-      result = await this.options.save({ ...(this.id === null ? {} : { id: this.id }), ...files });
+      result = await this.options.save({ id: this.id, ...files });
     } catch {
       // A save that throws instead of reporting failed the same way.
       return false;
     }
     if (!result.ok) return false;
     // Only `switchTo` changes the picture, and it waits for this save, so it is still the one held.
-    this.id = result.value.id;
+    this.inGallery = true;
     this.saved = version;
     return true;
   }

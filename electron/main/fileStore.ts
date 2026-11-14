@@ -278,10 +278,12 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
       checkPng(input.thumbnail, MAX_THUMBNAIL_BYTES, 'thumbnail');
       return inPictureQueue(profileId, async () => {
         const id = input.id ?? newId();
-        const files =
-          input.id === undefined
-            ? await pictureFiles(profileId, 'gallery', id)
-            : await requirePicture(profileId, 'gallery', id);
+        // A save under a known id creates or overwrites that picture, so a retry after an answer
+        // that came too late replaces the first save instead of adding a second picture.
+        if (input.id !== undefined && (await fileInfo((await pictureFiles(profileId, 'trash', id)).picture)) !== null) {
+          throw new BridgeError('not-found', `Picture ${id} is in the trash.`);
+        }
+        const files = await pictureFiles(profileId, 'gallery', id);
         await commitPair(io, files, input.png, input.thumbnail);
         return summary(files.picture, id);
       });

@@ -48,7 +48,11 @@ export interface PictureSummary {
 }
 
 export interface SavePictureInput {
-  /** Overwrites this gallery picture. Omit it to create a new picture. */
+  /**
+   * Saves under this id: overwrites the gallery picture with it, or creates it. A retry of a save
+   * whose answer never came is then the same save. Refused with `not-found` while a picture with
+   * this id is in the trash. Omit it to create a new picture under an id the bridge picks.
+   */
   id?: string;
   png: Uint8Array;
   thumbnail: Uint8Array;
