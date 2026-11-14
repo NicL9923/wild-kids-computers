@@ -108,7 +108,6 @@ describe('isAllowedLicense', () => {
     ['a choice with one allowed side', '(MIT OR GPL-3.0-only)'],
     ['AND of allowed licenses', 'MIT AND ISC'],
     ['a group before OR', '(MIT AND Zlib) OR GPL-2.0'],
-    ['an exception on an allowed license', 'Apache-2.0 WITH LLVM-exception'],
     ['nested groups', '((MIT))'],
     ['AND over two choices', '(MIT OR GPL-3.0-only) AND (ISC OR GPL-2.0-only)'],
     ['an allowed choice before a copyleft AND', 'MIT OR (GPL-3.0-only AND ISC)'],
@@ -125,8 +124,14 @@ describe('isAllowedLicense', () => {
     // Dropping the parentheses turned this into (GPL AND MIT) OR ISC, which passed.
     ['a copyleft term AND a group of choices', 'GPL-3.0-only AND (MIT OR ISC)'],
     ['an exception on a copyleft license', 'GPL-2.0-only WITH Classpath-exception-2.0'],
+    // No shipped package uses WITH, so the check accepts no exception at all. Both of these passed
+    // when an exception was read as any identifier and then dropped.
+    ['a made-up exception', 'MIT WITH made-up-exception'],
+    ['a license where an exception belongs', 'MIT WITH GPL-3.0-only'],
+    ['a real exception on an allowed license', 'Apache-2.0 WITH LLVM-exception'],
     ['WITH after a group', '(MIT OR ISC) WITH LLVM-exception'],
     ['WITH and no exception', 'MIT WITH'],
+    ['WITH where a license belongs', 'MIT OR WITH'],
     ['an unclosed group', '(MIT OR ISC'],
     ['a stray closing parenthesis', 'MIT) OR (ISC'],
     ['two licenses with no operator', 'MIT ISC'],

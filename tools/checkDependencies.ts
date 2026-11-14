@@ -134,10 +134,10 @@ type LicenseNode = { kind: 'license'; id: string } | { kind: 'and' | 'or'; left:
 const LICENSE_ID = /^(?:DocumentRef-[A-Za-z0-9.-]+:)?[A-Za-z0-9.-]+\+?$/;
 
 /**
- * Parses an SPDX license expression with its precedence: `WITH` binds tightest, then `AND`,
- * then `OR`, and parentheses group. Returns null for anything outside that grammar, including
- * lowercase operators and a `WITH` after a parenthesized group, so a check that cannot read an
- * expression rejects it instead of guessing.
+ * Parses an SPDX license expression with its precedence: `AND` binds tighter than `OR`, and
+ * parentheses group. Returns null for anything outside that grammar, including lowercase
+ * operators and any `WITH` exception, so a check that cannot read an expression rejects it
+ * instead of guessing.
  */
 function parseLicenseExpression(expression: string): LicenseNode | null {
   const tokens = expression.match(/\(|\)|[^\s()]+/g) ?? [];
@@ -150,15 +150,12 @@ function parseLicenseExpression(expression: string): LicenseNode | null {
       const inner = disjunction();
       return inner !== null && tokens[position++] === ')' ? inner : null;
     }
+    // WITH is no operator in this grammar, so an exception leaves tokens the parse cannot use and
+    // the expression is refused. No shipped package uses one. Reading any identifier as an
+    // exception let "MIT WITH GPL-3.0-only" through; when a package needs one, add a short list
+    // of permissive exceptions here.
     if (token === undefined || token === ')' || token === 'AND' || token === 'OR' || token === 'WITH') return null;
     if (!LICENSE_ID.test(token)) return null;
-    if (peek() === 'WITH') {
-      position += 1;
-      const exception = tokens[position++];
-      // An exception narrows its license and never widens it, so the base license decides.
-      if (exception === undefined || !LICENSE_ID.test(exception) || exception.endsWith('+')) return null;
-      if (exception === 'AND' || exception === 'OR' || exception === 'WITH') return null;
-    }
     return { kind: 'license', id: token };
   }
 
@@ -187,8 +184,7 @@ function licenseTreeAllowed(node: LicenseNode): boolean {
 
 /**
  * Whether an SPDX expression is acceptable. `A OR B` needs one allowed side, `A AND B` needs
- * both, and a `WITH` exception is judged by its base license. An expression the parser cannot
- * read is rejected.
+ * both. An expression with a `WITH` exception, or one the parser cannot read, is rejected.
  */
 export function isAllowedLicense(expression: string | undefined): boolean {
   if (expression === undefined) return false;
