@@ -5,5 +5,5 @@
     "lib": ["ES2024", "DOM"],
     "types": []
   },
-  "include": ["electron/preload"]
+  "include": ["electron/preload", "src/core/platform", "src/core/bands.ts"]
 }

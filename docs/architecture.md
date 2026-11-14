@@ -38,8 +38,8 @@ Inline styles are allowed because Radix adds `<style>` tags for scroll locking. 
 All of these apply at once. Each has a test.
 
 1. `session.webRequest.onBeforeRequest` cancels every request whose URL is not `app://bundle/...`, `devtools://...`, `blob:` or `data:` created by the app. The dev server origin, including its `ws:` socket, is allowed only in unpackaged dev runs.
-2. Chromium switches turn off background networking, component updates, and DNS resolution for outside hosts. WebRTC is limited with `webrtc-ip-handling-policy=disable_non_proxied_udp`.
-3. The session uses a proxy that does not exist, with loopback not bypassed, so a request that slips past the filter fails closed. Dev runs bypass the proxy for the dev server only.
+2. Chromium switches turn off background networking, component updates, hyperlink auditing pings, and DNS resolution for every host name except the dev server's in a dev run. WebRTC is limited to `disable_non_proxied_udp` through `webContents.setWebRTCIPHandlingPolicy`, because the Chromium switch for it has no effect in Electron 45.
+3. The session uses a proxy that does not exist (`fixed_servers` mode, `<-loopback>` bypass), so a request that slips past the filter fails closed, including one to this machine. Dev runs bypass the proxy for the dev server only.
 4. The spellchecker is off and its dictionary download URL points nowhere.
 5. The content security policy above.
 6. `will-navigate`, `will-redirect`, `setWindowOpenHandler`, and `will-attach-webview` deny everything.
@@ -48,7 +48,9 @@ All of these apply at once. Each has a test.
 
 The end-to-end no-network test starts a local HTTP server on a free port. From the renderer it tries `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, an `<img>`, a `<link rel="dns-prefetch">`, a fetch from a Worker, a WebRTC peer connection, `window.open`, and a navigation. It asserts that each fails and that the server saw zero requests.
 
-A second end-to-end test asserts hard rule 8 from inside the page: `process` and `require` are undefined, and the renderer process is sandboxed.
+A second end-to-end test asserts hard rule 8: `process` and `require` are undefined in the page, `window.wkBridge` holds only the bridge functions, and the renderer process is sandboxed. On Linux the test reads the renderer's seccomp status from `/proc`.
+
+`e2e/network/layers.spec.ts` observes each main-process layer on its own, so a layer cannot go missing behind the others. Playwright's keyboard skips `before-input-event`, so the shortcut test sends keys with `webContents.sendInputEvent`.
 
 End-to-end tests run against the unpackaged build, so installer fuses never affect them. On GitHub's Ubuntu runner the workflow sets `kernel.apparmor_restrict_unprivileged_userns=0` so that Chromium's sandbox can start. Tests never pass `--no-sandbox`.
 
@@ -157,23 +159,29 @@ export const strings = defineStrings('pop-the-seed-pods', {
 
 The contract covers:
 
-- **Documents.** Read, write, and set aside a named JSON document. Names come from a fixed set of patterns, such as `profiles` and `profile/<id>/progress`.
-- **Pictures.** Save a PNG with its thumbnail, list, read, copy, move to trash, restore, and purge, per profile.
-- **Window.** Fullscreen, kiosk lock, close request, and quit.
+- **Documents.** Read, write, and set aside a named JSON document, and remove everything of one profile. Names come from a fixed set of patterns in `src/core/platform/names.ts`, such as `profiles` and `profile/<id>/progress`.
+- **Pictures.** Save a PNG with its thumbnail, list, read, copy, move to trash, restore, and purge, per profile. Purge works only on a trashed picture.
+- **Window.** Fullscreen, kiosk lock, close request, and quit. With kiosk lock on, a close attempt calls the renderer's `onCloseRequest` listener. The renderer calls `acknowledgeCloseRequest()` at once and `quit()` after the parent gate passes. Without an answer within 3 seconds, the main process destroys the window, because a hung page never finishes its unload handlers.
 - **Export and print.** Save a PNG to a place the adult chooses, and print a PNG.
-- **Info.** Operating system family, app version, and whether the app runs in Electron.
+- **Info.** Operating system family, app version, and whether the app runs in Electron. With `WKC_TEST=1` it also returns the `test` object that `launchApp` passed in `WKC_TEST_INFO`.
+
+Errors reject with a `BridgeError` whose `code` is `invalid-argument`, `too-large`, `not-found`, `forbidden`, or `io`. Over IPC the main process answers with a result envelope, because Electron flattens a thrown error into a string.
 
 Rules:
 
 - The main process validates every IPC argument with Zod and rejects calls from any frame that is not the app's own page.
-- The main process writes files atomically: write a temporary file, then rename.
+- The main process writes files atomically: write a temporary file, flush it, then rename. Writes to one file run in call order.
+- The Electron build keeps data under `<userData>/data/`: `app.json`, `profiles.json`, and `profile/<id>/` with `settings.json`, `progress.json`, `activity/<activity-id>.json`, and `pictures/` with a `trash/` folder. The browser build keeps the same names in IndexedDB.
+- In a test run the page exposes the bridge it uses as `window.wkcTest.bridge`. The Electron app does this only with `WKC_TEST=1`. The browser build does it with a `wkc-test` query parameter, which grants nothing the page could not already do.
 - The bridge moves bytes and text. Schema validation of documents happens in `src/core/storage/`, so both implementations share it.
-- One contract test suite in `e2e/bridge/` runs against the Electron app and against the browser build.
+- One contract test suite, `e2e/bridge/contract.ts`, runs against the Electron app from `e2e/bridge/electron.spec.ts` and against the browser build from `e2e/browser/bridge.spec.ts`.
 
 ## Storage
 
 - `src/core/storage/` holds one Zod schema per document, each with a `version` field and a migration chain.
-- `loadDocument` reads the text, parses it, migrates it, and validates it. On any failure it asks the bridge to set the file aside under a `.corrupt-<timestamp>` name and returns defaults. It never throws on bad saved data.
+- `loadDocument` reads the text, parses it, migrates it, and validates it. On any failure it asks the bridge to set the file aside under a `.corrupt-<timestamp>` name and returns defaults. It never throws on bad saved data. A read the platform could not perform returns defaults with status `unreadable` and moves nothing.
+- `migrations[n]` turns version n into n + 1, and the chain sets `version` after each step. `src/core/storage/document.test.ts` proves the chain with a test-only document that migrates from version 0 to 2.
+- Lists that grow with use, such as recent rounds and practice days, are trimmed by the schema instead of rejected, so a busy year never resets progress.
 - Each guard has a test that feeds it the bad input: invalid JSON, a wrong type, a missing field, an unknown version, an oversized document.
 - Pictures are PNG files. The gallery index is rebuilt from the files when it is missing or corrupt.
 
