@@ -49,6 +49,34 @@
   },
   "overrides": [
     {
+      "files": ["src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@tanstack/react-router",
+                "importNames": ["lazyRouteComponent"],
+                "message": "Load a screen with lazyScreen from src/app/lazyScreen.ts, so its load has a deadline and a try-again screen."
+              },
+              {
+                "name": "react",
+                "importNames": ["lazy"],
+                "message": "Load a screen with lazyScreen from src/app/lazyScreen.ts, so its load has a deadline and a try-again screen."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/app/lazyScreen.ts", "src/activityShell/ActivityRun.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
       "files": ["src/core/**"],
       "rules": {
         "no-restricted-imports": [

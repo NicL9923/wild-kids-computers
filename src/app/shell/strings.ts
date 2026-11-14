@@ -8,4 +8,5 @@ export const strings = defineStrings('shell', {
   notFound: { text: 'This place is not ready yet.' },
   backToMeadow: { text: 'Back to the meadow' },
   tryAgain: { text: 'Try again' },
+  notOpened: { text: 'This place did not open. Try again, or go back to the meadow.' },
 });

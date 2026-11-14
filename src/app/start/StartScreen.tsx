@@ -1,7 +1,8 @@
 import { useRouter } from '@tanstack/react-router';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { TryAgainScreen } from '../../activityShell/TryAgainScreen.tsx';
 import { DEFAULT_BAND } from '../../core/bands.ts';
+import { lazyScreen } from '../lazyScreen.ts';
 import { HOME_PATH, START_PATH } from '../paths.ts';
 import ProfileChoice from '../profile-choice/ProfileChoice.tsx';
 import {
@@ -16,7 +17,7 @@ import { startView } from './startView.ts';
 import { strings } from './strings.ts';
 
 // Only a new install needs first launch, so it loads apart from the screens every launch shows.
-const FirstLaunch = lazy(() => import('../first-launch/FirstLaunch.tsx'));
+const FirstLaunch = lazyScreen(() => import('../first-launch/FirstLaunch.tsx'));
 
 /** The first screen: first launch, the profile choice, or on to the home map. */
 export default function StartScreen() {

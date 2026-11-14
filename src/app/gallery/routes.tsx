@@ -1,4 +1,5 @@
-import { createRoute, lazyRouteComponent } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
+import { lazyScreen } from '../lazyScreen.ts';
 import { DEV_GALLERY_PATH } from '../paths.ts';
 import { rootRoute, type FeatureRoutes } from '../rootRoute.ts';
 import { parseGallerySearch } from './galleryViews.ts';
@@ -10,6 +11,6 @@ export const routes: FeatureRoutes = [
     getParentRoute: () => rootRoute,
     path: DEV_GALLERY_PATH,
     validateSearch: parseGallerySearch,
-    component: lazyRouteComponent(() => import('./GalleryRoute.tsx')),
+    component: lazyScreen(() => import('./GalleryRoute.tsx')),
   }),
 ];

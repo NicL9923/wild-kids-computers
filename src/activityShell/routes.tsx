@@ -1,4 +1,5 @@
-import { createRoute, lazyRouteComponent } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
+import { lazyScreen } from '../app/lazyScreen.ts';
 import { rootRoute, type FeatureRoutes } from '../app/rootRoute.ts';
 import { ACTIVITY_ROUTE, AREA_ROUTE } from './paths.ts';
 
@@ -7,11 +8,11 @@ export const routes: FeatureRoutes = [
   createRoute({
     getParentRoute: () => rootRoute,
     path: AREA_ROUTE,
-    component: lazyRouteComponent(() => import('./AreaScreen.tsx')),
+    component: lazyScreen(() => import('./AreaScreen.tsx')),
   }),
   createRoute({
     getParentRoute: () => rootRoute,
     path: ACTIVITY_ROUTE,
-    component: lazyRouteComponent(() => import('./ActivityRoute.tsx')),
+    component: lazyScreen(() => import('./ActivityRoute.tsx')),
   }),
 ];

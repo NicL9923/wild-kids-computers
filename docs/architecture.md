@@ -107,10 +107,11 @@ A central list file causes a merge conflict every time two people add an item. T
 A feature adds screens in its own `routes.ts` or `routes.tsx`, which exports `routes`, an array of routes whose parent is `rootRoute`. `src/registry/routes.ts` finds every such file and `src/app/router.ts` adds them to the tree, so no feature edits the router. A test fails when two routes match the same path, and the error names both files.
 
 ```tsx
-import { createRoute, lazyRouteComponent } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
+import { lazyScreen } from '../../app/lazyScreen.ts';
 import { rootRoute, type FeatureRoutes } from '../../app/rootRoute.ts';
 
-const PaintStudio = lazyRouteComponent(() => import('./PaintStudio.tsx'));
+const PaintStudio = lazyScreen(() => import('./PaintStudio.tsx'));
 export const routes: FeatureRoutes = [
   createRoute({ getParentRoute: () => rootRoute, path: '/paint', component: PaintStudio }),
 ];
@@ -118,7 +119,7 @@ export const routes: FeatureRoutes = [
 
 Each route path has one owner: `src/app/paths.ts` for the shell's screens, `src/activityShell/paths.ts` for the area and activity screens, and `src/features/paint-studio/paths.ts` for the studio and its gallery. Everything else, end-to-end tests included, imports the constant. `tools/sourceRules.test.ts` fails on a route literal outside its owner.
 
-Load each screen with `lazyRouteComponent`, because the registry imports every routes file at start. The router keeps hash history. TanStack Router cannot type a tree it finds by file convention, so the router is not registered for path types: a screen parses its own search parameters, as `parseGallerySearch` does, and links take plain strings.
+Load each screen with `lazyScreen` from `src/app/lazyScreen.ts`, because the registry imports every routes file at start. Its load has a deadline, and a screen that fails to load or throws shows the router's calm try-again screen, `ScreenNotOpened`. A lint rule bans the bare `lazyRouteComponent` and React's `lazy` elsewhere; the activity shell's own loader in `ActivityRun.tsx` is the one exception. The router keeps hash history. TanStack Router cannot type a tree it finds by file convention, so the router is not registered for path types: a screen parses its own search parameters, as `parseGallerySearch` does, and links take plain strings.
 
 | Item                | Convention                                                                                               |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |

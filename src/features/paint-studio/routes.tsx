@@ -1,4 +1,5 @@
-import { createRoute, lazyRouteComponent } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
+import { lazyScreen } from '../../app/lazyScreen.ts';
 import { rootRoute, type FeatureRoutes } from '../../app/rootRoute.ts';
 import { PAINT_GALLERY_PATH, PAINT_STUDIO_PATH, parseStudioSearch } from './paths.ts';
 
@@ -7,11 +8,11 @@ export const routes: FeatureRoutes = [
     getParentRoute: () => rootRoute,
     path: PAINT_STUDIO_PATH,
     validateSearch: parseStudioSearch,
-    component: lazyRouteComponent(() => import('./PaintStudio.tsx')),
+    component: lazyScreen(() => import('./PaintStudio.tsx')),
   }),
   createRoute({
     getParentRoute: () => rootRoute,
     path: PAINT_GALLERY_PATH,
-    component: lazyRouteComponent(() => import('./gallery/PaintGallery.tsx')),
+    component: lazyScreen(() => import('./gallery/PaintGallery.tsx')),
   }),
 ];
