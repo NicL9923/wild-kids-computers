@@ -157,6 +157,12 @@ const roundOutcomeSchema = z.object({
   hintsUsed: z.int().min(0),
   /** Milliseconds since the epoch when the round finished. */
   at: z.int().min(0),
+  /**
+   * The difficulty the round was played at, so the difficulty model counts only rounds at the
+   * current level. Optional: rounds saved before it existed have none. A bad value is dropped
+   * instead of resetting the whole document.
+   */
+  level: z.int().min(MIN_DIFFICULTY).max(MAX_DIFFICULTY).optional().catch(undefined),
 });
 
 /**

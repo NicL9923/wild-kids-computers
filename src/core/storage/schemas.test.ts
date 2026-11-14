@@ -175,6 +175,24 @@ describe('progress schema', () => {
     expect(issuePaths(progressDocument.schema, progress(activity))).toEqual([path]);
   });
 
+  it.each([
+    ['level 0', 0],
+    ['level 11', 11],
+    ['a fractional level', 2.5],
+    ['a text level', 'three'],
+  ])('drops %s from a saved round instead of resetting progress', (_label, level) => {
+    const parsed = progressDocument.schema.parse(
+      progress({ recentRounds: [{ mistakes: 0, hintsUsed: 0, at: 5, level }] }),
+    );
+    expect(parsed.activities['pop-the-seed-pods']?.recentRounds).toEqual([{ mistakes: 0, hintsUsed: 0, at: 5 }]);
+  });
+
+  it('keeps a saved round level at both ends of the scale', () => {
+    const rounds = [1, 10].map((level) => ({ mistakes: 0, hintsUsed: 0, at: 5, level }));
+    const parsed = progressDocument.schema.parse(progress({ recentRounds: rounds }));
+    expect(parsed.activities['pop-the-seed-pods']?.recentRounds.map((r) => r.level)).toEqual([1, 10]);
+  });
+
   it('accepts a leap day', () => {
     expect(issuePaths(progressDocument.schema, progress({ daysPracticed: ['2028-02-29'] }))).toEqual([]);
   });

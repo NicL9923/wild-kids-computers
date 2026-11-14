@@ -79,6 +79,19 @@ describe('recordRound', () => {
     expect(next.activities['find-the-key']?.difficulty).toBe(4);
   });
 
+  it('keeps the level a round was played at', () => {
+    const next = recordRound(
+      progressDocument.defaults(),
+      'find-the-key',
+      { mistakes: 0, hintsUsed: 0, level: 3 },
+      finishedAt,
+      4,
+    );
+    expect(next.activities['find-the-key']?.recentRounds).toEqual([
+      { mistakes: 0, hintsUsed: 0, level: 3, at: finishedAt.getTime() },
+    ]);
+  });
+
   it.each([0, 11, 2.5])('rejects difficulty %s outside the 1 to 10 scale', (difficulty) => {
     expect(() =>
       recordRound(progressDocument.defaults(), 'find-the-key', { mistakes: 0, hintsUsed: 0 }, finishedAt, difficulty),
