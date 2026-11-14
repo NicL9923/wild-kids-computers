@@ -1,0 +1,46 @@
+import { defineActivity } from '../../../../core/activityKit/defineActivity.ts';
+import { generateLevel, type SecretsLevel } from './level.ts';
+import { strings } from './strings.ts';
+
+export default defineActivity<SecretsLevel>({
+  id: 'secrets-stay-secret',
+  area: 'toy-desktop',
+  order: 140,
+  bands: ['band-6-8', 'band-9-12'],
+  goal: strings.goal,
+  title: strings.title,
+  icon: { emoji: 'lock' },
+  kind: 'rounds',
+  inputs: ['click', 'drag', 'keyboard'],
+  difficulty: {
+    'band-6-8': { min: 1, max: 4 },
+    'band-9-12': { min: 2, max: 5 },
+  },
+  roundsPerSession: 3,
+  generateLevel,
+  spoken: [
+    strings.instruction,
+    strings.sort,
+    strings.password,
+    strings.pieces,
+    strings.takeOff,
+    strings.strength,
+    strings.weak,
+    strings.okay,
+    strings.strong,
+    strings.keepPrivate,
+    strings.fineToShare,
+    strings.cards,
+    strings.isPrivate,
+    strings.isFine,
+    strings.homeAddress,
+    strings.fullNameBirthday,
+    strings.phoneNumber,
+    strings.yourPassword,
+    strings.favoriteColor,
+    strings.favoriteAnimal,
+    strings.favoriteFood,
+    strings.favoriteSong,
+  ],
+  load: () => import('./SecretsStaySecretActivity.tsx'),
+});
