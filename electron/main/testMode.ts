@@ -28,7 +28,7 @@ export function readTestMode(env: NodeJS.ProcessEnv, isPackaged: boolean): TestM
 }
 
 /** Chromium switches that open the app to a debugger. Playwright passes them to an unpackaged run. */
-export const DEBUG_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe', 'remote-debugging-address'] as const;
+const DEBUG_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe', 'remote-debugging-address'] as const;
 
 interface CommandLine {
   hasSwitch(name: string): boolean;
