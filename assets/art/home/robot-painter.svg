@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <ellipse cx="200" cy="356" rx="176" ry="30" fill="#6fae58"/>
+  <!-- the workshop shed -->
+  <path d="M40 356V170l110-60 110 60v186z" fill="#9fb7c9"/>
+  <path d="M28 178 150 104l122 74" fill="none" stroke="#5f7d94" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="96" y="250" width="108" height="106" rx="6" fill="#5f7d94"/>
+  <path d="M96 286h108M96 320h108" stroke="#7e98ad" stroke-width="5"/>
+  <!-- a gear sign -->
+  <g transform="translate(150 196)">
+    <path d="M-6-30h12l3 9 9 4 8-5 8 8-5 8 4 9 9 3v12l-9 3-4 9 5 8-8 8-8-5-9 4-3 9H-6l-3-9-9-4-8 5-8-8 5-8-4-9-9-3V-6l9-3 4-9-5-8 8-8 8 5 9-4z" fill="#f5c542"/>
+    <circle r="10" fill="#9fb7c9"/>
+  </g>
+  <!-- the drawing the robot made on the ground -->
+  <path d="M232 340c20-26 40 10 60-12s34 6 54-10" fill="none" stroke="#e8664a" stroke-width="8" stroke-linecap="round"/>
+  <!-- the robot -->
+  <rect x="268" y="292" width="16" height="34" rx="6" fill="#5f7d94"/>
+  <rect x="318" y="292" width="16" height="34" rx="6" fill="#5f7d94"/>
+  <ellipse cx="276" cy="330" rx="18" ry="9" fill="#2e4034"/>
+  <ellipse cx="326" cy="330" rx="18" ry="9" fill="#2e4034"/>
+  <rect x="252" y="214" width="98" height="86" rx="18" fill="#dfe8ee"/>
+  <rect x="276" y="236" width="50" height="36" rx="8" fill="#9fb7c9"/>
+  <circle cx="290" cy="254" r="5" fill="#f5c542"/><circle cx="312" cy="254" r="5" fill="#e8664a"/>
+  <path d="M352 244c18 4 26 16 26 32" fill="none" stroke="#9fb7c9" stroke-width="12" stroke-linecap="round"/>
+  <path d="M378 276l-6 40" stroke="#8a5a3b" stroke-width="7" stroke-linecap="round"/>
+  <path d="M372 316l-3 14" stroke="#e8664a" stroke-width="10" stroke-linecap="round"/>
+  <path d="M250 244c-16 6-22 18-22 32" fill="none" stroke="#9fb7c9" stroke-width="12" stroke-linecap="round"/>
+  <rect x="258" y="136" width="86" height="72" rx="20" fill="#dfe8ee"/>
+  <circle cx="284" cy="172" r="10" fill="#2e4034"/><circle cx="318" cy="172" r="10" fill="#2e4034"/>
+  <circle cx="287" cy="168" r="3" fill="#ffffff"/><circle cx="321" cy="168" r="3" fill="#ffffff"/>
+  <path d="M290 192h22" stroke="#7e98ad" stroke-width="5" stroke-linecap="round"/>
+  <path d="M301 136v-22" stroke="#7e98ad" stroke-width="5"/>
+  <circle cx="301" cy="108" r="9" fill="#f5c542"/>
+</svg>

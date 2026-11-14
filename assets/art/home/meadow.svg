@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet" overflow="visible">
+  <!-- The layout area is 1600 by 1000. Shapes reach past it so any window shape shows meadow, never a gap. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bfe0ef"/>
+      <stop offset="1" stop-color="#e6f3ee"/>
+    </linearGradient>
+    <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a9d48c"/>
+      <stop offset="1" stop-color="#8cc372"/>
+    </linearGradient>
+  </defs>
+  <rect x="-1200" y="-800" width="4000" height="1200" fill="url(#sky)"/>
+  <g fill="#ffffff" opacity="0.85">
+    <path d="M150 120c0-26 22-44 48-40 10-22 44-30 64-12 22-6 44 10 44 32 18 2 30 14 30 28H150z"/>
+    <path d="M1180 92c0-20 18-34 38-30 8-18 36-24 52-10 18-5 36 8 36 26 14 2 24 12 24 22h-150z"/>
+    <path d="M700 60c0-16 14-27 30-24 7-14 28-19 41-8 14-4 28 6 28 20 11 1 19 9 19 18H700z"/>
+  </g>
+  <path d="M-1200 330C-700 260-300 300 0 290s320-70 560-40 380 60 620 30 300-60 420-40 600 30 1000 20v1500h-3800z" fill="#c3e0a9"/>
+  <path d="M-1200 380C-500 340-160 330 120 330s400 40 700 20 420-50 660-30 600 40 1320 20v1400h-4000z" fill="url(#grass)"/>
+  <path d="M-1200 560C-400 520 200 540 600 560s700 10 1000-10 700-20 1200 10v1200h-4000z" fill="#93c879" opacity="0.6"/>
+  <!-- the footpath that joins the five places -->
+  <path d="M800 1400C790 1100 830 980 800 860S780 700 800 620M800 830C700 840 600 870 500 880M800 810C900 830 1000 870 1100 880M790 570C650 520 480 520 340 500M810 570C950 520 1120 520 1260 500" fill="none" stroke="#efe2bd" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M800 1400C790 1100 830 980 800 860S780 700 800 620M800 830C700 840 600 870 500 880M800 810C900 830 1000 870 1100 880M790 570C650 520 480 520 340 500M810 570C950 520 1120 520 1260 500" fill="none" stroke="#f6edd2" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- distant trees on the horizon -->
+  <g fill="#8fbf7a">
+    <circle cx="640" cy="300" r="26"/><circle cx="672" cy="292" r="32"/><circle cx="704" cy="304" r="22"/>
+    <circle cx="940" cy="318" r="22"/><circle cx="966" cy="306" r="28"/>
+    <circle cx="1530" cy="300" r="30"/><circle cx="1566" cy="290" r="36"/>
+    <circle cx="20" cy="304" r="28"/><circle cx="54" cy="296" r="34"/>
+  </g>
+  <!-- scattered wildflowers, kept small and soft so the places stand out -->
+  <g>
+    <g fill="#ffffff"><circle cx="90" cy="640" r="7"/><circle cx="210" cy="900" r="7"/><circle cx="700" cy="640" r="6"/><circle cx="1010" cy="560" r="6"/><circle cx="1470" cy="640" r="7"/><circle cx="1380" cy="940" r="7"/><circle cx="560" cy="960" r="6"/><circle cx="960" cy="980" r="6"/><circle cx="1560" cy="820" r="7"/><circle cx="40" cy="860" r="7"/></g>
+    <g fill="#f3c74f"><circle cx="90" cy="640" r="3"/><circle cx="210" cy="900" r="3"/><circle cx="700" cy="640" r="2.5"/><circle cx="1010" cy="560" r="2.5"/><circle cx="1470" cy="640" r="3"/><circle cx="1380" cy="940" r="3"/><circle cx="560" cy="960" r="2.5"/><circle cx="960" cy="980" r="2.5"/><circle cx="1560" cy="820" r="3"/><circle cx="40" cy="860" r="3"/></g>
+    <g fill="#e98a73"><circle cx="150" cy="740" r="6"/><circle cx="660" cy="900" r="6"/><circle cx="1240" cy="600" r="5"/><circle cx="1500" cy="740" r="6"/><circle cx="1000" cy="880" r="5"/><circle cx="380" cy="980" r="6"/></g>
+    <g fill="#8aa7e2"><circle cx="250" cy="600" r="5"/><circle cx="1120" cy="980" r="6"/><circle cx="1560" cy="560" r="5"/><circle cx="740" cy="760" r="5"/><circle cx="1290" cy="980" r="6"/></g>
+    <g fill="#c99ad0"><circle cx="40" cy="520" r="5"/><circle cx="1420" cy="520" r="5"/><circle cx="590" cy="610" r="5"/><circle cx="1600" cy="960" r="6"/><circle cx="860" cy="610" r="5"/></g>
+  </g>
+</svg>

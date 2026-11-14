@@ -1,0 +1,26 @@
+[
+  {
+    "files": "home/*.svg",
+    "source": "Original SVG drawn for this repository: the home map meadow and its five places",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "avatars/*.svg",
+    "source": "Original SVG drawn for this repository: twelve animal avatars",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "interface/*.svg",
+    "source": "Original SVG drawn for this repository: interface icons for young children",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "pictures/*.svg",
+    "source": "Original SVG drawn for this repository: the finish and closing screen pictures",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  }
+]

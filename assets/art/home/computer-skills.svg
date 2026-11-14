@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <ellipse cx="200" cy="356" rx="174" ry="30" fill="#6fae58"/>
+  <!-- the grassy mound with a round burrow door -->
+  <path d="M28 356c0-120 70-200 168-200s176 80 176 200z" fill="#7dbd62"/>
+  <path d="M60 300c30-70 80-110 140-116" fill="none" stroke="#93cc78" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="214" cy="300" r="74" fill="#8a5a3b"/>
+  <circle cx="214" cy="300" r="62" fill="#c98b5a"/>
+  <path d="M214 238v124M160 270h108M154 320h120" stroke="#a8693f" stroke-width="6"/>
+  <circle cx="246" cy="304" r="8" fill="#f5c542"/>
+  <!-- the signpost, its sign shaped like a pointer -->
+  <rect x="318" y="150" width="14" height="206" rx="6" fill="#8a5a3b"/>
+  <g transform="translate(270 58) rotate(-10) scale(0.92)">
+    <path d="M12 8 12 120 40 94 62 140 82 130 60 86 98 84z" fill="#ffffff" stroke="#2e4034" stroke-width="9" stroke-linejoin="round"/>
+  </g>
+  <!-- tufts and a flower -->
+  <path d="M60 356c-4-16-2-28 6-38m8 38c0-14 4-24 12-30" fill="none" stroke="#4f9147" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="110" cy="250" r="9" fill="#ffffff"/><circle cx="110" cy="250" r="4" fill="#f5c542"/>
+  <circle cx="300" cy="236" r="8" fill="#e8664a"/>
+</svg>
