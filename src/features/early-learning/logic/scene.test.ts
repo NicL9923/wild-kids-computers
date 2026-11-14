@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRandom } from '../../../core/activityKit/random.ts';
-import { makeScene, THEMES, type Scene } from './scene.ts';
+import { strings as emojiNames } from '../../../core/strings/shared/emoji.ts';
+import { makeScene, POOLS, THEMES, type Scene } from './scene.ts';
 
 const SEEDS = Array.from({ length: 100 }, (_, index) => index * 1_009 + 1);
 
@@ -33,6 +34,19 @@ function problems(scene: Scene, columns: number, rows: number): string[] {
   return found;
 }
 
+describe('POOLS', () => {
+  it('holds only bundled pictures, ten for the sky and twenty for the ground in every theme', () => {
+    const names: Partial<Record<string, unknown>> = emojiNames;
+    for (const theme of THEMES) {
+      const { sky, ground } = POOLS[theme];
+      expect(sky.length, theme).toBeGreaterThanOrEqual(10);
+      expect(ground.length, theme).toBeGreaterThanOrEqual(20);
+      for (const picture of [...sky, ...ground]) expect(names[picture], picture).toBeDefined();
+      expect(new Set([...sky, ...ground]).size, theme).toBe(sky.length + ground.length);
+    }
+  });
+});
+
 describe('makeScene', () => {
   it.each([
     [1600, 1000, 3, 2],
@@ -45,6 +59,21 @@ describe('makeScene', () => {
       const scene = makeScene(createRandom(seed), width, height, columns, rows);
       expect(problems(scene, columns, rows), `seed ${String(seed)}`).toEqual([]);
     }
+  });
+
+  it('fills a scene as wide as ten cells, the most sky pictures a theme has', () => {
+    expect(problems(makeScene(createRandom(3), 2000, 400, 10, 2), 10, 2)).toEqual([]);
+  });
+
+  it('wobbles each picture a little in its cell, so the scene is not a table', () => {
+    const offsets = SEEDS.flatMap((seed) =>
+      makeScene(createRandom(seed), 1600, 1000, 3, 2).pictures.map((picture) => (picture.x % (1600 / 3)) - 1600 / 6),
+    );
+    expect(Math.max(...offsets) - Math.min(...offsets)).toBeGreaterThan(30);
+    const lifts = SEEDS.flatMap((seed) =>
+      makeScene(createRandom(seed), 1600, 1000, 3, 2).pictures.map((picture) => (picture.y % 500) - 250),
+    );
+    expect(Math.max(...lifts) - Math.min(...lifts)).toBeGreaterThan(30);
   });
 
   it('uses every theme over many scenes', () => {

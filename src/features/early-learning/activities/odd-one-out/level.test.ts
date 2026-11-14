@@ -10,6 +10,7 @@ import {
   type GroupId,
   type OddOneOutLevel,
 } from './level.ts';
+import { strings as emojiNames } from '../../../../core/strings/shared/emoji.ts';
 import { strings } from './strings.ts';
 
 const SEEDS = Array.from({ length: 300 }, (_, index) => index * 6_151 + 5);
@@ -34,6 +35,42 @@ function problems(level: OddOneOutLevel): string[] {
 }
 
 describe('GROUPS', () => {
+  it('holds only bundled pictures, and takes odd pictures only from groups that exist', () => {
+    const names: Partial<Record<string, unknown>> = emojiNames;
+    for (const id of groupIds) {
+      for (const member of GROUPS[id].members) expect(names[member], `${id} ${member}`).toBeDefined();
+      for (const other of [...GROUPS[id].far, ...GROUPS[id].near]) expect(groupIds, id).toContain(other);
+    }
+  });
+
+  // The design: which groups fill the easier rounds, and which have a group close enough for the harder ones.
+  it('fills easy rounds from every group of five or more, and hard rounds only from groups with a close group', () => {
+    expect(groupsFor({ items: 4, distance: 'far' })).toEqual([
+      'fruit',
+      'vegetables',
+      'sweets',
+      'farm',
+      'sea',
+      'birds',
+      'bugs',
+      'road',
+      'clothes',
+      'instruments',
+      'balls',
+      'sky',
+    ]);
+    expect(groupsFor({ items: 4, distance: 'near' })).toEqual([
+      'fruit',
+      'vegetables',
+      'sweets',
+      'farm',
+      'sea',
+      'birds',
+      'bugs',
+      'road',
+    ]);
+  });
+
   it('puts no picture in two groups, so the odd one is never also in the group', () => {
     const all = groupIds.flatMap((id) => GROUPS[id].members);
     expect(new Set(all).size).toBe(all.length);

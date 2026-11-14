@@ -25,7 +25,7 @@ describe('pieceDetail', () => {
     const pixels = image(4, 4, (x, y) => (y >= 2 && x % 2 === 0 ? BLACK : WHITE));
     const details = pieceDetail(pixels, 4, 4, 1, 2);
     expect(details[0]).toBe(0);
-    expect(details[1]).toBeGreaterThan(100);
+    expect(details[1]).toBeCloseTo(127.5, 1);
   });
 
   it('counts a transparent pixel as white paper, not black', () => {
@@ -37,6 +37,12 @@ describe('pieceDetail', () => {
     const pixels = image(2, 1, (x) => (x === 0 ? [0, 255, 0, 255] : [0, 0, 255, 255]));
     const [detail = 0] = pieceDetail(pixels, 2, 1, 1, 1);
     expect(detail).toBeCloseTo(((0.587 - 0.114) * 255) / 2, 1);
+  });
+
+  it('finds nothing in a piece too thin to hold a pixel', () => {
+    // Two pixels across cut into four columns: two of the pieces are empty.
+    const pixels = image(2, 1, (x) => (x === 0 ? BLACK : WHITE));
+    expect(pieceDetail(pixels, 2, 1, 4, 1)).toEqual([0, 0, 0, 0]);
   });
 
   it('refuses pixels that do not match the size', () => {

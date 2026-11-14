@@ -141,6 +141,12 @@ describe('generateLevel', () => {
     }
   });
 
+  it('slides either tile next to the space first, over many rounds', () => {
+    // On the easiest board one slide moves tile 1 or tile 2 into the corner.
+    const moved = new Set(SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5').board.indexOf(null)));
+    expect([...moved].toSorted((a, b) => a - b)).toEqual([1, 2]);
+  });
+
   it.each([0, MAX_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {
     expect(() => generateLevel(1, difficulty, 'band-3-5')).toThrow(/difficulty 1 to 10, not/);
   });

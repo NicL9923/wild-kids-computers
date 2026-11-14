@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import activity from './activity.ts';
-import { generateLevel, MAX_DIFFICULTY, SHAPES, type PatternItem, type WhatComesNextLevel } from './level.ts';
+import { generateLevel, isShape, MAX_DIFFICULTY, SHAPES, type PatternItem, type WhatComesNextLevel } from './level.ts';
 
 const SEEDS = Array.from({ length: 300 }, (_, index) => index * 3_571 + 7);
 
@@ -101,6 +101,13 @@ describe('generateLevel', () => {
 
   it.each([0, MAX_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {
     expect(() => generateLevel(1, difficulty, 'band-3-5')).toThrow(/difficulty 1 to 8, not/);
+  });
+});
+
+describe('isShape', () => {
+  it('tells a shape from a picture', () => {
+    expect(isShape('circle')).toBe(true);
+    expect(isShape('apple')).toBe(false);
   });
 });
 

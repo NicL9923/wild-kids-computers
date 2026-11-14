@@ -98,6 +98,8 @@ describe('generateLevel', () => {
 describe('columnsFor', () => {
   // The board is twice as wide as tall; these are the grids that make the biggest cards.
   it.each([
+    [1, 1],
+    [2, 2],
     [4, 2],
     [6, 3],
     [8, 4],

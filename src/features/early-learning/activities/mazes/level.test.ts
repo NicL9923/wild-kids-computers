@@ -116,9 +116,9 @@ describe('generateLevel', () => {
   });
 
   it('branches more once the walk jumps back, so harder mazes have more dead ends', () => {
-    // Same size, with and without jumping back.
-    const winding = average(3);
-    expect(average(4)).toBeGreaterThan(winding);
+    // A winding walk leaves few dead ends; jumping back leaves several. Measured: 1.1 and 3.5.
+    expect(average(3)).toBeLessThan(1.6);
+    expect(average(4)).toBeGreaterThan(2.5);
     // The biggest maze has many places to go wrong.
     expect(average(MAX_DIFFICULTY)).toBeGreaterThan(15);
   });
@@ -130,6 +130,32 @@ describe('generateLevel', () => {
 
   it.each([0, MAX_DIFFICULTY + 1, 2.5])('rejects difficulty %s', (difficulty) => {
     expect(() => generateLevel(1, difficulty, 'band-3-5')).toThrow(/difficulty 1 to 10, not/);
+  });
+});
+
+describe('waysFrom', () => {
+  // A 3 by 1 corridor open all the way.
+  const corridor = [[OPEN.right, OPEN.left | OPEN.right, OPEN.left]];
+
+  it('finds the way to every cell, and no way at all for the cell it starts in', () => {
+    const ways = waysFrom(corridor, { x: 0, y: 0 });
+    expect(ways.get('0,0')).toEqual([]);
+    expect(ways.get('1,0')).toEqual(['right']);
+    expect(ways.get('2,0')).toEqual(['right', 'right']);
+  });
+
+  it('never walks off the board, even through a side marked open at the edge', () => {
+    expect([...waysFrom([[OPEN.right | OPEN.up]], { x: 0, y: 0 }).keys()]).toEqual(['0,0']);
+  });
+
+  it('knows only the start in an empty maze', () => {
+    expect([...waysFrom([], { x: 0, y: 0 }).keys()]).toEqual(['0,0']);
+  });
+});
+
+describe('canMove', () => {
+  it('finds no open side for a cell off the board', () => {
+    expect(canMove([[OPEN.right]], { x: 0, y: 3 }, 'right')).toBe(false);
   });
 });
 
@@ -149,8 +175,28 @@ describe('straightRun', () => {
     ]);
   });
 
-  it('stops at the snack on the way', () => {
+  it('stops at the snack on the way, and only there', () => {
     expect(straightRun(open, { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 0 })).toEqual([{ x: 1, y: 0 }]);
+    // A snack in another row or column is not on the way.
+    expect(straightRun(open, { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 5 })).toHaveLength(2);
+    const column = { columns: 1, rows: 3, cells: [[OPEN.down], [OPEN.up | OPEN.down], [OPEN.up]] };
+    expect(straightRun(column, { x: 0, y: 0 }, { x: 0, y: 2 }, { x: 4, y: 1 })).toHaveLength(2);
+  });
+
+  it('refuses a cell off the straight line even when the snack is on the way', () => {
+    const square = {
+      columns: 2,
+      rows: 2,
+      cells: [
+        [OPEN.right | OPEN.down, OPEN.left | OPEN.down],
+        [OPEN.up, OPEN.up],
+      ],
+    };
+    expect(straightRun(square, { x: 0, y: 0 }, { x: 1, y: 1 }, { x: 1, y: 0 })).toBeNull();
+  });
+
+  it('never walks off the board, even through a side marked open at the edge', () => {
+    expect(straightRun({ columns: 1, rows: 1, cells: [[OPEN.right]] }, { x: 0, y: 0 }, { x: 1, y: 0 })).toBeNull();
   });
 
   it.each([

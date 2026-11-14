@@ -111,12 +111,14 @@ export const keyOf = (cell: Cell) => `${String(cell.x)},${String(cell.y)}`;
  * `branching` from a random earlier cell that still has uncarved neighbors.
  */
 function carve(random: Random, columns: number, rows: number, start: Cell, branching: number): number[][] {
-  const open = Array.from({ length: columns * rows }, () => 0);
+  // Open sides by cell, row by row. The walk reaches every cell, so every entry gets set.
+  const open: number[] = [];
   const seen = new Set([keyOf(start)]);
   const active: Cell[] = [start];
   while (active.length > 0) {
     const index = random.next() < branching ? random.int(0, active.length - 1) : active.length - 1;
-    const from = active[index] ?? start;
+    const from = active[index];
+    if (from === undefined) throw new RangeError(`No growing cell at ${String(index)}.`);
     const next = random
       .shuffle(DIRECTIONS)
       .map((direction) => ({ direction, to: neighbor(from, direction, columns, rows) }))
@@ -155,15 +157,11 @@ export function waysFrom(cells: MazeLevel['cells'], from: Cell): Map<string, Dir
   return ways;
 }
 
-/** The cell with the longest way. The first the search reached wins a tie. */
+/** The last cell the search reached, which has the longest way: a breadth-first search reaches cells nearest first. */
 function farthest(ways: ReadonlyMap<string, readonly Direction[]>): { cell: Cell; way: readonly Direction[] } {
-  let best: { cell: Cell; way: readonly Direction[] } = { cell: { x: 0, y: 0 }, way: [] };
-  for (const [key, way] of ways) {
-    if (way.length <= best.way.length) continue;
-    const [x = 0, y = 0] = key.split(',').map(Number);
-    best = { cell: { x, y }, way };
-  }
-  return best;
+  const [key = '0,0', way = []] = [...ways].at(-1) ?? [];
+  const [x = 0, y = 0] = key.split(',').map(Number);
+  return { cell: { x, y }, way };
 }
 
 /**

@@ -96,7 +96,8 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Wh
   // from one draw, so none repeats.
   const kinds = [...new Set(unit.split(''))];
   const drawn = random.sample(pool, Math.max(kinds.length, tier.choices));
-  const length = random.int(Math.max(tier.shown[0], unit.length * 2), tier.shown[1]);
+  // Every tier's shortest row holds its longest unit twice; the level test checks it.
+  const length = random.int(tier.shown[0], tier.shown[1]);
   const sequence = Array.from({ length: length + 1 }, (_, index) =>
     at(drawn, kinds.indexOf(at(unit.split(''), index % unit.length))),
   );

@@ -45,8 +45,12 @@ export function pieceDetail(
           count += 1;
         }
       }
-      const mean = count === 0 ? 0 : sum / count;
-      details.push(count === 0 ? 0 : Math.sqrt(Math.max(0, squares / count - mean * mean)));
+      if (count === 0) {
+        details.push(0);
+        continue;
+      }
+      const mean = sum / count;
+      details.push(Math.sqrt(Math.max(0, squares / count - mean * mean)));
     }
   }
   return details;

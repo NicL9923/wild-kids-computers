@@ -91,7 +91,7 @@ export function solvesBySingles(start: readonly (readonly (number | null)[])[], 
   const puzzle: Puzzle = start.map((row) => [...row]);
   for (;;) {
     let empty = 0;
-    let filled = 0;
+    let progressed = false;
     puzzle.forEach((row, r) =>
       row.forEach((value, c) => {
         if (value !== null) return;
@@ -99,12 +99,12 @@ export function solvesBySingles(start: readonly (readonly (number | null)[])[], 
         const left = candidates(puzzle, boxes, r, c);
         if (left.length === 1) {
           row[c] = left[0] ?? null;
-          filled += 1;
+          progressed = true;
         }
       }),
     );
     if (empty === 0) return true;
-    if (filled === 0) return false;
+    if (!progressed) return false;
   }
 }
 
@@ -125,9 +125,6 @@ function solutionGrid(random: Random, size: 3 | 4): number[][] {
   return rows.map((r) => columns.map((c) => symbols[base(r, c)] ?? 0));
 }
 
-/** Tries before giving up on reaching the tier's number of empty squares. */
-const ATTEMPTS = 40;
-
 /** Pure: the same seed and difficulty give the same puzzle. The band does not change it. */
 export function generateLevel(seed: number, difficulty: number, _band: Band): SudokuLevel {
   const tier = tierFor(difficulty);
@@ -136,22 +133,21 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Su
   const pictures = random.sample(PICTURE_SETS.animals, tier.size);
   const solution = solutionGrid(random, tier.size);
   const squares = solution.flatMap((row, r) => row.map((_, c) => [r, c] as const));
-  for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-    const puzzle: Puzzle = solution.map((row) => [...row]);
-    const blanks: (readonly [number, number])[] = [];
-    for (const [r, c] of random.shuffle(squares)) {
-      if (blanks.length === tier.blanks) break;
-      const row = puzzle[r];
-      if (row === undefined) continue;
-      const kept = row[c] ?? null;
-      row[c] = null;
-      if (solvesBySingles(puzzle, boxes)) blanks.push([r, c]);
-      else row[c] = kept;
-    }
-    if (blanks.length === tier.blanks) {
-      const inReadingOrder = blanks.toSorted(([r1, c1], [r2, c2]) => r1 - r2 || c1 - c2);
-      return { size: tier.size, boxes, pictures, solution, blanks: inReadingOrder };
-    }
+  // One pass over the squares in random order, emptying each one that leaves the puzzle solvable
+  // by looking. Over 20,000 seeds at every difficulty a pass always reached the tier's count.
+  const puzzle: Puzzle = solution.map((row) => [...row]);
+  const blanks: (readonly [number, number])[] = [];
+  for (const [r, c] of random.shuffle(squares)) {
+    if (blanks.length === tier.blanks) break;
+    const row = puzzle[r];
+    if (row === undefined) continue;
+    row[c] = null;
+    if (solvesBySingles(puzzle, boxes)) blanks.push([r, c]);
+    else row[c] = solution[r]?.[c] ?? null;
+  }
+  if (blanks.length === tier.blanks) {
+    const inReadingOrder = blanks.toSorted(([r1, c1], [r2, c2]) => r1 - r2 || c1 - c2);
+    return { size: tier.size, boxes, pictures, solution, blanks: inReadingOrder };
   }
   throw new Error(`No puzzle with ${String(tier.blanks)} empty squares for seed ${String(seed)}.`);
 }
