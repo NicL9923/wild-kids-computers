@@ -230,6 +230,54 @@ describe('speakSequence', () => {
   });
 });
 
+describe('speechSettled', () => {
+  it('resolves at once when nothing is speaking', async () => {
+    const { environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    await expect(engine.speechSettled()).resolves.toBeUndefined();
+  });
+
+  it('waits for the last clip of a sequence', async () => {
+    const { context, environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    void engine.speakSequence([strings.find, strings.b]);
+    let settled = false;
+    void engine.speechSettled().then(() => (settled = true));
+    await settle();
+    finish(context.sources[0]);
+    await settle();
+    expect(settled).toBe(false);
+    finish(context.sources[1]);
+    await settle();
+    expect(settled).toBe(true);
+  });
+
+  it('waits for a sequence that replaced the one playing', async () => {
+    const { context, environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    void engine.speak(strings.find);
+    let settled = false;
+    void engine.speechSettled().then(() => (settled = true));
+    await settle();
+    void engine.speak(strings.b);
+    await settle();
+    expect(settled).toBe(false);
+    finish(context.sources[1]);
+    await settle();
+    expect(settled).toBe(true);
+  });
+
+  it('resolves when speech is cancelled', async () => {
+    const { environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    void engine.speakSequence([strings.find, strings.b]);
+    const settled = engine.speechSettled();
+    await settle();
+    engine.cancelSpeech();
+    await expect(settled).resolves.toBeUndefined();
+  });
+});
+
 describe('effects', () => {
   it('plays a named effect through the effects bus and logs it', () => {
     const { context, environment } = harness();

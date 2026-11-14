@@ -17,6 +17,7 @@ import { createAudioEngine, type AudioEngine } from '../audio/audioEngine.ts';
 import { AudioProvider } from '../audio/AudioProvider.tsx';
 import { CONTINUOUS } from '../audio/sfx/continuous.ts';
 import { ONE_SHOTS } from '../audio/sfx/oneShots.ts';
+import { FakeAudioContext } from '../audio/testing/fakeAudioContext.ts';
 import type { Band } from '../core/bands.ts';
 import { defineActivity, type ActivityDefinition } from '../core/activityKit/defineActivity.ts';
 import { nextDifficulty } from '../core/activityKit/difficulty.ts';
@@ -138,7 +139,7 @@ interface Harness {
 
 async function run(
   definition: ActivityDefinition,
-  options: { furthestStep?: number; sessionMinutes?: number; band?: Band } = {},
+  options: { furthestStep?: number; sessionMinutes?: number; band?: Band; voice?: FakeAudioContext } = {},
 ): Promise<Harness> {
   const clock = { mono: 0 };
   const progress = progressDocument.defaults();
@@ -158,12 +159,20 @@ async function run(
     test: { seed: SEED, difficulty: 3 },
   });
   const audio = createAudioEngine({
-    environment: {
-      createContext: () => null,
-      clipUrl: () => undefined,
-      fetchClip: () => Promise.reject(new Error('no clips in unit tests')),
-      now: () => 0,
-    },
+    // With a voice, every string has a clip that plays until the test ends it.
+    environment: options.voice
+      ? {
+          createContext: () => options.voice?.asAudioContext() ?? null,
+          clipUrl: (clip) => `app://bundle/${clip}`,
+          fetchClip: () => Promise.resolve(new ArrayBuffer(8)),
+          now: () => 0,
+        }
+      : {
+          createContext: () => null,
+          clipUrl: () => undefined,
+          fetchClip: () => Promise.reject(new Error('no clips in unit tests')),
+          now: () => 0,
+        },
     sfx: { oneShots: ONE_SHOTS, continuous: CONTINUOUS },
     testLog: true,
   });
@@ -248,6 +257,21 @@ describe('a rounds activity', () => {
     await advance(1);
     expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 1))} at 3`);
     expect(document.querySelector('.wk-activity-stage')?.getAttribute('data-resting')).toBe('false');
+  });
+
+  it('waits for the speech in progress before the next round, so no sentence is cut off', async () => {
+    const voice = new FakeAudioContext();
+    await run(rounds, { voice });
+    await level();
+    click('done');
+    await advance(BETWEEN_ROUNDS_MS);
+    // The instruction clip is still playing, so the round rests.
+    expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 0))} at 3`);
+    await act(async () => {
+      for (const source of voice.sources) if (source.started && !source.stopped) source.end();
+      await Promise.resolve();
+    });
+    expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 1))} at 3`);
   });
 
   it('counts mistakes and hints for the difficulty model, and a second completion in a round does nothing', async () => {

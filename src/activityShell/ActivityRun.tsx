@@ -102,6 +102,11 @@ interface Player {
   readonly replay: () => void;
   /** Puts the instruction back to the definition's first spoken string and speaks it. */
   readonly startInstruction: () => void;
+  /**
+   * Runs `next` after the calm pause between rounds and after the speech in progress ends, so a
+   * round never cuts off what the last one is still saying.
+   */
+  readonly afterRest: (next: () => void) => void;
 }
 
 function ActivityRunWithState({
@@ -165,6 +170,16 @@ function ActivityRunWithState({
     setInstruction({ spoken: [mainInstruction], shown: [mainInstruction] });
     void audio.speakSequence([mainInstruction]);
   }, [audio, mainInstruction]);
+  const afterRest = useCallback(
+    (next: () => void) => {
+      visit.setTimeout(() => {
+        void audio.speechSettled().then(() => {
+          if (!visit.disposed) next();
+        });
+      }, BETWEEN_ROUNDS_MS);
+    },
+    [audio, visit],
+  );
   const player = useMemo<Player>(
     () => ({
       instruction,
@@ -177,8 +192,9 @@ function ActivityRunWithState({
       visit,
       replay,
       startInstruction,
+      afterRest,
     }),
-    [attachStage, host, instruction, marks, pictures, reducedMotion, replay, startInstruction, state, visit],
+    [afterRest, attachStage, host, instruction, marks, pictures, reducedMotion, replay, startInstruction, state, visit],
   );
 
   // Leaving the activity stops its voice, even mid-sentence.
@@ -348,7 +364,7 @@ function RoundsRun({
     const next = nextDifficulty(played, [...history, { ...ended, level: played }], range);
     progress.recordRound(definition.id, { ...ended, level: played }, next);
     const roundsDone = phase.round + 1;
-    player.visit.setTimeout(() => {
+    player.afterRest(() => {
       continueOrClose(() => {
         if (roundsDone % definition.roundsPerSession === 0) {
           setPhase({ kind: 'finished', round: roundsDone, difficulty: next });
@@ -356,7 +372,7 @@ function RoundsRun({
           setPhase({ kind: 'playing', round: roundsDone, difficulty: next, outcome: null });
         }
       });
-    }, BETWEEN_ROUNDS_MS);
+    });
     // Runs once per finished round: `ended` changes only when a round ends.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [ended]);
@@ -421,12 +437,12 @@ function SequenceRun({
     if (phase.kind !== 'playing' || !phase.ended) return;
     const next = Math.min(phase.step + 1, lastStep);
     progress.recordStep(definition.id, next);
-    player.visit.setTimeout(() => {
+    player.afterRest(() => {
       continueOrClose(() => {
         if (phase.step === lastStep) setPhase({ kind: 'picking' });
         else setPhase({ kind: 'playing', step: next, visit: phase.visit + 1, ended: false });
       });
-    }, BETWEEN_ROUNDS_MS);
+    });
     // Runs once per finished step: `ended` turns true only when a step ends.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [ended]);

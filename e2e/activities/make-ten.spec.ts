@@ -54,9 +54,9 @@ forEachBand(activity.bands, (band: Band) => {
     await page.locator(`[data-choice="${String(level.answer)}"]`).click();
     await expect(page.locator(`[data-choice="${String(level.answer)}"]`)).toHaveAttribute('data-look', 'answer');
     await expect(page.locator('.wk-feedback-mark[data-kind="correct"]')).toBeVisible();
-    await expect.poll(() => spokenIds(page)).toContain(numberHandle(level.whole).id);
-    // The frame is full.
+    // The frame is full. Checked before the sentence ends, because the next round follows it.
     await expect(page.locator('[data-counter="none"]')).toHaveCount(0);
+    await expect.poll(() => spokenIds(page)).toContain(numberHandle(level.whole).id);
   });
 
   test('can be played with the keyboard alone', async () => {
