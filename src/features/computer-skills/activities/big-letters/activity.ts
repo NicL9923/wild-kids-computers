@@ -9,7 +9,7 @@ export default defineActivity<ShiftLevel>({
   bands: ['band-6-8', 'band-9-12'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'keyboard' },
+  icon: { emoji: 'giraffe' },
   kind: 'rounds',
   inputs: ['keyboard'],
   difficulty: {

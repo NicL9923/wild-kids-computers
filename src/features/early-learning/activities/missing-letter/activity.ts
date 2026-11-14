@@ -10,7 +10,7 @@ export default defineActivity<MissingLetterLevel>({
   bands: ['band-6-8'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'puzzle-piece' },
+  icon: { emoji: 'page' },
   kind: 'rounds',
   inputs: ['click', 'keyboard'],
   difficulty: {

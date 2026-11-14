@@ -9,7 +9,7 @@ export default defineActivity<MatchLevel>({
   bands: ['band-3-5', 'band-6-8'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'abacus' },
+  icon: { emoji: 'ladybug' },
   kind: 'rounds',
   inputs: ['click', 'keyboard'],
   difficulty: {

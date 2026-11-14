@@ -49,7 +49,10 @@ function Area({ area }: { area: AreaId }) {
     <div className='wk-area-screen' data-area={area}>
       <Screen
         exit={<ExitControl to={HOME_PATH} label={strings.exitToMeadow} />}
-        instruction={<InstructionControl instruction={prompt} onReplay={() => void audio.speakSequence(prompt)} />}
+        // The heading already shows the area's name, so the line shows only what to do.
+        instruction={
+          <InstructionControl instruction={prompt.slice(1)} onReplay={() => void audio.speakSequence(prompt)} />
+        }
         end={<MuteControl />}
       >
         <h1 className='wk-area-title wk-reading-text'>{t(strings[area])}</h1>

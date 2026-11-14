@@ -9,7 +9,7 @@ export default defineActivity<FindTheLetterLevel>({
   bands: ['band-3-5', 'band-6-8'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'magnifying-glass' },
+  icon: { emoji: 'eye' },
   kind: 'rounds',
   inputs: ['click', 'keyboard'],
   difficulty: {
