@@ -1,0 +1,40 @@
+/*
+ * The fact on top and the array under it, filling the rest of the board. Each row of the array
+ * sits on its own band, so rows read as equal groups.
+ */
+
+.times-board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-container);
+}
+
+.times-board[data-show='fact'] .times-fact {
+  font-size: calc(var(--wk-target-min) * 1.4);
+}
+
+.times-array-area {
+  display: grid;
+  place-items: center;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.times-array {
+  padding: var(--wk-space-item);
+  border-radius: var(--wk-radius-card);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--wk-color-surface) 0 var(--math-cell),
+    var(--wk-color-surface-sunken) var(--math-cell) calc(var(--math-cell) * 2)
+  );
+  background-origin: content-box;
+  --math-cell: min(
+    (100cqw - var(--wk-space-item) * 2) / var(--cols),
+    (100cqh - var(--wk-space-item) * 2) / var(--rows)
+  );
+}
