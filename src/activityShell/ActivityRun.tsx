@@ -1,6 +1,8 @@
 import { useNavigate } from '@tanstack/react-router';
 import {
+  Component,
   createElement,
+  Fragment,
   lazy,
   Suspense,
   useCallback,
@@ -16,7 +18,9 @@ import { usePictures, useProgress, useSessionLength, useTestInfo } from '../app/
 import { useReducedMotion } from '../app/theme/ThemeRoot.tsx';
 import { useAudio } from '../audio/AudioProvider.tsx';
 import type { Band } from '../core/bands.ts';
+import { withDeadline } from '../core/activityKit/deadline.ts';
 import type { ActivityDefinition } from '../core/activityKit/defineActivity.ts';
+import { systemScheduler } from '../core/activityKit/scheduler.ts';
 import { clampDifficulty, nextDifficulty, startingDifficulty } from '../core/activityKit/difficulty.ts';
 import { roundSeed } from '../core/activityKit/random.ts';
 import type { Scope } from '../core/activityKit/scope.ts';
@@ -40,7 +44,8 @@ import { AREA_PATH } from './paths.ts';
 import { ExitControl, InstructionControl, MuteControl } from './ShellControls.tsx';
 import { StepPicker } from './StepPicker.tsx';
 import { strings } from './strings.ts';
-import { BETWEEN_ROUNDS_MS, FEEDBACK_MARK_MS, IDLE_CHECK_MS } from './timing.ts';
+import { ACTIVITY_LOAD_DEADLINE_MS, BETWEEN_ROUNDS_MS, FEEDBACK_MARK_MS, IDLE_CHECK_MS } from './timing.ts';
+import { TryAgainScreen } from './TryAgainScreen.tsx';
 import { useScope } from './useScope.ts';
 import { WithActivityState } from './WithActivityState.tsx';
 
@@ -55,15 +60,75 @@ function asComponent(value: unknown): LoadedComponent {
   return value;
 }
 
-/** One lazy component per definition, made on first use and kept, so a render never remakes it. */
+/** An activity's component that failed to load or did not load in time. The shell offers to try again. */
+class ActivityLoadError extends Error {
+  override readonly name = 'ActivityLoadError';
+  constructor(activityId: string, cause: unknown) {
+    super(`Activity ${activityId} did not load: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+  }
+}
+
+/**
+ * One lazy component per definition, made on first use and kept, so a render never remakes it. A
+ * load that answers after its deadline is dropped. A failed one stays failed, even through the
+ * render React repeats after an error, until the child tries again and `forgetComponent` drops it.
+ */
 const components = new WeakMap<ActivityDefinition, LoadedComponent>();
 
 function componentOf(definition: ActivityDefinition): LoadedComponent {
   const known = components.get(definition);
   if (known !== undefined) return known;
-  const made = lazy(() => definition.load().then((module) => ({ default: asComponent(module.default) })));
+  const loading = withDeadline(
+    definition.load(),
+    ACTIVITY_LOAD_DEADLINE_MS,
+    systemScheduler(),
+    `Loading activity ${definition.id}`,
+  ).catch((error: unknown) => {
+    throw new ActivityLoadError(definition.id, error);
+  });
+  const made = lazy(() => loading.then((module) => ({ default: asComponent(module.default) })));
   components.set(definition, made);
   return made;
+}
+
+/** Drops a failed load, so the next render loads the component afresh. */
+function forgetComponent(definition: ActivityDefinition): void {
+  components.delete(definition);
+}
+
+const NOT_OPENED = [strings.notOpened] as const;
+
+/**
+ * Shows the calm try-again screen, with the way out to the area, when the activity's component did
+ * not load. Trying again starts the visit afresh. Any other error is a bug and goes on up.
+ */
+class LoadBoundary extends Component<
+  { definition: ActivityDefinition; children: ReactNode },
+  { failed: boolean; attempt: number }
+> {
+  override state = { failed: false, attempt: 0 };
+
+  static getDerivedStateFromError(error: unknown): { failed: boolean } | null {
+    if (!(error instanceof ActivityLoadError)) throw error;
+    return { failed: true };
+  }
+
+  override render() {
+    const { definition, children } = this.props;
+    if (this.state.failed) {
+      return (
+        <TryAgainScreen
+          message={NOT_OPENED}
+          exit={<ExitControl to={AREA_PATH(definition.area)} label={strings.exitToArea} />}
+          onTryAgain={() => {
+            forgetComponent(definition);
+            this.setState(({ attempt }) => ({ failed: false, attempt: attempt + 1 }));
+          }}
+        />
+      );
+    }
+    return <Fragment key={this.state.attempt}>{children}</Fragment>;
+  }
 }
 
 /** A fresh session seed when no test pinned one. Activities never see Math.random. */
@@ -200,9 +265,11 @@ function ActivityRunWithState({
   // Leaving the activity stops its voice, even mid-sentence.
   useEffect(() => () => audio.cancelSpeech(), [audio]);
 
-  if (definition.kind === 'rounds') return <RoundsRun definition={definition} band={band} player={player} />;
-  if (definition.kind === 'sequence') return <SequenceRun definition={definition} band={band} player={player} />;
-  return <FreeRun definition={definition} band={band} player={player} />;
+  let runner: ReactNode;
+  if (definition.kind === 'rounds') runner = <RoundsRun definition={definition} band={band} player={player} />;
+  else if (definition.kind === 'sequence') runner = <SequenceRun definition={definition} band={band} player={player} />;
+  else runner = <FreeRun definition={definition} band={band} player={player} />;
+  return <LoadBoundary definition={definition}>{runner}</LoadBoundary>;
 }
 
 function spotCenter(spot: FeedbackOptions['at'], stage: DOMRect | undefined): { x: number; y: number } {
