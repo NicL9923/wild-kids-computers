@@ -222,6 +222,7 @@ export class History {
   private readonly redoStack: Change[] = [];
   private open: Change | null = null;
   private storedBytes = 0;
+  private revisionCount = 0;
 
   constructor(doc: PaintDocument, options: HistoryOptions = {}) {
     this.doc = doc;
@@ -248,6 +249,15 @@ export class History {
     return this.redoStack.length;
   }
 
+  /**
+   * Counts every change to the picture that went through the history: each step added, undone,
+   * or redone. Dropping the oldest steps to stay under the caps does not change the picture, so it
+   * does not count. A caller that saved at one revision knows the picture changed when it differs.
+   */
+  get revision(): number {
+    return this.revisionCount;
+  }
+
   /** Bytes held by every undo and redo step. */
   get bytes(): number {
     return this.storedBytes;
@@ -269,6 +279,7 @@ export class History {
     this.redoStack.length = 0;
     this.undoStack.push(change);
     this.storedBytes += change.bytes;
+    this.revisionCount++;
     // Drop the oldest steps over the cap, but always keep the newest one.
     while (this.undoStack.length > 1 && (this.storedBytes > this.byteCap || this.undoStack.length > this.maxSteps)) {
       const oldest = this.undoStack.shift();
@@ -288,6 +299,7 @@ export class History {
     const step = this.undoStack.pop();
     if (step === undefined) return EMPTY_RECT;
     this.redoStack.push(step);
+    this.revisionCount++;
     return step.swap();
   }
 
@@ -296,6 +308,7 @@ export class History {
     const step = this.redoStack.pop();
     if (step === undefined) return EMPTY_RECT;
     this.undoStack.push(step);
+    this.revisionCount++;
     return step.swap();
   }
 

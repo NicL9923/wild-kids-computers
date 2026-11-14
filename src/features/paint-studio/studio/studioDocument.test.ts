@@ -96,15 +96,18 @@ describe('StudioDocument', () => {
     expect(studio.version).toBe(0);
   });
 
-  it('keeps counting versions once the history is full and drops its oldest step', () => {
-    const studio = new StudioDocument(40, 20);
-    const max = studio.history.maxSteps;
-    for (let i = 0; i <= max; i++) {
-      const pixels = createSurface(40, 20, rgba(i % 2 === 0 ? 10 : 200, 0, 0)).data;
-      studio.replacePaint(pixels);
+  it('counts a version for every whole-picture change once the history is full, by bytes or by steps', () => {
+    // A 64 by 64 picture is one 16 KiB tile, so a byte cap of two tiles holds two steps. Each cap
+    // makes the history drop its oldest step as it adds one, so the step counts stay the same.
+    const tile = 64 * 64 * 4;
+    for (const caps of [{ byteCap: 2 * tile }, { maxSteps: 2 }]) {
+      const studio = new StudioDocument(64, 64, caps);
+      for (let i = 1; i <= 6; i++) {
+        studio.replacePaint(createSurface(64, 64, rgba(i * 30, 0, 0)).data);
+        expect(studio.version, JSON.stringify(caps)).toBe(i);
+      }
+      expect(studio.history.undoSteps).toBe(2);
     }
-    expect(studio.history.undoSteps).toBe(max);
-    expect(studio.version).toBe(max + 1);
   });
 
   it('notifies listeners on changes', () => {
