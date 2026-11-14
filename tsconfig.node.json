@@ -6,5 +6,5 @@
     "moduleResolution": "NodeNext",
     "types": ["node"]
   },
-  "include": ["electron/main", "tools", "vite.config.ts"]
+  "include": ["electron/main", "tools", "vite.config.ts", "src/core/platform", "src/core/bands.ts"]
 }

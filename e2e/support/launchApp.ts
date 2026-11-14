@@ -1,14 +1,40 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
+import { DEFAULT_BAND, type Band } from '../../src/core/bands.ts';
+import {
+  documentFileSegments,
+  documentNames,
+  parseDocumentName,
+  type DocumentName,
+} from '../../src/core/platform/names.ts';
+import { testInfoSchema, type TestInfo } from '../../src/core/platform/testInfo.ts';
+import { saveDocument, type DocumentSpec } from '../../src/core/storage/document.ts';
+import { appDocument, profilesDocument, progressDocument, settingsDocument } from '../../src/core/storage/schemas.ts';
 
 const projectRoot = path.resolve(import.meta.dirname, '..', '..');
+
+/** The profile launchApp creates when a test asks for a ready app. */
+export const FIXTURE_PROFILE = { id: 'e2e-child', avatarId: 'fox', colorId: 'sky' } as const;
+
+export interface LaunchOptions {
+  /** The age band of the ready profile. Defaults to the youngest band. */
+  band?: Band;
+  /** The session seed the activity kit uses, so levels repeat. */
+  seed?: number;
+  /** The starting difficulty, 1 to 10. */
+  difficulty?: number;
+  /** Opens this activity's route instead of the home map. */
+  activity?: string;
+}
 
 export interface LaunchedApp {
   app: ElectronApplication;
   page: Page;
   userDataDir: string;
+  /** Where the main process keeps documents and pictures. */
+  dataDir: string;
   close: () => Promise<void>;
 }
 
@@ -17,13 +43,19 @@ export interface LaunchedApp {
  * temporary user data directory and test hooks on. Always call `close()`, normally from a
  * fixture or `afterEach`. It closes the app and deletes the directory even if the app crashed.
  *
- * The milestone 1 signature takes `{ band, seed }` and seeds a ready profile. That arrives with
- * profiles and storage.
+ * With no argument the app starts at first launch, with nothing saved. With options it starts
+ * with a ready profile in the given band: first launch done, the profile active, and default
+ * settings and progress, all written through the storage schemas. The seed, difficulty, and
+ * activity reach the app through `info().test`.
  */
-export async function launchApp(): Promise<LaunchedApp> {
+export async function launchApp(options?: LaunchOptions): Promise<LaunchedApp> {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'wkc-e2e-'));
+  const dataDir = path.join(userDataDir, 'data');
   let app: ElectronApplication | undefined;
   try {
+    const testInfo: TestInfo = testInfoSchema.parse(options === undefined ? {} : { band: DEFAULT_BAND, ...options });
+    if (options !== undefined) await writeReadyProfile(dataDir, testInfo.band ?? DEFAULT_BAND);
+
     app = await electron.launch({
       args: [projectRoot],
       cwd: projectRoot,
@@ -31,6 +63,7 @@ export async function launchApp(): Promise<LaunchedApp> {
         ...process.env,
         WKC_TEST: '1',
         WKC_USER_DATA_DIR: userDataDir,
+        WKC_TEST_INFO: JSON.stringify(testInfo),
         // A test always runs the bundle, never a dev server left in the environment.
         WKC_DEV_SERVER_URL: '',
       },
@@ -42,6 +75,7 @@ export async function launchApp(): Promise<LaunchedApp> {
       app: launched,
       page,
       userDataDir,
+      dataDir,
       close: async () => {
         await closeQuietly(launched);
         await rm(userDataDir, { recursive: true, force: true });
@@ -52,6 +86,28 @@ export async function launchApp(): Promise<LaunchedApp> {
     await rm(userDataDir, { recursive: true, force: true });
     throw error;
   }
+}
+
+async function writeReadyProfile(dataDir: string, band: Band): Promise<void> {
+  const store = { write: (name: DocumentName, text: string) => writeDocumentFile(dataDir, name, text) };
+  const save = <T>(name: DocumentName, spec: DocumentSpec<T>, value: T) => saveDocument(store, name, spec, value);
+  await save(documentNames.app, appDocument, {
+    ...appDocument.defaults(),
+    firstLaunchDone: true,
+    lastActiveProfileId: FIXTURE_PROFILE.id,
+  });
+  await save(documentNames.profiles, profilesDocument, { version: 1, profiles: [{ ...FIXTURE_PROFILE, band }] });
+  await save(documentNames.settings(FIXTURE_PROFILE.id), settingsDocument, settingsDocument.defaults());
+  await save(documentNames.progress(FIXTURE_PROFILE.id), progressDocument, progressDocument.defaults());
+}
+
+/** Writes a document where the main process reads it, using the shared name-to-file mapping. */
+export async function writeDocumentFile(dataDir: string, name: DocumentName, text: string): Promise<void> {
+  const parsed = parseDocumentName(name);
+  if (parsed === null) throw new Error(`Not a document name: ${name}`);
+  const file = path.join(dataDir, ...documentFileSegments(parsed));
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, text);
 }
 
 async function closeQuietly(app: ElectronApplication): Promise<void> {
