@@ -118,7 +118,7 @@ function splice(text: string, at: number, remove: number, insert: string): strin
  * turn a word into another real one: "ride" can become "rude". A child reads the slipped
  * sentence, so any candidate with one of these words is dropped. Lower case, whole words.
  */
-const DENIED_SLIP_WORDS: ReadonlySet<string> = new Set([
+export const DENIED_SLIP_WORDS: ReadonlySet<string> = new Set([
   'arse',
   'ass',
   'bad',
