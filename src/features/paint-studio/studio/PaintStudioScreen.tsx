@@ -846,13 +846,15 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
                   busy={busy || !ready}
                   onPenChange={setPenIsDown}
                   handleRef={canvasRef}
+                  overlay={
+                    penIsDown && (
+                      <output className='wk-paint-pen-badge'>
+                        <EmojiPicture id='paintbrush' />
+                        <span className='wk-reading-text'>{t(strings.penDown)}</span>
+                      </output>
+                    )
+                  }
                 />
-              )}
-              {penIsDown && (
-                <output className='wk-paint-pen-badge'>
-                  <EmojiPicture id='paintbrush' />
-                  <span className='wk-reading-text'>{t(strings.penDown)}</span>
-                </output>
               )}
               {panel === 'stamps' && (
                 <StampPanel

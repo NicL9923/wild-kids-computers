@@ -169,19 +169,39 @@
     opacity: 0.6;
   }
 
+  /* The pen is down. A fixed place at the picture's top left corner: a round badge with the
+     brush for the youngest, and a pill with the brush and the sentence on one line for readers. */
   .wk-paint-pen-badge {
     position: absolute;
     top: var(--wk-space-item);
     left: var(--wk-space-item);
-    display: grid;
-    place-items: center;
-    width: var(--wk-target-min);
-    height: var(--wk-target-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-item);
+    box-sizing: border-box;
+    min-width: var(--wk-target-min);
+    max-width: calc(100% - var(--wk-space-item) * 2);
+    min-height: var(--wk-target-min);
+    padding: 0 calc(var(--wk-target-min) * 0.2);
     border: var(--wk-border-width) solid var(--wk-color-focus);
     border-radius: var(--wk-radius-round);
     background: var(--wk-color-surface);
     box-shadow: var(--wk-shadow-raised);
+    font-size: var(--wk-text-small);
+    font-weight: var(--wk-font-weight-bold);
+    line-height: var(--wk-line-height-tight);
+    white-space: nowrap;
     pointer-events: none;
+  }
+
+  .wk-paint-pen-badge .wk-paint-emoji {
+    flex: none;
+  }
+
+  [data-band='band-6-8'] .wk-paint-pen-badge,
+  [data-band='band-9-12'] .wk-paint-pen-badge {
+    padding-inline-end: var(--wk-space-container);
   }
 
   /* ---- buttons ---- */
