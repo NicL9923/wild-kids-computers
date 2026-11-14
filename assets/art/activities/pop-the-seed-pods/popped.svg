@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- the same seed head split open: two empty halves and its seeds tumbling out -->
+  <ellipse cx="100" cy="188" rx="60" ry="8" fill="#2f4a22" opacity="0.22"/>
+  <g transform="rotate(-26 94 176)">
+    <path d="M96 70c-36 4-58 32-58 60 0 26 22 44 58 46z" fill="#9fcb6b" stroke="#3d5c25" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M92 84c-24 6-38 26-38 46 0 18 14 30 38 34z" fill="#f4f0d2"/>
+  </g>
+  <g transform="rotate(26 106 176)">
+    <path d="M104 70c36 4 58 32 58 60 0 26-22 44-58 46z" fill="#9fcb6b" stroke="#3d5c25" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M108 84c24 6 38 26 38 46 0 18-14 30-38 34z" fill="#f4f0d2"/>
+  </g>
+  <g fill="#6b4a2b" stroke="#3b2814" stroke-width="3">
+    <circle cx="100" cy="40" r="11"/>
+    <circle cx="62" cy="56" r="10"/>
+    <circle cx="140" cy="54" r="10"/>
+    <circle cx="36" cy="100" r="9"/>
+    <circle cx="166" cy="96" r="9"/>
+    <circle cx="80" cy="22" r="7"/>
+    <circle cx="124" cy="20" r="7"/>
+  </g>
+  <g fill="#c79b6c">
+    <circle cx="96" cy="36" r="3.5"/><circle cx="59" cy="52" r="3"/><circle cx="137" cy="50" r="3"/>
+  </g>
+</svg>

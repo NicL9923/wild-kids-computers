@@ -1,0 +1,122 @@
+/*
+ * The flower bed on top keeps its 25:11 shape and fits the space above the numbers. The numbers
+ * sit in one row of big, equal buttons. Every value is a token.
+ */
+
+.flowers-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--wk-space-container);
+  justify-items: center;
+}
+
+.flowers-bed-area {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.flowers-bed {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 25 / 11));
+  aspect-ratio: 25 / 11;
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+}
+
+.flowers-flower {
+  position: absolute;
+  aspect-ratio: 1;
+  min-width: var(--wk-target-min);
+  padding: 0;
+  border: var(--wk-border-width) solid transparent;
+  border-radius: var(--wk-radius-round);
+  background: transparent;
+  cursor: pointer;
+  translate: -50% -50%;
+}
+
+.flowers-flower[aria-pressed='true'] {
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-surface);
+}
+
+.flowers-picture {
+  display: block;
+  width: 86%;
+  height: 86%;
+  margin: auto;
+}
+
+/* The counted number sits on the flower in a solid circle, readable on any petal color. */
+.flowers-badge {
+  position: absolute;
+  right: -6%;
+  bottom: -6%;
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--wk-target-min) * 0.6);
+  height: calc(var(--wk-target-min) * 0.6);
+  padding: 0 calc(var(--wk-space-unit) * 2);
+  box-sizing: border-box;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-primary);
+  color: var(--wk-color-on-primary);
+  font-size: var(--wk-text-body);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.flowers-choices {
+  margin: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  padding-bottom: var(--wk-press-depth);
+}
+
+.flowers-choice {
+  min-width: calc(var(--wk-target-large) * 1.1);
+  min-height: calc(var(--wk-target-large) * 1.1);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  font: inherit;
+  font-size: calc(var(--wk-target-large) * 0.5);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.flowers-choice:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+/* A number already tried steps back: dashed edge and lighter text, so it is not color alone. */
+.flowers-choice[data-tried='true'] {
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--wk-color-text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.flowers-choice[data-answer='true'] {
+  border-width: calc(var(--wk-border-width) * 2);
+  background: var(--wk-color-selected);
+}
+
+.flowers-choice:disabled:not([data-tried='true'], [data-answer='true']) {
+  opacity: 0.6;
+  cursor: default;
+}

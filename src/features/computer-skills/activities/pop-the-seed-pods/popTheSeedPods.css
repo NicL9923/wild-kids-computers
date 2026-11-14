@@ -1,0 +1,64 @@
+/*
+ * The board keeps its 5:3 shape and fits the stage. Pods are sized in the board's width, so they
+ * grow with the window, and never fall below twice the band's smallest target.
+ */
+
+.pods-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.pods-board {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+}
+
+.pods-pod {
+  position: absolute;
+  min-width: var(--wk-target-large);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wk-radius-round);
+  background: transparent;
+  cursor: pointer;
+  translate: -50% -50%;
+  transition: scale var(--wk-duration-quick) var(--wk-ease-out);
+}
+
+.pods-pod img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pods-pod:hover:not(:disabled) {
+  scale: calc(1 + 0.04 * var(--wk-motion-scale));
+}
+
+.pods-pod:disabled {
+  cursor: default;
+}
+
+/* The burst: a quick swell and settle. Reduced motion shows the open pod at once. */
+.pods-pod[data-popped='true'] img {
+  animation: pods-burst var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes pods-burst {
+  from {
+    scale: calc(1 + 0.18 * var(--wk-motion-scale));
+  }
+
+  to {
+    scale: 1;
+  }
+}

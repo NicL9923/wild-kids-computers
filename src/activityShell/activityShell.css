@@ -29,7 +29,7 @@
 
   .wk-instruction-text {
     margin: 0;
-    max-width: 32ch;
+    max-width: 46ch;
     font-size: var(--wk-text-title);
     font-weight: var(--wk-font-weight-bold);
     line-height: var(--wk-line-height-tight);
