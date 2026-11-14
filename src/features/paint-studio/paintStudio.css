@@ -41,6 +41,9 @@
   .wk-paint-tools,
   .wk-paint-colors {
     display: grid;
+    /* Each button keeps its full height. Without this, rows shrink to the buttons' minimum when
+       the window is short and the labels spill out; with it, the column scrolls instead. */
+    grid-auto-rows: max-content;
     align-content: start;
     gap: var(--wk-space-item);
     min-height: 0;
@@ -220,10 +223,24 @@
     height: calc(var(--wk-icon-size) * 1.2);
   }
 
+  /* Older bands read the names, so each tool puts its picture beside its name. That keeps all
+     eight tools in a 1280 by 800 window, and the longest name, "Straight line", on one line. */
   [data-band='band-6-8'] .wk-paint-tools .wk-paint-button,
   [data-band='band-9-12'] .wk-paint-tools .wk-paint-button {
-    width: calc(var(--wk-target-min) * 2);
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--wk-space-item);
+    /* The column takes the width of the longest name, and every tool stretches to it. */
+    width: auto;
+    min-width: calc(var(--wk-target-min) * 2.5);
     min-height: var(--wk-target-min);
+    padding-inline: var(--wk-space-item) var(--wk-space-container);
+  }
+
+  [data-band='band-6-8'] .wk-paint-tools .wk-paint-button-label,
+  [data-band='band-9-12'] .wk-paint-tools .wk-paint-button-label {
+    text-align: start;
+    white-space: nowrap;
   }
 
   .wk-paint-check {
