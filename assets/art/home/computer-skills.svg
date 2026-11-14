@@ -8,8 +8,8 @@
   <path d="M214 238v124M160 270h108M154 320h120" stroke="#a8693f" stroke-width="6"/>
   <circle cx="246" cy="304" r="8" fill="#f5c542"/>
   <!-- the signpost, its sign shaped like a pointer -->
-  <rect x="318" y="150" width="14" height="206" rx="6" fill="#8a5a3b"/>
-  <g transform="translate(270 58) rotate(-10) scale(0.92)">
+  <rect x="318" y="176" width="14" height="180" rx="6" fill="#8a5a3b"/>
+  <g transform="translate(278 92) rotate(-10) scale(0.84)">
     <path d="M12 8 12 120 40 94 62 140 82 130 60 86 98 84z" fill="#ffffff" stroke="#2e4034" stroke-width="9" stroke-linejoin="round"/>
   </g>
   <!-- tufts and a flower -->

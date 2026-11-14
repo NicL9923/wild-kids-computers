@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import './tokens.css';
 @import './fonts.css';
+@import '../components/ui/ui.css';
 
 /*
  * Tailwind's own palette, type scale, radii, and shadows are removed, so a utility such as

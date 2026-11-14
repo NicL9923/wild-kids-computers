@@ -1,10 +1,11 @@
 import { Outlet } from '@tanstack/react-router';
-import { DEFAULT_BAND } from '../core/bands.ts';
+import { ThemeRoot } from './theme/ThemeRoot.tsx';
 
 export default function RootLayout() {
+  // The app shell passes the active profile's settings here once profiles load.
   return (
-    <div data-band={DEFAULT_BAND}>
+    <ThemeRoot>
       <Outlet />
-    </div>
+    </ThemeRoot>
   );
 }
