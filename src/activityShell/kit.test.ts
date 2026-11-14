@@ -43,8 +43,10 @@ function setup(state: KitParts<{ n: number }>['state'] = null) {
           return sound;
         },
       },
-      onInstruction: (handles, speak) =>
-        calls.push(`instruction ${handles.map((h) => h.id).join(' ')} ${String(speak)}`),
+      onInstruction: (handles, speak, shown) =>
+        calls.push(
+          `instruction ${handles.map((h) => h.id).join(' ')} ${String(speak)} shows ${shown.map((h) => h.id).join(' ')}`,
+        ),
       onFeedback: (kind: string, options: FeedbackOptions) =>
         calls.push(`feedback ${kind}${options.say === undefined ? '' : ` ${options.say.id}`}`),
     },
@@ -109,17 +111,23 @@ describe('createKit', () => {
     kit.play('pop');
     kit.setInstruction(strings.b);
     kit.setInstruction([strings.a, strings.b], { speak: false });
+    kit.setInstruction([strings.a, strings.b], { shown: strings.a });
     expect(calls).toEqual([
       'speak kit-test.a',
       'sequence kit-test.a kit-test.b',
       'play pop',
-      'instruction kit-test.b true',
-      'instruction kit-test.a kit-test.b false',
+      'instruction kit-test.b true shows kit-test.b',
+      'instruction kit-test.a kit-test.b false shows kit-test.a kit-test.b',
+      'instruction kit-test.a kit-test.b true shows kit-test.a',
     ]);
   });
 
   it('rejects an empty instruction', () => {
-    expect(() => setup().kit.setInstruction([])).toThrow(/at least one string/);
+    expect(() => setup().kit.setInstruction([])).toThrow(/at least one string\./);
+  });
+
+  it('rejects an instruction that shows nothing', () => {
+    expect(() => setup().kit.setInstruction(strings.a, { shown: [] })).toThrow(/at least one string to show/);
   });
 
   it('does nothing once the round scope is disposed', async () => {

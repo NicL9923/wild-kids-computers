@@ -72,6 +72,11 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **A sequence shows only the steps reached.** Nothing looks locked.
 - **Pop the seed pods draws original seed heads,** not an emoji: no bundled emoji reads as a seed pod. Pods are at least 160 board units, about twice the youngest band's target, and never near the exit corner.
 - **Count the flowers lets a child touch each flower to count it out loud.** Counting is the goal, so the aid serves it. Rows hold at most five, like a ten frame, and distractors are within two of the answer.
+- **Find the letter and sight words keep their choices quiet under the pointer.** Knowing a written letter or word is the goal, so a choice that said its name on hover would turn the round into listening for a match. A wrong pick says its own name instead, so every try still teaches. Other letter choices speak on hover and focus: names where the goal is a sound or an order, and sounds where the goal is spelling.
+- **An instruction line can show less than the voice says.** `setInstruction` takes `shown`, so "Which letter makes this sound?" shows without the letter that would give the answer away from band-6-8 up.
+- **Letters that say the same sound never share a round.** c and k share the shared clip "kuh", and q starts with it, so a sound or a spelling round never offers two of them.
+- **Sight words, missing letter, and sentence builder start at band-6-8.** Each needs the child to read written words, which hard rule 5 keeps away from the youngest. First sound and build the word with its letter guide cover the same ground for them.
+- **Rhyme sets are true rhymes in General American English, checked by ear.** Pairs that share only a vowel, such as goat and nose, meet only at higher difficulty, and near rhymes are left out.
 
 ### Assets
 

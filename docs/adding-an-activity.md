@@ -85,7 +85,7 @@ export default function PackThePicnicActivity({ level, band, kit }: ActivityProp
 
 The shell already supplies the exit (top left, to the area screen), the replay control and the instruction text from `band-6-8` (top center), and the mute control (top right). It speaks `spoken[0]` when each round starts. You cannot leave them out, so do not draw your own.
 
-- **Speech.** `kit.speak(handle)` and `kit.speakSequence([strings.find, numberHandle(3)])`. Strings have no interpolation; use the shared sets in `src/core/strings/shared/` for numbers, letters, colors, and shapes. `kit.setInstruction(handle)` changes what replay says until the round ends. `kit.hint(say?)` counts a hint.
+- **Speech.** `kit.speak(handle)` and `kit.speakSequence([strings.find, numberHandle(3)])`. Strings have no interpolation; use the shared sets in `src/core/strings/shared/` for numbers, letters, colors, and shapes. `kit.setInstruction(handle)` changes what replay says until the round ends; `{ shown }` limits the text line when the spoken part would give the answer away. `kit.hint(say?)` counts a hint.
 - **Time.** Only `kit.scope.setTimeout`, `setInterval`, `requestFrame`, and `listen`. Leaving the round cancels them. A lint rule bans the global timer functions under `src/features/`. `kit.clock.now()` and `monotonic()` read time.
 - **Sound.** `kit.play('pop')` for the names in `src/audio/sfx/sfxNames.ts`. `kit.startSound('brush')` for a sound the child's action drives.
 - **Outcome.** `kit.roundComplete()` uses the mistakes counted by `feedback.wrong` and the hints counted by `hint`. Pass `{ mistakes, hintsUsed }` only to override. A second call in a round does nothing.

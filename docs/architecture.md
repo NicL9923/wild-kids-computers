@@ -272,7 +272,7 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 
 ### What the kit supplies
 
-- **Instruction player.** Speaks the main instruction when a round starts and shows a replay control that is always visible. Bands above `band-3-5` also show the text. An activity whose instruction changes within a round calls `kit.setInstruction(handleOrSequence)`, and the replay control then plays that.
+- **Instruction player.** Speaks the main instruction when a round starts and shows a replay control that is always visible. Bands above `band-3-5` also show the text. An activity whose instruction changes within a round calls `kit.setInstruction(handleOrSequence)`, and the replay control then plays that. Pass `{ shown }` when the instruction line must show less than the voice says, such as a sound the child is asked to match to its letter.
 - **Speech.** `kit.speak(handle)` and `kit.speakSequence([...])` play clips through the scope, so leaving cancels them. `kit.hint(say?)` counts a hint. `kit.play(name)` and `kit.startSound(name)` play effects.
 - **Feedback.** `kit.feedback.correct({ at, say, silent })` gives a soft chime and a check mark. `kit.feedback.wrong(...)` gives a low nudge and an open ring in a quiet color, and counts a mistake. No character shows disappointment. A wrong action never ends the round.
 - **Difficulty adjustment.** `src/core/activityKit/difficulty.ts` is a pure model. It raises the level by one after two clean rounds in a row at the current level, and lowers it by one right after a round with three or more mistakes and hints together, within the range for the band. Each saved round records the level it was played at. A test's difficulty is clamped into the band's range.

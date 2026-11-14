@@ -4,7 +4,7 @@ import type { ContinuousSfxName, SfxName } from '../audio/sfx/sfxNames.ts';
 import type { Band } from '../core/bands.ts';
 import type { KitClock } from '../core/activityKit/scheduler.ts';
 import type { Scope } from '../core/activityKit/scope.ts';
-import type { SpokenHandle } from '../core/strings/defineStrings.ts';
+import type { SpokenHandle, StringHandle } from '../core/strings/defineStrings.ts';
 
 /**
  * The kit handle an activity component receives. Everything an activity does to the world goes
@@ -39,6 +39,18 @@ export interface KitFeedback {
 }
 
 /** @public */
+export interface InstructionOptions {
+  /** Speak the new instruction now. Defaults to true. */
+  readonly speak?: boolean;
+  /**
+   * What the instruction line shows in the bands that show text. Defaults to the spoken strings.
+   * Show less when the text would give the answer away, such as the letter whose sound the
+   * child is asked to find.
+   */
+  readonly shown?: StringHandle | readonly StringHandle[];
+}
+
+/** @public */
 export interface RoundOutcomeInput {
   readonly mistakes?: number;
   readonly hintsUsed?: number;
@@ -66,7 +78,7 @@ export interface ActivityKit<S = never> {
    * Changes what the replay control says for the rest of the round, and speaks it unless
    * `speak: false`. The round starts with the definition's first spoken string.
    */
-  readonly setInstruction: (instruction: SpokenHandle | readonly SpokenHandle[], options?: { speak?: boolean }) => void;
+  readonly setInstruction: (instruction: SpokenHandle | readonly SpokenHandle[], options?: InstructionOptions) => void;
   /** Plays a short sound effect. */
   readonly play: (name: SfxName) => void;
   /** Starts a sound the child's action drives, such as a brush. The scope stops it on leave. */
@@ -97,8 +109,8 @@ export interface KitHost {
   readonly audio: Pick<AudioEngine, 'speak' | 'speakSequence' | 'cancelSpeech' | 'play' | 'startContinuous'>;
   readonly clock: KitClock;
   readonly activityId: string;
-  /** The instruction changed. `speak` says whether to say it now. */
-  onInstruction(handles: readonly SpokenHandle[], speak: boolean): void;
+  /** The instruction changed. `speak` says whether to say it now; `shown` is the text to show. */
+  onInstruction(handles: readonly SpokenHandle[], speak: boolean, shown: readonly StringHandle[]): void;
   onFeedback(kind: 'correct' | 'wrong', options: FeedbackOptions): void;
 }
 
@@ -158,7 +170,10 @@ export function createKit<S>(parts: KitParts<S>): ActivityKit<S> {
       if (scope.disposed) return;
       const handles: readonly SpokenHandle[] = Array.isArray(instruction) ? instruction : [instruction];
       if (handles.length === 0) throw new Error('setInstruction needs at least one string.');
-      host.onInstruction(handles, options?.speak ?? true);
+      const shown: readonly StringHandle[] =
+        options?.shown === undefined ? handles : Array.isArray(options.shown) ? options.shown : [options.shown];
+      if (shown.length === 0) throw new Error('setInstruction needs at least one string to show.');
+      host.onInstruction(handles, options?.speak ?? true, shown);
     },
     play(name) {
       if (!scope.disposed) host.audio.play(name);

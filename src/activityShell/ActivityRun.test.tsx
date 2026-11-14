@@ -57,6 +57,9 @@ function Fixture({ level, kit }: ActivityProps<string, { taps: number }>) {
       <button type='button' onClick={() => kit.setInstruction(strings.other)}>
         change
       </button>
+      <button type='button' onClick={() => kit.setInstruction([strings.say, strings.other], { shown: strings.other })}>
+        change, showing less
+      </button>
       <button type='button' onClick={() => kit.scope.setTimeout(() => void kit.speak(strings.other), 500)}>
         later
       </button>
@@ -327,6 +330,17 @@ describe('a rounds activity', () => {
     await level();
     click(shellStrings.replay.text);
     expect(h.spoken().at(-1)).toBe(strings.say.id);
+  });
+
+  it('shows only the text it is given while replay says the whole instruction', async () => {
+    const h = await run(rounds);
+    await level();
+    click('change, showing less');
+    expect(document.querySelector('.wk-instruction-text')?.textContent).toBe(strings.other.text);
+    // Replay starts the whole spoken instruction, which begins with the string the line hides.
+    const before = h.spoken().length;
+    click(shellStrings.replay.text);
+    expect(h.spoken().slice(before)[0]).toBe(strings.say.id);
   });
 
   it('cancels the activity timers when the child leaves', async () => {
