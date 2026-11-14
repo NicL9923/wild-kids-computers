@@ -1,6 +1,6 @@
 import type { Band } from '../../../../core/bands.ts';
 import { createRandom } from '../../../../core/activityKit/random.ts';
-import { ALPHABET, sameSound, similarSound, type Letter } from '../../reading/alphabet.ts';
+import { ALPHABET, lookAlike, sameSound, similarSound, type Letter } from '../../reading/alphabet.ts';
 import { chooseWithAnswer } from '../../reading/choices.ts';
 
 /**
@@ -24,18 +24,23 @@ interface Tier {
   readonly letters: readonly Letter[];
   /** How many wrong letters have a sound close to the answer's. */
   readonly similar: number;
+  /**
+   * True while no two letters in a round may look alike, such as the mirror images b, d, p, and
+   * q. Telling them apart by shape is not this activity's goal, so the youngest never face it.
+   */
+  readonly shapesApart: boolean;
 }
 
 /** One entry per difficulty, 1 first. */
 const TIERS: readonly Tier[] = [
-  { choices: 2, letters: FIRST_LETTERS, similar: 0 },
-  { choices: 3, letters: FIRST_LETTERS, similar: 0 },
-  { choices: 3, letters: COMMON_LETTERS, similar: 0 },
-  { choices: 4, letters: COMMON_LETTERS, similar: 0 },
-  { choices: 4, letters: COMMON_LETTERS, similar: 1 },
-  { choices: 4, letters: MOST_LETTERS, similar: 1 },
-  { choices: 5, letters: MOST_LETTERS, similar: 1 },
-  { choices: 5, letters: ALPHABET, similar: 2 },
+  { choices: 2, letters: FIRST_LETTERS, similar: 0, shapesApart: true },
+  { choices: 3, letters: FIRST_LETTERS, similar: 0, shapesApart: true },
+  { choices: 3, letters: COMMON_LETTERS, similar: 0, shapesApart: true },
+  { choices: 4, letters: COMMON_LETTERS, similar: 0, shapesApart: true },
+  { choices: 4, letters: COMMON_LETTERS, similar: 1, shapesApart: true },
+  { choices: 4, letters: MOST_LETTERS, similar: 1, shapesApart: false },
+  { choices: 5, letters: MOST_LETTERS, similar: 1, shapesApart: false },
+  { choices: 5, letters: ALPHABET, similar: 2, shapesApart: false },
 ];
 
 export const MAX_DIFFICULTY = TIERS.length;
@@ -63,7 +68,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Le
   const choices = chooseWithAnswer(random, answer, {
     pool: tier.letters,
     total: tier.choices,
-    clashes: sameSound,
+    clashes: (a, b) => sameSound(a, b) || (tier.shapesApart && lookAlike(a, b)),
     confusable: similarSound,
     similar: tier.similar,
   });

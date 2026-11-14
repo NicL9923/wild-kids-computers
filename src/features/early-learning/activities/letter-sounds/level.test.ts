@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Band } from '../../../../core/bands.ts';
-import { isLetter, sameSound, similarSound, type Letter } from '../../reading/alphabet.ts';
+import { isLetter, lookAlike, sameSound, similarSound, type Letter } from '../../reading/alphabet.ts';
 import { generateLevel, MAX_DIFFICULTY, type LetterSoundsLevel } from './level.ts';
 
 const SEEDS = Array.from({ length: 300 }, (_, index) => index * 7_919 + 11);
@@ -19,10 +19,12 @@ function problems(level: LetterSoundsLevel): string[] {
   return found;
 }
 
-// How many letters with a close sound one round could offer: c, k, and q count once.
-const closeTo = (answer: Letter, pool: string) => {
+// How many letters with a close sound one round could offer: c, k, and q count once, and while
+// shapes are kept apart, a letter that looks like the answer does not count.
+const closeTo = (answer: Letter, pool: string, shapesApart: boolean) => {
   const kept: Letter[] = [];
   for (const letter of pool.split('').filter(isLetter)) {
+    if (shapesApart && lookAlike(answer, letter)) continue;
     if (similarSound(answer, letter) && !sameSound(answer, letter) && kept.every((k) => !sameSound(k, letter))) {
       kept.push(letter);
     }
@@ -82,8 +84,35 @@ describe('generateLevel', () => {
   ])('at difficulty %i offers letters with a close sound when it can', (difficulty, pool, wanted) => {
     for (const seed of SEEDS) {
       const level = generateLevel(seed, difficulty, 'band-6-8');
-      expect(similarTo(level), `seed ${String(seed)}`).toBe(Math.min(wanted, closeTo(level.answer, pool)));
+      expect(similarTo(level), `seed ${String(seed)}`).toBe(
+        Math.min(wanted, closeTo(level.answer, pool, difficulty <= 5)),
+      );
     }
+  });
+
+  // b, d, p, and q are mirror images. band-3-5 plays difficulty 1 to 5 and never sees two letters
+  // that look alike in one round, the rule find the letter keeps for its easy rounds.
+  it('keeps letters that look alike, such as b and d, out of one round up to difficulty 5', () => {
+    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
+      for (const seed of SEEDS) {
+        const { choices } = generateLevel(seed, difficulty, 'band-3-5');
+        const pairs = choices.flatMap((a, index) =>
+          choices
+            .slice(index + 1)
+            .filter((b) => lookAlike(a, b))
+            .map((b) => a + b),
+        );
+        expect(pairs, `difficulty ${String(difficulty)} seed ${String(seed)}`).toEqual([]);
+      }
+    }
+  });
+
+  it('offers look-alike letters together again from difficulty 6', () => {
+    const together = SEEDS.some((seed) => {
+      const { choices } = generateLevel(seed, 6, 'band-6-8');
+      return choices.some((a, index) => choices.slice(index + 1).some((b) => lookAlike(a, b)));
+    });
+    expect(together).toBe(true);
   });
 
   it('never offers c, k, and q together, because they share the sound "kuh"', () => {
