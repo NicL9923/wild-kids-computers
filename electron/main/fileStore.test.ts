@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -265,5 +265,90 @@ describe('pictures', () => {
     if (code === 'too-large') bytes.set(SIGNATURE);
     await writeFile(path.join(root, 'profile', 'p1', 'pictures', name), bytes);
     expect(await rejection(pictures.read('p1', 'pic-a', file))).toMatchObject({ code });
+  });
+});
+
+// The renderer cannot make a link through the bridge, but another program or a restored backup
+// can leave one under the data directory. Following it would read and overwrite files elsewhere.
+describe('links under the data directory', () => {
+  let outside: string;
+
+  beforeEach(async () => {
+    outside = await mkdtemp(path.join(os.tmpdir(), 'wkc-outside-'));
+    await writeFile(path.join(outside, 'settings.json'), 'outside settings');
+    await writeFile(path.join(outside, 'app.json'), 'outside app');
+  });
+
+  afterEach(async () => {
+    await rm(outside, { recursive: true, force: true });
+  });
+
+  async function outsideUntouched() {
+    expect((await readdir(outside)).toSorted()).toEqual(['app.json', 'settings.json']);
+    expect(await readFile(path.join(outside, 'settings.json'), 'utf8')).toBe('outside settings');
+    expect(await readFile(path.join(outside, 'app.json'), 'utf8')).toBe('outside app');
+  }
+
+  it.each([
+    ['a linked profile directory', ['profile', 'p1'], 'dir'],
+    ['a linked profile folder', ['profile'], 'parent'],
+  ] as const)('refuses documents through %s', async (_label, linkSegments, kind) => {
+    const link = path.join(root, ...linkSegments);
+    await mkdir(path.dirname(link), { recursive: true });
+    if (kind === 'parent') {
+      await mkdir(path.join(outside, 'p1'));
+      await writeFile(path.join(outside, 'p1', 'settings.json'), 'nested outside');
+    }
+    await symlink(outside, link, 'dir');
+    const { documents } = store();
+    const name = 'profile/p1/settings';
+    expect(await rejection(documents.read(name))).toMatchObject({ code: 'forbidden' });
+    expect(await rejection(documents.write(name, 'child data'))).toMatchObject({ code: 'forbidden' });
+    expect(await rejection(documents.setAside(name))).toMatchObject({ code: 'forbidden' });
+    expect(await rejection(documents.removeProfile('p1'))).toMatchObject({ code: 'forbidden' });
+    if (kind === 'parent') {
+      await rm(path.join(outside, 'p1'), { recursive: true });
+    }
+    await outsideUntouched();
+  });
+
+  it('refuses a document that is itself a link', async () => {
+    await symlink(path.join(outside, 'app.json'), path.join(root, 'app.json'), 'file');
+    const { documents } = store();
+    expect(await rejection(documents.read('app'))).toMatchObject({ code: 'forbidden' });
+    expect(await rejection(documents.write('app', '{}'))).toMatchObject({ code: 'forbidden' });
+    await outsideUntouched();
+  });
+
+  it('refuses pictures through a linked pictures folder', async () => {
+    await mkdir(path.join(root, 'profile', 'p1'), { recursive: true });
+    await symlink(outside, path.join(root, 'profile', 'p1', 'pictures'), 'dir');
+    const { pictures } = store();
+    expect(await rejection(pictures.save('p1', { png: png(1), thumbnail: png(2) }))).toMatchObject({
+      code: 'forbidden',
+    });
+    expect(await rejection(pictures.list('p1', 'gallery'))).toMatchObject({ code: 'forbidden' });
+    expect(await rejection(pictures.read('p1', 'settings', 'picture'))).toMatchObject({ code: 'forbidden' });
+    await outsideUntouched();
+  });
+
+  it('leaves a linked picture file out of the list and refuses to read or move it', async () => {
+    const { pictures } = store();
+    await pictures.save('p1', { png: png(1), thumbnail: png(2) });
+    const dir = path.join(root, 'profile', 'p1', 'pictures');
+    await symlink(path.join(outside, 'app.json'), path.join(dir, 'linked.png'), 'file');
+    expect((await pictures.list('p1', 'gallery')).map((p) => p.id)).toEqual(['pic-a']);
+    expect(await rejection(pictures.read('p1', 'linked', 'picture'))).toMatchObject({ code: 'forbidden' });
+    expect(await rejection(pictures.copy('p1', 'linked'))).toMatchObject({ code: 'forbidden' });
+    await outsideUntouched();
+  });
+
+  it('still works when the data directory itself is reached through a link', async () => {
+    const linkedRoot = path.join(outside, 'linked-root');
+    await symlink(root, linkedRoot, 'dir');
+    const { documents } = createFileStore(linkedRoot);
+    await documents.write('profile/p1/settings', '{"version":1}');
+    expect(await documents.read('profile/p1/settings')).toBe('{"version":1}');
+    await rm(linkedRoot);
   });
 });
