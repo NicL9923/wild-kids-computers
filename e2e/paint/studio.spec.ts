@@ -271,7 +271,7 @@ test('a picture left in the trash is gone for good once the gallery closes', asy
   await expect(cards).toHaveCount(0);
   expect(await galleryIds(page, 'trash')).toHaveLength(1);
 
-  await button(page, strings.backToPainting.text).click();
+  await page.getByRole('banner').getByRole('button', { name: strings.backToPainting.text }).click();
   await expect(page.locator('.wk-paint-screen[data-ready="true"] canvas[data-layer="paint"]')).toBeVisible();
   await expect.poll(() => galleryIds(page, 'trash')).toEqual([]);
 });
