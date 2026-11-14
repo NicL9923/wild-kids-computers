@@ -80,10 +80,14 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     return target;
   }
 
-  function documentPath(name: DocumentName): Promise<string> {
+  /**
+   * The file of a document. Synchronous, so a write joins its file's queue in call order; the
+   * link check runs inside the queued operation.
+   */
+  function documentPath(name: DocumentName): string {
     const parsed = parseDocumentName(name);
     if (parsed === null) throw new BridgeError('invalid-argument', `Unknown document name ${JSON.stringify(name)}.`);
-    return unlinked(inside(documentFileSegments(parsed)));
+    return inside(documentFileSegments(parsed));
   }
 
   function pictureDirName(profileId: string, place: PicturePlace): string {
@@ -178,7 +182,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
 
   const documents: DocumentStore = {
     async read(name) {
-      const file = await documentPath(name);
+      const file = await unlinked(documentPath(name));
       const info = await fileInfo(file);
       if (info === null) return null;
       if (info.size > MAX_DOCUMENT_BYTES) {
@@ -190,17 +194,17 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     },
 
     async write(name, text) {
-      const file = await documentPath(name);
+      const file = documentPath(name);
       if (utf8ByteLength(text) > MAX_DOCUMENT_BYTES) {
         throw new BridgeError('too-large', `The ${name} document is over ${MAX_DOCUMENT_BYTES} bytes.`);
       }
-      await queue.run(file, () => writeFileAtomic(file, text));
+      await queue.run(file, async () => writeFileAtomic(await unlinked(file), text));
     },
 
     async setAside(name) {
-      const file = await documentPath(name);
+      const file = documentPath(name);
       return queue.run(file, async () => {
-        if ((await fileInfo(file)) === null) return false;
+        if ((await fileInfo(await unlinked(file))) === null) return false;
         const stamp = now();
         let attempt = 0;
         let target = path.join(path.dirname(file), setAsideFileName(path.basename(file), stamp));
@@ -214,8 +218,8 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     },
 
     async removeProfile(profileId) {
-      const dir = await unlinked(inside(profileDirSegments(requireId(profileId, 'profileId'))));
-      await queue.run(dir, () => rm(dir, { recursive: true, force: true }));
+      const dir = inside(profileDirSegments(requireId(profileId, 'profileId')));
+      await queue.run(dir, async () => rm(await unlinked(dir), { recursive: true, force: true }));
     },
   };
 
