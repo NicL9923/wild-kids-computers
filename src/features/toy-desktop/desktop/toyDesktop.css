@@ -280,6 +280,19 @@
   }
 }
 
+/* A window clips what lies outside it, so a pointed-at title bar draws its ring inside. */
+.td-title[data-highlight='true'] {
+  outline-offset: calc(var(--wk-focus-width) * -2);
+  box-shadow: none;
+  animation-name: td-point-inside;
+}
+
+@keyframes td-point-inside {
+  50% {
+    outline-offset: calc(var(--wk-focus-width) * -2 - 4px * var(--wk-motion-scale));
+  }
+}
+
 /* ---- menu bar ---- */
 
 .td-menu-bar {

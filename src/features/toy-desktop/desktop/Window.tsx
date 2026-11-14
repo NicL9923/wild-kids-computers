@@ -140,7 +140,7 @@ export function DesktopWindow({ window, layer, focused, area }: DesktopWindowPro
             {title.unsaved && parts.menuBar && <UnsavedMark />}
           </button>
         ) : (
-          <div className='td-title'>
+          <div className='td-title' data-highlight={isHighlighted(highlight, { kind: 'title-bar', windowId })}>
             <AppPicture app={window.app.kind} className='td-title-picture' />
             <span id={titleId} className='td-title-text'>
               {title.text}
