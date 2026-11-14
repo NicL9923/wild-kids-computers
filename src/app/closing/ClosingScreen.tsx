@@ -7,13 +7,12 @@ import { Dialog } from '../../components/ui/Dialog.tsx';
 import { IconButton } from '../../components/ui/IconButton.tsx';
 import { InterfaceIcon } from '../../components/ui/InterfaceIcon.tsx';
 import { t } from '../../core/strings/defineStrings.ts';
-import { quitApp } from '../kiosk/closeRequest.ts';
+import { useQuitApp } from '../kiosk/QuitGuard.tsx';
 import { useParentGate } from '../parent-gate/ParentGate.tsx';
 import { HOME_PATH } from '../paths.ts';
-import { useSessionLength, useSessionStatus, useSessionStore } from '../session/sessionHooks.ts';
+import { useSessionLength, useSessionStatus } from '../session/sessionHooks.ts';
 import { useSpeakOnShow } from '../shell/Instruction.tsx';
 import { strings as shellStrings } from '../shell/strings.ts';
-import { useShellPlatform } from '../shell/shellPlatform.tsx';
 import { strings } from './strings.ts';
 import { MORE_TIME_MS } from './useSessionLimit.ts';
 import '../shell/shell.css';
@@ -29,8 +28,7 @@ export default function ClosingScreen() {
   const status = useSessionStatus();
   const askParent = useParentGate();
   const navigate = useNavigate();
-  const platform = useShellPlatform();
-  const store = useSessionStore();
+  const quitApp = useQuitApp();
   const { grantPlayTime } = useSessionLength();
   const [choosing, setChoosing] = useState(false);
   useSpeakOnShow(SPOKEN);
@@ -67,10 +65,7 @@ export default function ClosingScreen() {
             <Button icon={<Clock className='wk-lucide' aria-hidden='true' />} onClick={moreTime}>
               {t(strings.moreTime)}
             </Button>
-            <Button
-              icon={<LogOut className='wk-lucide' aria-hidden='true' />}
-              onClick={() => void quitApp(platform.window, store.flush)}
-            >
+            <Button icon={<LogOut className='wk-lucide' aria-hidden='true' />} onClick={() => void quitApp()}>
               {t(strings.closeApp)}
             </Button>
           </>
