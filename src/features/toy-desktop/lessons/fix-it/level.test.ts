@@ -139,6 +139,7 @@ describe('fix it difficulty', () => {
     // only the right end of its title bar, where buttons would cover the part to grab.
     const { systemSound: _sound, ...parts } = withDefaults(generateLevel(1, 1, 'band-6-8').parts);
     expect(parts).toEqual({
+      hiddenCommands: [],
       icons: [],
       menuBar: false,
       taskStrip: true,

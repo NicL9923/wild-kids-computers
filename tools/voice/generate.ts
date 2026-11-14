@@ -86,7 +86,7 @@ async function main(): Promise<void> {
  * the lead-in window, so a pause later in the sentence is never taken for it.
  */
 function cutLead(samples: Float32Array, sampleRate: number): Float32Array | undefined {
-  for (const minPauseMs of [DEFAULT_LEAD_CUT.minPauseMs, 80, 50]) {
+  for (const minPauseMs of [DEFAULT_LEAD_CUT.minPauseMs, 80, 50, 30]) {
     try {
       return cutAfterLead(samples, { ...DEFAULT_LEAD_CUT, sampleRate, minPauseMs });
     } catch {

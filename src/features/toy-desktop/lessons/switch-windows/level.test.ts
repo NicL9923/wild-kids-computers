@@ -121,6 +121,7 @@ describe('switch windows difficulty', () => {
     // No close button: a closed window could never be found. Windows move, so a child can push
     // one aside to look behind it.
     expect(withDefaults(generateLevel(1, 3, 'band-6-8').parts)).toEqual({
+      hiddenCommands: [],
       icons: [],
       menuBar: false,
       taskStrip: true,

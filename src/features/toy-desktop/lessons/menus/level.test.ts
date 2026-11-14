@@ -175,6 +175,7 @@ describe('menus cases', () => {
   it('shows the menu bar and one still window with no buttons', () => {
     // No window buttons: closing the window would leave no menus to look in.
     expect(withDefaults(generateLevel(1, 1, 'band-6-8').parts)).toEqual({
+      hiddenCommands: [],
       icons: [],
       menuBar: true,
       taskStrip: false,

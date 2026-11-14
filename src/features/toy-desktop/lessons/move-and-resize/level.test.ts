@@ -200,6 +200,7 @@ describe('move and resize desktop', () => {
     const level = generateLevel(1, 1, 'band-6-8');
     // No window buttons: a minimized window with no task strip could never come back.
     expect(withDefaults(level.parts)).toEqual({
+      hiddenCommands: [],
       icons: [],
       menuBar: false,
       taskStrip: false,
