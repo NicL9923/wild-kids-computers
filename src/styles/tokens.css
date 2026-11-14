@@ -111,14 +111,16 @@
  * Every band sets every value that differs between bands, so an element marked with a band inside
  * another band's page, such as the parent corner's text preview, gets all of its own values.
  * --wk-press-depth: buttons stand on a darker base, like a key, and press down into it.
+ * --wk-zoom, unset everywhere but a scene that scales with the window, such as the toy desktop at
+ * band-9-12, multiplies the target and text sizes of the element that sets it with its band.
  */
 :root,
 [data-band='band-3-5'] {
-  --wk-target-min: 72px;
-  --wk-font-small: 20px;
-  --wk-font-body: 24px;
-  --wk-font-title: 32px;
-  --wk-font-display: 44px;
+  --wk-target-min: calc(72px * var(--wk-zoom, 1));
+  --wk-font-small: calc(20px * var(--wk-zoom, 1));
+  --wk-font-body: calc(24px * var(--wk-zoom, 1));
+  --wk-font-title: calc(32px * var(--wk-zoom, 1));
+  --wk-font-display: calc(44px * var(--wk-zoom, 1));
   --wk-space-screen-edge: 24px;
   --wk-radius-control: 18px;
   --wk-radius-card: 28px;
@@ -126,11 +128,11 @@
 }
 
 [data-band='band-6-8'] {
-  --wk-target-min: 56px;
-  --wk-font-small: 18px;
-  --wk-font-body: 21px;
-  --wk-font-title: 28px;
-  --wk-font-display: 38px;
+  --wk-target-min: calc(56px * var(--wk-zoom, 1));
+  --wk-font-small: calc(18px * var(--wk-zoom, 1));
+  --wk-font-body: calc(21px * var(--wk-zoom, 1));
+  --wk-font-title: calc(28px * var(--wk-zoom, 1));
+  --wk-font-display: calc(38px * var(--wk-zoom, 1));
   --wk-space-screen-edge: 24px;
   --wk-radius-control: 18px;
   --wk-radius-card: 28px;
@@ -138,11 +140,11 @@
 }
 
 [data-band='band-9-12'] {
-  --wk-target-min: 44px;
-  --wk-font-small: 15px;
-  --wk-font-body: 17px;
-  --wk-font-title: 24px;
-  --wk-font-display: 32px;
+  --wk-target-min: calc(44px * var(--wk-zoom, 1));
+  --wk-font-small: calc(15px * var(--wk-zoom, 1));
+  --wk-font-body: calc(17px * var(--wk-zoom, 1));
+  --wk-font-title: calc(24px * var(--wk-zoom, 1));
+  --wk-font-display: calc(32px * var(--wk-zoom, 1));
   --wk-space-screen-edge: 20px;
   --wk-radius-control: 14px;
   --wk-radius-card: 22px;

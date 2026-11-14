@@ -11,7 +11,8 @@ function targetMinFor(selector: string): number | undefined {
   for (const [, selectorList = '', body = ''] of rules) {
     const selectors = selectorList.split(',').map((part) => part.trim());
     if (!selectors.includes(selector)) continue;
-    const match = /--wk-target-min:\s*(\d+)px/.exec(body);
+    // A band may scale its value with --wk-zoom; the px number is the base.
+    const match = /--wk-target-min:\s*(?:calc\()?(\d+)px/.exec(body);
     if (match?.[1] !== undefined) return Number(match[1]);
   }
   return undefined;

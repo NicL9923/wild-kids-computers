@@ -4,6 +4,7 @@
  * desktop to fill what is left, so nothing is clipped and no space is wasted. A lesson that
  * places its windows inside 1024 by 640 is fully visible on every screen.
  */
+import type { Band } from '../../../core/bands.ts';
 import { MIN_DESKTOP_SIZE, type Rect, type Size } from '../model/geometry.ts';
 import type { AppKind } from '../model/state.ts';
 
@@ -60,4 +61,19 @@ export function comfortableSize(app: AppKind, targetPx: number, fit: DesktopFit)
     width: Math.round(Math.min((comfort.width * targetPx) / fit.scale, fit.size.width - OPEN_MARGIN.width)),
     height: Math.round(Math.min((comfort.height * targetPx) / fit.scale, fit.size.height - OPEN_MARGIN.height)),
   };
+}
+
+/** The app window the desktop's controls and text are sized for. */
+const REFERENCE_WINDOW: Size = { width: 1280, height: 800 };
+const MAX_ZOOM = 1.5;
+
+/**
+ * How much the desktop's own targets and text grow with the app's window. At band-9-12 the
+ * targets are 44 px, which leaves a large window mostly empty, so they grow with the window up to
+ * one and a half times. Younger bands already have large targets and keep them.
+ */
+export function contentZoom(band: Band, window: Size): number {
+  if (band !== 'band-9-12') return 1;
+  const fit = Math.min(window.width / REFERENCE_WINDOW.width, window.height / REFERENCE_WINDOW.height);
+  return Number.isFinite(fit) ? Math.min(MAX_ZOOM, Math.max(1, fit)) : 1;
 }

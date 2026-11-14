@@ -6,6 +6,7 @@
 .party-stage {
   position: absolute;
   inset: 0;
+  container-type: size;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   justify-items: center;
@@ -72,5 +73,6 @@
 }
 
 .party-keyboard {
-  width: min(100%, calc(var(--wk-target-min) * 9));
+  /* Grows with the window, so a pressed key is easy to see, and leaves the meadow most of it. */
+  width: min(100%, max(calc(var(--wk-target-min) * 9), 45cqw), calc(var(--wk-target-min) * 15));
 }

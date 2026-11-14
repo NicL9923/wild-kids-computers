@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MIN_DESKTOP_SIZE } from '../model/geometry.ts';
-import { comfortableSize, fitDesktop, toPixels } from './layout.ts';
+import { comfortableSize, contentZoom, fitDesktop, toPixels } from './layout.ts';
 
 describe('fitDesktop', () => {
   it('gives the minimum desktop at scale 1 before the space is measured', () => {
@@ -46,5 +46,18 @@ describe('comfortableSize', () => {
   it('never opens a window bigger than the desktop leaves room for', () => {
     const tight = { scale: 0.5, size: { width: 1024, height: 640 } };
     expect(comfortableSize('file-explorer', 72, tight)).toEqual({ width: 1024 - 96, height: 640 - 64 });
+  });
+});
+
+describe('contentZoom', () => {
+  it.each([
+    ['band-9-12', { width: 1280, height: 800 }, 1],
+    ['band-9-12', { width: 1920, height: 1080 }, 1.35],
+    ['band-9-12', { width: 3840, height: 2160 }, 1.5],
+    ['band-9-12', { width: 1024, height: 640 }, 1],
+    ['band-6-8', { width: 1920, height: 1080 }, 1],
+    ['band-3-5', { width: 1920, height: 1080 }, 1],
+  ] as const)('at %s in a %o window is %d', (band, window, zoom) => {
+    expect(contentZoom(band, window)).toBeCloseTo(zoom, 5);
   });
 });
