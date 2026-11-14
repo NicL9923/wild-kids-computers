@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ActivityKit } from '../../../../activityShell/kit.ts';
 import type { Band } from '../../../../core/bands.ts';
 import { feedback } from '../../../../core/strings/shared/index.ts';
 import type { HighlightTarget } from '../../desktop/parts.ts';
 import { ToyDesktop } from '../../desktop/ToyDesktop.tsx';
 import { useDesktop } from '../../desktop/useDesktop.ts';
+import type { DesktopState } from '../../model/state.ts';
 import type { LessonLevel, LessonStep } from './lesson.ts';
 
 /** Wrong tries in one step before the harness points at the answer. */
@@ -25,6 +26,24 @@ export interface LessonDesktopProps {
   readonly kit: LessonKit;
   /** The steps of one round, in order. The round completes when the last one is done. */
   readonly steps: readonly LessonStep[];
+  /** Lesson marks on the desktop under the windows, such as a place to move a window to. */
+  readonly backdrop?: (view: LessonView) => ReactNode;
+}
+
+/** What a lesson's backdrop draws from. */
+export interface LessonView {
+  /** CSS pixels per desktop unit. */
+  readonly scale: number;
+  readonly state: DesktopState;
+  /** The index of the step the child is on. Equal to the step count once the round is done. */
+  readonly step: number;
+}
+
+/** The first step from `from` on that is not done already, or the step count when all are. */
+function firstOpenStep(steps: readonly LessonStep[], from: number, state: DesktopState): number {
+  let index = from;
+  while (index < steps.length && steps[index]?.done(state, []) === true) index += 1;
+  return index;
 }
 
 /**
@@ -33,7 +52,7 @@ export interface LessonDesktopProps {
  * wrong try, points at the answer after a couple of tries, and ends the round when the last step
  * is done.
  */
-export function LessonDesktop({ level, band, kit, steps }: LessonDesktopProps) {
+export function LessonDesktop({ level, band, kit, steps, backdrop }: LessonDesktopProps) {
   const desktop = useDesktop(() => level.desktop);
   const [step, setStep] = useState(0);
   const [highlight, setHighlight] = useState<HighlightTarget | null>(null);
@@ -63,7 +82,8 @@ export function LessonDesktop({ level, band, kit, steps }: LessonDesktopProps) {
         // After the last step there is no current step, so nothing the child does counts.
         if (current === undefined) return;
         if (current.done(transition.state, transition.events)) {
-          const next = now.step + 1;
+          // A later step the child already did on the way counts as done too.
+          const next = firstOpenStep(stepsNow, now.step + 1, transition.state);
           progress.current = { step: next, tries: 0, hinted: false };
           setStep(next);
           setHighlight(null);
@@ -80,7 +100,7 @@ export function LessonDesktop({ level, band, kit, steps }: LessonDesktopProps) {
         if (current.wrong?.(transition, action) !== true) return;
         const tries = now.tries + 1;
         progress.current = { ...now, tries };
-        kitNow.feedback.wrong({ say: feedback.tryAnother });
+        kitNow.feedback.wrong({ say: current.nudge ?? feedback.tryAnother });
         const target = current.hint?.(transition.state) ?? null;
         if (tries >= HINT_AFTER_TRIES && target !== null && !now.hinted) {
           progress.current = { ...progress.current, hinted: true };
@@ -93,7 +113,14 @@ export function LessonDesktop({ level, band, kit, steps }: LessonDesktopProps) {
 
   return (
     <div className='td-lesson' data-lesson-step={step}>
-      <ToyDesktop desktop={desktop} kit={kit} band={band} parts={level.parts} highlight={highlight} />
+      <ToyDesktop
+        desktop={desktop}
+        kit={kit}
+        band={band}
+        parts={level.parts}
+        highlight={highlight}
+        backdrop={backdrop === undefined ? undefined : (scale) => backdrop({ scale, state: desktop.state, step })}
+      />
     </div>
   );
 }

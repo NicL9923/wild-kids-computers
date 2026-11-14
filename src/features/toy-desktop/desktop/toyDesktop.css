@@ -1388,3 +1388,20 @@ button.td-resize[data-carry-item] {
 .td-monitor[data-band='band-3-5'] .td-notepad-text {
   font-size: var(--wk-text-display);
 }
+
+/*
+ * The title bar and the resize corner touch the window's clipped edge, so a ring around them
+ * would be cut off. Theirs sits just inside instead.
+ */
+.td-title[data-highlight='true'],
+.td-resize[data-highlight='true'] {
+  outline-offset: calc(var(--wk-focus-width) * -2.5);
+  box-shadow: inset 0 0 0 calc(var(--wk-focus-width) * 4) var(--wk-profile-night);
+  animation: td-point-inside 1.6s var(--wk-ease-in-out) infinite;
+}
+
+@keyframes td-point-inside {
+  50% {
+    outline-offset: calc(var(--wk-focus-width) * -2.5 - 3px * var(--wk-motion-scale));
+  }
+}

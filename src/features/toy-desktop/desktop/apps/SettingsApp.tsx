@@ -17,7 +17,8 @@ import { ToyTextField } from '../ToyTextField.tsx';
 
 /**
  * One of each common control, for the "Controls" lesson: a checkbox, a radio group, a dropdown,
- * a slider, a text field, and a list that scrolls. The values change the desktop around it.
+ * a slider, a text field, and a list that scrolls. The values change the desktop around it. Each
+ * setting carries `data-highlight-key` "setting:<name>", so a lesson can point at it.
  */
 export function SettingsApp({ windowId, app }: { readonly windowId: string; readonly app: SettingsPanelState }) {
   const { desktop, sayName } = useDesktopContext();
@@ -28,7 +29,7 @@ export function SettingsApp({ windowId, app }: { readonly windowId: string; read
 
   return (
     <div className='td-settings'>
-      <label className='td-setting td-setting-inline' data-setting='showNames'>
+      <label className='td-setting td-setting-inline' data-setting='showNames' data-highlight-key='setting:showNames'>
         <input
           type='checkbox'
           className='td-checkbox'
@@ -38,7 +39,7 @@ export function SettingsApp({ windowId, app }: { readonly windowId: string; read
         {t(strings.showNames)}
       </label>
 
-      <fieldset className='td-setting' data-setting='wallpaper'>
+      <fieldset className='td-setting' data-setting='wallpaper' data-highlight-key='setting:wallpaper'>
         <legend className='td-field-label'>{t(strings.background)}</legend>
         <div className='td-radio-row'>
           {WALLPAPERS.map((wallpaper) => (
@@ -56,7 +57,7 @@ export function SettingsApp({ windowId, app }: { readonly windowId: string; read
         </div>
       </fieldset>
 
-      <div className='td-setting' data-setting='iconSize'>
+      <div className='td-setting' data-setting='iconSize' data-highlight-key='setting:iconSize'>
         <span className='td-field-label' id={`${dropdownId}-label`}>
           {t(strings.iconSize)}
         </span>
@@ -94,7 +95,7 @@ export function SettingsApp({ windowId, app }: { readonly windowId: string; read
         </div>
       </div>
 
-      <label className='td-setting' data-setting='brightness'>
+      <label className='td-setting' data-setting='brightness' data-highlight-key='setting:brightness'>
         <span className='td-field-label'>{t(strings.brightness)}</span>
         <input
           type='range'
@@ -107,7 +108,7 @@ export function SettingsApp({ windowId, app }: { readonly windowId: string; read
         />
       </label>
 
-      <label className='td-setting' data-setting='computerName'>
+      <label className='td-setting' data-setting='computerName' data-highlight-key='setting:computerName'>
         <span className='td-field-label'>{t(strings.computerName)}</span>
         <ToyTextField
           windowId={windowId}
@@ -118,7 +119,7 @@ export function SettingsApp({ windowId, app }: { readonly windowId: string; read
         />
       </label>
 
-      <div className='td-setting' data-setting='alertSound'>
+      <div className='td-setting' data-setting='alertSound' data-highlight-key='setting:alertSound'>
         <span className='td-field-label'>{t(strings.alertSound)}</span>
         <div className='td-scroll-list'>
           <ul

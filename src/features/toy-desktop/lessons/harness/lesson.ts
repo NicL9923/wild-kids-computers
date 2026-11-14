@@ -30,7 +30,11 @@ export interface LessonStep {
    * first step to keep the definition's main instruction.
    */
   readonly instruction?: SpokenHandle | readonly SpokenHandle[];
-  /** True when the step is done. Called after every action with the new state and its events. */
+  /**
+   * True when the step is done. Called after every action with the new state and its events, and
+   * with no events when the step starts, so a step the child already did on the way is not asked
+   * for again. A check that needs an event is never done at the start.
+   */
   readonly done: (state: DesktopState, events: readonly DesktopEvent[]) => boolean;
   /**
    * True when an action is a wrong try for this step, such as opening another app. A wrong try
@@ -39,4 +43,6 @@ export interface LessonStep {
   readonly wrong?: (transition: Transition, action: DesktopAction) => boolean;
   /** The control to point at after a couple of wrong tries. Counted as a hint. */
   readonly hint?: (state: DesktopState) => HighlightTarget | null;
+  /** What a wrong try says. Defaults to "Try another one.", which suits a choice among things. */
+  readonly nudge?: SpokenHandle;
 }

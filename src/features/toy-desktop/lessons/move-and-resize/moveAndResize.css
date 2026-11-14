@@ -1,0 +1,38 @@
+/*
+ * The dashed box a window moves into or grows to fill. It sits under every window, so the window
+ * covers it as it lands. Two dots mark the corners the child lines up: the top left for moving and
+ * the bottom right for resizing.
+ */
+
+.mr-mark {
+  position: absolute;
+  z-index: 0;
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 3) dashed var(--wk-color-primary);
+  border-radius: var(--wk-radius-card);
+  background: color-mix(in srgb, var(--wk-color-surface) 45%, transparent);
+}
+
+.mr-corner {
+  position: absolute;
+  width: calc(var(--wk-target-min) * 0.4);
+  height: calc(var(--wk-target-min) * 0.4);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-primary);
+  translate: -50% -50%;
+}
+
+.mr-corner[data-corner='top-left'] {
+  top: 0;
+  left: 0;
+}
+
+.mr-corner[data-corner='bottom-right'] {
+  top: 100%;
+  left: 100%;
+}
+
+.mr-mark[data-mark='place'] .mr-corner[data-corner='bottom-right'],
+.mr-mark[data-mark='outline'] .mr-corner[data-corner='top-left'] {
+  opacity: 0.35;
+}
