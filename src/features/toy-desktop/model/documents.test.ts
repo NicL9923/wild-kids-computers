@@ -1038,9 +1038,8 @@ describe('more document edges', () => {
       () =>
         setup().act(
           buildDesktop({ windows: [{ app: 'calculator' }] }),
-          ...[{ type: 'operator', operator: 'divide' }, { type: 'equals' }].map(
-            (key) => ({ type: 'calculator', windowId: 'w1', key }) as DesktopAction,
-          ),
+          { type: 'calculator', windowId: 'w1', key: { type: 'operator', operator: 'divide' } },
+          { type: 'calculator', windowId: 'w1', key: { type: 'equals' } },
         ).state,
       'copy',
     ],
