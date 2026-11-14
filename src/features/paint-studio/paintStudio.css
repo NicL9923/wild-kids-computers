@@ -1,0 +1,606 @@
+/*
+ * The paint studio and its gallery. Every size, color, and duration is a token from
+ * src/styles/tokens.css. The only colors not from tokens are paint colors, which the swatches
+ * and previews receive as data through --wk-swatch and canvas pixels.
+ */
+
+@layer components {
+  .wk-paint-screen .wk-screen {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .wk-paint-screen .wk-screen-main {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: var(--wk-space-item);
+  }
+
+  .wk-paint-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ---- layout: tools, the picture with its options, colors ---- */
+
+  .wk-paint-studio {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--wk-space-container);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .wk-paint-tools,
+  .wk-paint-colors {
+    display: grid;
+    align-content: start;
+    gap: var(--wk-space-item);
+    min-height: 0;
+    margin: 0;
+    /* Room for the chosen ring, the check badge, and the focus ring, so none is clipped. */
+    padding: calc(var(--wk-border-width) * 4 + var(--wk-focus-offset));
+    overflow: hidden auto;
+    border: 0;
+  }
+
+  .wk-paint-colors {
+    position: relative;
+    grid-template-columns: repeat(2, var(--wk-target-min));
+    overflow: visible;
+  }
+
+  .wk-paint-center {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: var(--wk-space-item);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .wk-paint-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    container-type: size;
+  }
+
+  .wk-paint-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--wk-space-container);
+    min-height: calc(var(--wk-target-min) + var(--wk-press-depth));
+    padding: 0 var(--wk-focus-offset);
+  }
+
+  .wk-paint-option-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wk-space-item);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* ---- the picture ---- */
+
+  .wk-paint-frame {
+    position: relative;
+    width: min(100cqw, 160cqh);
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-small);
+    background: var(--wk-color-surface);
+    box-shadow: var(--wk-shadow-raised);
+    cursor: crosshair;
+    touch-action: none;
+    container-type: inline-size;
+  }
+
+  .wk-paint-frame[data-pen='down'] {
+    cursor: none;
+  }
+
+  .wk-paint-frame[data-busy='true'] {
+    cursor: progress;
+  }
+
+  .wk-paint-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .wk-paint-layer[data-layer='lines'] {
+    pointer-events: none;
+  }
+
+  .wk-paint-cursor {
+    position: absolute;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .wk-paint-ring {
+    position: absolute;
+    left: 0;
+    top: 0;
+    box-sizing: border-box;
+    aspect-ratio: 1;
+    border: var(--wk-border-width) solid var(--wk-color-text);
+    border-radius: var(--wk-radius-round);
+    box-shadow: 0 0 0 var(--wk-border-width) var(--wk-color-surface);
+    transform: translate(-50%, -50%);
+  }
+
+  .wk-paint-frame[data-pen='down'] .wk-paint-ring {
+    border-width: calc(var(--wk-border-width) * 2);
+    border-color: var(--wk-color-focus);
+    background: var(--wk-color-accent);
+    opacity: 0.8;
+  }
+
+  .wk-paint-cursor[data-keyboard='true'] .wk-paint-ring {
+    min-width: calc(var(--wk-target-min) * 0.5);
+    border: var(--wk-focus-width) solid var(--wk-color-focus);
+  }
+
+  .wk-paint-ghost {
+    position: absolute;
+    left: 0;
+    top: 0;
+    max-width: none;
+    opacity: 0.6;
+  }
+
+  .wk-paint-pen-badge {
+    position: absolute;
+    top: var(--wk-space-item);
+    left: var(--wk-space-item);
+    display: grid;
+    place-items: center;
+    width: var(--wk-target-min);
+    height: var(--wk-target-min);
+    border: var(--wk-border-width) solid var(--wk-color-focus);
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-color-surface);
+    box-shadow: var(--wk-shadow-raised);
+    pointer-events: none;
+  }
+
+  /* ---- buttons ---- */
+
+  .wk-paint-button {
+    position: relative;
+    flex-direction: column;
+    gap: calc(var(--wk-space-unit) * 1);
+    padding: calc(var(--wk-space-unit) * 1.5);
+  }
+
+  .wk-paint-button-picture {
+    display: grid;
+    place-items: center;
+  }
+
+  .wk-paint-button-label {
+    font-size: var(--wk-text-small);
+    line-height: var(--wk-line-height-tight);
+    text-align: center;
+  }
+
+  .wk-paint-emoji,
+  .wk-paint-glyph {
+    display: block;
+    width: var(--wk-icon-size);
+    height: var(--wk-icon-size);
+    color: var(--wk-color-text);
+  }
+
+  .wk-paint-tools .wk-paint-button {
+    width: calc(var(--wk-target-min) * 1.25);
+    min-height: calc(var(--wk-target-min) * 1.25);
+  }
+
+  .wk-paint-tools .wk-paint-emoji,
+  .wk-paint-tools .wk-paint-glyph {
+    width: calc(var(--wk-icon-size) * 1.2);
+    height: calc(var(--wk-icon-size) * 1.2);
+  }
+
+  [data-band='band-6-8'] .wk-paint-tools .wk-paint-button,
+  [data-band='band-9-12'] .wk-paint-tools .wk-paint-button {
+    width: calc(var(--wk-target-min) * 2);
+    min-height: var(--wk-target-min);
+  }
+
+  .wk-paint-check {
+    position: absolute;
+    top: calc(var(--wk-space-unit) * -2);
+    right: calc(var(--wk-space-unit) * -2);
+    display: grid;
+    place-items: center;
+    width: calc(var(--wk-target-min) * 0.42);
+    height: calc(var(--wk-target-min) * 0.42);
+    border: var(--wk-border-width) solid var(--wk-color-surface);
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-color-primary);
+    color: var(--wk-color-on-primary);
+  }
+
+  .wk-paint-check svg {
+    width: 70%;
+    height: 70%;
+  }
+
+  .wk-paint-wide {
+    min-width: calc(var(--wk-target-min) * 1.6);
+  }
+
+  .wk-paint-wide .wk-paint-preview {
+    width: calc(var(--wk-target-min) * 1.3);
+  }
+
+  .wk-paint-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: calc(var(--wk-radius-small) / 2);
+  }
+
+  .wk-paint-size-dot {
+    display: grid;
+    place-items: center;
+    width: var(--wk-icon-size);
+    height: var(--wk-icon-size);
+  }
+
+  .wk-paint-size-dot > span {
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-color-text);
+  }
+
+  .wk-paint-hint,
+  .wk-paint-effect-name {
+    margin: 0;
+    color: var(--wk-color-text-muted);
+  }
+
+  .wk-paint-text-field {
+    width: min(24em, 100%);
+  }
+
+  .wk-paint-problem {
+    margin: 0;
+    color: var(--wk-color-danger);
+    font-size: var(--wk-text-small);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  /* ---- colors ---- */
+
+  .wk-paint-swatch {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--wk-target-min);
+    height: var(--wk-target-min);
+    padding: 0;
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-swatch);
+    cursor: pointer;
+  }
+
+  .wk-paint-swatch[aria-pressed='true'] {
+    box-shadow:
+      0 0 0 calc(var(--wk-border-width) * 2) var(--wk-color-page),
+      0 0 0 calc(var(--wk-border-width) * 4) var(--wk-color-text);
+  }
+
+  .wk-paint-swatch .wk-paint-check {
+    position: static;
+    width: 60%;
+    height: 60%;
+    border: 0;
+    background: none;
+  }
+
+  .wk-paint-swatch[data-mark='dark'] .wk-paint-check {
+    color: var(--wk-color-text);
+  }
+
+  .wk-paint-swatch[data-mark='light'] .wk-paint-check {
+    color: var(--wk-color-on-primary);
+  }
+
+  .wk-paint-swatch[data-color='mix'] {
+    border-style: dashed;
+    border-width: calc(var(--wk-border-width) * 2);
+  }
+
+  .wk-paint-mixer {
+    display: grid;
+    gap: var(--wk-space-container);
+  }
+
+  .wk-paint-mixer-preview {
+    display: block;
+    height: var(--wk-target-min);
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-control);
+    background: var(--wk-swatch);
+  }
+
+  /* ---- pickers over the picture ---- */
+
+  .wk-paint-panel {
+    position: absolute;
+    inset: 0 auto auto 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-surface);
+    color: var(--wk-color-text);
+    box-shadow: var(--wk-shadow-overlay);
+  }
+
+  .wk-paint-panel:not([data-wide='true']) {
+    width: min(40em, 100%);
+  }
+
+  .wk-paint-panel[data-placement='beside'] {
+    inset: 0 calc(100% + var(--wk-space-item)) auto auto;
+    width: min(26em, 40vw);
+    /* The colors column is narrow, so the mixer measures itself against the window instead. */
+    max-width: none;
+  }
+
+  .wk-paint-panel[data-wide='true'] {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .wk-paint-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wk-space-item);
+    padding: var(--wk-space-item) var(--wk-space-container);
+    border-bottom: var(--wk-border-width) solid var(--wk-color-divider);
+  }
+
+  /* The youngest band reads no title, so the close button floats and the choices get the room. */
+  [data-band='band-3-5'] .wk-paint-panel-header {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    border: 0;
+  }
+
+  [data-band='band-3-5'] .wk-paint-panel-body {
+    padding-inline-end: calc(var(--wk-target-min) + var(--wk-space-container) * 2);
+  }
+
+  .wk-paint-panel-title {
+    margin: 0;
+    font-size: var(--wk-text-title);
+  }
+
+  .wk-paint-close {
+    margin-inline-start: auto;
+  }
+
+  .wk-paint-panel-body {
+    min-height: 0;
+    padding: var(--wk-space-container);
+    overflow-y: auto;
+  }
+
+  .wk-paint-grid {
+    --wk-paint-choice: calc(var(--wk-target-min) * 1.4);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--wk-paint-choice), 1fr));
+    align-content: start;
+    gap: var(--wk-space-item);
+  }
+
+  [data-band='band-3-5'] .wk-paint-grid[data-kind='effects'] {
+    --wk-paint-choice: calc(var(--wk-target-min) * 3.4);
+  }
+
+  .wk-paint-grid[data-kind='stamps'] {
+    --wk-paint-choice: max(calc(var(--wk-target-min) * 1.4), 80px);
+  }
+
+  .wk-paint-grid[data-kind='stamps'] .wk-paint-choice {
+    aspect-ratio: 1;
+  }
+
+  /* A stamp shows what it is, and its name is spoken when picked, so no band needs the label. */
+  .wk-paint-grid[data-kind='stamps'] .wk-paint-button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .wk-paint-grid[data-kind='effects'],
+  .wk-paint-grid[data-kind='pages'] {
+    --wk-paint-choice: calc(var(--wk-target-min) * 2.6);
+  }
+
+  .wk-paint-grid[data-kind='tips'] {
+    --wk-paint-choice: calc(var(--wk-target-min) * 2.2);
+  }
+
+  .wk-paint-choice {
+    min-height: var(--wk-paint-choice);
+  }
+
+  .wk-paint-choice .wk-paint-emoji {
+    width: calc(var(--wk-paint-choice) * 0.62);
+    height: calc(var(--wk-paint-choice) * 0.62);
+  }
+
+  .wk-paint-choice .wk-paint-button-picture {
+    width: 100%;
+  }
+
+  .wk-paint-page-thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border-radius: calc(var(--wk-radius-small) / 2);
+    background: var(--wk-color-surface);
+  }
+
+  .wk-paint-stamp-layout {
+    display: grid;
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--wk-space-container);
+  }
+
+  .wk-paint-categories {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    align-content: start;
+    gap: var(--wk-space-item);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .wk-paint-group + .wk-paint-group {
+    margin-top: var(--wk-space-section);
+  }
+
+  .wk-paint-group-title {
+    margin: 0 0 var(--wk-space-item);
+    font-size: var(--wk-text-body);
+  }
+
+  [data-band='band-3-5'] .wk-paint-group-title {
+    display: none;
+  }
+
+  /* ---- gallery ---- */
+
+  .wk-paint-gallery {
+    width: 100%;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .wk-paint-gallery-title {
+    display: flex;
+    align-items: center;
+    gap: var(--wk-space-item);
+    margin: 0;
+    font-size: var(--wk-text-title);
+  }
+
+  .wk-paint-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--wk-target-min) * 6), 100%), 1fr));
+    gap: var(--wk-space-container);
+    margin: 0;
+    padding: var(--wk-focus-offset);
+    list-style: none;
+  }
+
+  .wk-paint-card {
+    display: grid;
+    gap: var(--wk-space-item);
+    padding: var(--wk-space-item);
+    border: var(--wk-border-width) solid var(--wk-color-divider);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-surface);
+    box-shadow: var(--wk-shadow-raised);
+  }
+
+  .wk-paint-card-open {
+    display: block;
+    padding: 0;
+    overflow: hidden;
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-small);
+    background: var(--wk-color-surface);
+    cursor: pointer;
+  }
+
+  .wk-paint-card-open img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: contain;
+  }
+
+  .wk-paint-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wk-space-item);
+  }
+
+  .wk-paint-card-adult {
+    display: flex;
+    gap: var(--wk-space-item);
+    margin-inline-start: auto;
+  }
+
+  .wk-paint-undo-delete {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--wk-space-container);
+    width: fit-content;
+    margin: 0 auto var(--wk-space-container);
+    padding: var(--wk-space-item) var(--wk-space-container);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-accent);
+    color: var(--wk-color-on-accent);
+    box-shadow: var(--wk-shadow-raised);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-paint-empty {
+    display: grid;
+    justify-items: center;
+    gap: var(--wk-space-container);
+    padding: var(--wk-space-section);
+    text-align: center;
+  }
+
+  .wk-paint-empty > .wk-paint-emoji {
+    width: var(--wk-target-large);
+    height: var(--wk-target-large);
+  }
+}
