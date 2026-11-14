@@ -22,8 +22,8 @@ const FirstLaunch = lazyScreen(() => import('../first-launch/FirstLaunch.tsx'));
 /** The first screen: first launch, the profile choice, or on to the home map. */
 export default function StartScreen() {
   const status = useSessionStatus();
-  const { profiles } = useProfiles();
-  const view = startView(status, profiles.length);
+  const { profiles, notOpened } = useProfiles();
+  const view = startView(status, profiles.length, notOpened !== null);
   const theme = useThemeSettings();
   // Before a child is chosen, the youngest band wins: the person at the computer may be three.
   const youngest = useMemo(() => ({ ...theme, band: DEFAULT_BAND }), [theme]);

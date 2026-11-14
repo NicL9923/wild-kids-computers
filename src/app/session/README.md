@@ -14,7 +14,7 @@ The session holds the saved documents of the app and of the active profile, and 
 - **A bad value throws at once.** Updates are checked against the document's schema before anything changes. A value the schema rejects is a bug in the caller.
 - **Picture calls resolve to a result**, `{ ok: true, value }` or `{ ok: false, error }`, and never reject.
 - **No bridge call holds the session forever, except the profile list write of a creation or a removal.** Every other call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable and sets nothing aside. A late read answer is dropped.
-- **A profile whose settings or progress cannot be read does not become active.** The status is `unavailable`, the start screen offers to try again, and `retryStart()` reads them again. Updates made while they loaded are dropped. An activity whose state cannot be read shows the screen that says it did not open, and trying again reads it again.
+- **A profile whose settings or progress cannot be read does not become active.** The status is `needs-profile`, `profileNotOpened` names it, and the profile choice says so and shows the grown-ups' control. Choosing it again reads them again; every other profile opens as usual. Updates made while they loaded are dropped. An activity whose state cannot be read shows the screen that says it did not open, and trying again reads it again.
 - **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file.
 - **Creating a profile waits for the list that names it.** `createProfile` resolves once that write really ends, however long it takes. Until it succeeds the profile is not listed, so nothing can choose it or save its work. When it fails, nothing is added and `saveProblem` says why.
 - **Removing a profile happens at one write.** The profile list is saved without it, and `deleteProfile` resolves once that write really ends, however long it takes. Until then the profile stays as it was. When it fails, the profile stays exactly as before. When it succeeds, the profile is gone, the session leaves it, and its documents and pictures are deleted once, after any work already queued for them ends. A deletion that fails is not tried again: nothing but an adult's confirmed removal deletes stored data, and leftover files are never read.
@@ -26,7 +26,7 @@ The session holds the saved documents of the app and of the active profile, and 
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `useSessionStatus()`                 | `'loading'`, `'unavailable'`, `'needs-first-launch'`, `'needs-profile'`, or `'ready'`                           |
 | `useAppDocument()`                   | `app`, `updateApp(change)`, and `setKioskLock(on)`, which saves the lock and applies it to the window           |
-| `useProfiles()`                      | `profiles`, `createProfile`, `updateProfile`, `deleteProfile`, and `chooseProfile(id \| null)`                  |
+| `useProfiles()`                      | `profiles`, `notOpened`, `createProfile`, `updateProfile`, `deleteProfile`, and `chooseProfile(id \| null)`     |
 | `useActiveProfile()`                 | The active `Profile`, or null                                                                                   |
 | `useBand()`                          | The active band, or `band-3-5`                                                                                  |
 | `useThemeSettings()`                 | Band, text size, letter spacing, and motion. `RootLayout` already applies them.                                 |
@@ -41,13 +41,13 @@ The session holds the saved documents of the app and of the active profile, and 
 
 ## Status
 
-| Status               | When                                                                                                      |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| `loading`            | The app or profiles document is loading, or the chosen profile's settings or progress are                 |
-| `unavailable`        | The app, profiles, or chosen profile's documents could not be read. The start screen offers to try again. |
-| `needs-first-launch` | `firstLaunchDone` is false, or no profile exists, such as after the last one is deleted                   |
-| `needs-profile`      | Profiles exist and none is active                                                                         |
-| `ready`              | A profile is active and loaded                                                                            |
+| Status               | When                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------- |
+| `loading`            | The app or profiles document is loading, or the chosen profile's settings or progress are |
+| `unavailable`        | The app or profiles document could not be read. The start screen offers to try again.     |
+| `needs-first-launch` | `firstLaunchDone` is false, or no profile exists, such as after the last one is deleted   |
+| `needs-profile`      | Profiles exist and none is active, also when the chosen one could not be opened           |
+| `ready`              | A profile is active and loaded                                                            |
 
 At start the store makes `app.lastActiveProfileId` active when that profile still exists, so a returning child lands on the home map. The first-launch flow can create and choose a profile while the status is still `needs-first-launch`. The theme follows the chosen profile from then on. The flow sets `firstLaunchDone` last.
 

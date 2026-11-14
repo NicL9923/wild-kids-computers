@@ -857,16 +857,26 @@ describe('bridge calls that never answer', () => {
     expect(await hasSettled(started)).toBe(false);
     timers.advance(1);
     await started;
-    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null, loadProblems: [] });
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'needs-profile',
+      activeProfile: null,
+      profileNotOpened: FOX.id,
+      loadProblems: [],
+    });
     expect(fake.calls).not.toContain(`documents.setAside ${settingsName}`);
 
-    // The late answer is dropped: only trying again reads the file, and then the profile opens.
+    // The late answer is dropped: only choosing the profile again reads the file, and then it opens.
     hung.answerAll(json({ ...settingsDocument.defaults(), muted: true }));
     await settle();
-    expect(store.getSnapshot().status).toBe('unavailable');
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profileNotOpened: FOX.id });
     fake.bridge.documents.read = read;
-    await store.retryStart();
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX, settings: { voiceVolume: 0.2 } });
+    store.chooseProfile(FOX.id);
+    await until(store, () => store.getSnapshot().status === 'ready');
+    expect(store.getSnapshot()).toMatchObject({
+      activeProfile: FOX,
+      profileNotOpened: null,
+      settings: { voiceVolume: 0.2 },
+    });
     expect(fake.calls.filter((call) => call.startsWith('documents.write profile/'))).toEqual([]);
   });
 
@@ -1107,20 +1117,31 @@ describe('documents that could not be read', () => {
     store.updateSettings({ muted: true });
     await until(store, () => store.getSnapshot().status !== 'loading');
     await store.flush();
-    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null });
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'needs-profile',
+      activeProfile: null,
+      profileNotOpened: FOX.id,
+    });
     expect(fake.calls).not.toContain(`documents.write ${nameOf(FOX.id)}`);
 
-    await store.retryStart();
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+    // The rest of the family is not blocked, and choosing the profile again reads it again.
+    store.chooseProfile(OWL.id);
+    await until(store, () => store.getSnapshot().status === 'ready');
+    expect(store.getSnapshot()).toMatchObject({ activeProfile: OWL, profileNotOpened: null });
+    store.chooseProfile(FOX.id);
+    await until(store, () => store.getSnapshot().status === 'ready');
+    expect(store.getSnapshot().activeProfile).toEqual(FOX);
   });
 
-  it('leaves the try-again state when the profile that could not be opened is deleted', async () => {
+  it('forgets the profile that could not be opened once it is deleted', async () => {
     const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], FOX.id) });
     fake.failNext('read', documentNames.settings(FOX.id), new BridgeError('io', 'disk busy'));
     await store.start();
-    expect(store.getSnapshot().status).toBe('unavailable');
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profileNotOpened: FOX.id });
     expect(await store.deleteProfile(FOX.id)).toEqual({ ok: true, value: undefined });
-    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profiles: [OWL] });
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profileNotOpened: null, profiles: [OWL] });
+    await store.flush();
+    expect(saved(fake, 'app', appDocument).lastActiveProfileId).toBeNull();
   });
 
   it('never writes a document without a successful read of it, through random reads that fail, pass their deadline, or answer late', async () => {

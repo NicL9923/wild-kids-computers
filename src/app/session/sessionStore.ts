@@ -56,14 +56,16 @@ export type SessionStatus =
   /** The app or profiles document, or the active profile's settings or progress, is loading. */
   | 'loading'
   /**
-   * The app or profiles document could not be read, so the app cannot know which children it has,
-   * or the chosen profile's settings or progress could not be read, so that profile is not active.
+   * The app or profiles document could not be read, so the app cannot know which children it has.
    * Nothing is replaced with defaults and nothing is written until `retryStart()` reads them.
    */
   | 'unavailable'
   /** First launch is not done, or no profile exists. */
   | 'needs-first-launch'
-  /** Profiles exist and none is active. */
+  /**
+   * Profiles exist and none is active, including when the chosen profile's settings or progress
+   * could not be read: `profileNotOpened` names it then.
+   */
   | 'needs-profile'
   /** A profile is active and its settings and progress are loaded. */
   | 'ready';
@@ -110,6 +112,11 @@ export interface SessionSnapshot {
   readonly app: AppDocument;
   readonly profiles: readonly Profile[];
   readonly activeProfile: Profile | null;
+  /**
+   * The profile last chosen whose settings or progress could not be read, so it is not active.
+   * Choosing it again reads them again. Null once any profile opens or it is removed.
+   */
+  readonly profileNotOpened: string | null;
   /** The active profile's settings, or the defaults when no profile is active. */
   readonly settings: Settings;
   /** The active profile's progress, or empty progress when no profile is active. */
@@ -167,8 +174,7 @@ export interface SessionStore {
   readonly start: () => Promise<void>;
   /**
    * With status `unavailable`, reads the app and profiles documents that could not be read, and
-   * goes on as `start` does once both are open, or reads the chosen profile's settings and
-   * progress again and makes it active once both are open. A retry already running is reused.
+   * goes on as `start` does once both are open. A retry already running is reused.
    */
   readonly retryStart: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
@@ -198,7 +204,8 @@ export interface SessionStore {
   readonly deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
   /**
    * Makes a profile active and loads its documents, or makes none active with null. When its
-   * settings or progress cannot be read, it does not stay active and the status is `unavailable`.
+   * settings or progress cannot be read, it does not stay active, the status is `needs-profile`,
+   * and `profileNotOpened` names it.
    */
   readonly chooseProfile: (profileId: string | null) => void;
 
@@ -422,10 +429,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   const profiles = new Cell(documentNames.profiles, profilesDocument, true);
   /** Profiles removed from the list this session. Their pictures take no more changes. */
   const removed = new Set<string>();
-  /**
-   * The profile that was chosen but whose settings or progress could not be read. It is not
-   * active, the status is `unavailable`, and `retryStart` chooses it again.
-   */
+  /** The profile that was chosen but whose settings or progress could not be read. It is not active. */
   let unopened: string | null = null;
   /**
    * Documents with a read or write still queued or running, by name. Choosing a profile again, or
@@ -459,6 +463,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       app: app.value,
       profiles: profiles.value.profiles,
       activeProfile,
+      profileNotOpened: unopened,
       settings,
       progress: active?.progress.value ?? EMPTY_PROGRESS,
       theme: {
@@ -475,7 +480,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function statusOf(): SessionStatus {
-    if (app.unreadable || profiles.unreadable || unopened !== null) return 'unavailable';
+    if (app.unreadable || profiles.unreadable) return 'unavailable';
     if (!app.loaded || !profiles.loaded) return 'loading';
     if (!app.value.firstLaunchDone || profiles.value.profiles.length === 0) return 'needs-first-launch';
     if (active === null) return 'needs-profile';
@@ -555,7 +560,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
   /**
    * A profile whose settings or progress could not be read does not stay active, so nothing
-   * reads, shows, or writes defaults in their place. The status says `unavailable` until a retry.
+   * reads, shows, or writes defaults in their place. The other profiles can still be chosen.
    */
   function leaveUnopened(cell: Cell<unknown>): void {
     if (active === null || (active.settings !== cell && active.progress !== cell)) return;
@@ -901,12 +906,6 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     await Promise.all([active?.settings.ready, active?.progress.ready]);
   }
 
-  /** Chooses again the profile whose documents could not be read, and waits for them. */
-  async function reopenProfile(profileId: string): Promise<void> {
-    chooseProfile(profileId);
-    await Promise.all([active?.settings.ready, active?.progress.ready]);
-  }
-
   audio?.onVolumeChange(onEngineVolume);
   let started = false;
   let retrying: Promise<void> | null = null;
@@ -934,7 +933,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     retryStart() {
       if (!started) throw new Error('The session has not started.');
       if (statusOf() !== 'unavailable') return Promise.resolve();
-      retrying ??= (unopened === null ? open(false) : reopenProfile(unopened)).finally(() => {
+      retrying ??= open(false).finally(() => {
         retrying = null;
       });
       return retrying;

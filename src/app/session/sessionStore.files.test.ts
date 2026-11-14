@@ -261,11 +261,16 @@ describe('a profile document that could not be read', () => {
       ]),
     ).toEqual(before);
     // The child is not shown defaults in place of their own settings: the app says it could not
-    // open the saved things, and trying again opens them.
-    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null });
+    // open them, and choosing the child again opens them.
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'needs-profile',
+      activeProfile: null,
+      profileNotOpened: KID.id,
+    });
 
-    await store.retryStart();
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: KID });
+    store.chooseProfile(KID.id);
+    await untilReady(store);
+    expect(store.getSnapshot()).toMatchObject({ activeProfile: KID, profileNotOpened: null });
     expect(store.getSnapshot().settings).toMatchObject({ voiceVolume: 0.2, sessionLengthMinutes: 15 });
     expect(store.progressOf('old')).toMatchObject({ furthestStep: 7 });
   });
