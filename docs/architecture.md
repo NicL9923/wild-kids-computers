@@ -219,6 +219,8 @@ An activity never edits a shared schema to save its own state. It declares `stat
 
 ## Activity kit
 
+[adding-an-activity.md](adding-an-activity.md) is the how-to with copyable skeletons. This section is the contract.
+
 ### Definition
 
 Each activity has one directory:
@@ -235,25 +237,26 @@ e2e/activities/<activity-id>.spec.ts
 
 `defineActivity` takes:
 
-| Field              | Meaning                                                                                                                       |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `id`               | Kebab-case, unique                                                                                                            |
-| `area`             | `computer-skills`, `toy-desktop`, `early-learning`, or `robot-painter`                                                        |
-| `order`            | Position within the area                                                                                                      |
-| `bands`            | The bands it serves                                                                                                           |
-| `goal`             | A string handle for the one learning goal, in plain words a parent can read                                                   |
-| `title`, `icon`    | A string handle and an art reference                                                                                          |
-| `kind`             | `rounds`, `sequence`, or `free`. See below.                                                                                   |
-| `inputs`           | Input needs: `pointer-move`, `click`, `drag`, `double-click`, `right-click`, `scroll`, `zoom`, `keyboard`, `text-entry`       |
-| `difficulty`       | For `rounds`: per band, the lowest and highest level on a 1 to 10 scale                                                       |
-| `roundsPerSession` | For `rounds`: how many rounds before the finish screen                                                                        |
-| `generateLevel`    | `(seed, difficulty, band) => Level`. Pure. No clock, no `Math.random`. For `sequence`, the second argument is the step index. |
-| `steps`            | For `sequence`: the ordered, authored steps, each with an id                                                                  |
-| `state`            | Optional `{ schema, defaults }` for state the activity saves per profile                                                      |
-| `spoken`           | The string handles the activity speaks. The first is the main instruction.                                                    |
-| `load`             | `() => import('./<Name>Activity')`                                                                                            |
+| Field              | Meaning                                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | Kebab-case, unique                                                                                                                                        |
+| `area`             | `computer-skills`, `toy-desktop`, `early-learning`, or `robot-painter`                                                                                    |
+| `order`            | Position within the area                                                                                                                                  |
+| `bands`            | The bands it serves                                                                                                                                       |
+| `goal`             | A string handle for the one learning goal, in plain words a parent can read                                                                               |
+| `title`, `icon`    | A spoken string handle, and `{ emoji }` or `{ art }`: an emoji id, or a path under `assets/art/activities/` without `.svg`                                |
+| `kind`             | `rounds`, `sequence`, or `free`. See below.                                                                                                               |
+| `inputs`           | Input needs: `pointer-move`, `click`, `drag`, `double-click`, `right-click`, `scroll`, `zoom`, `keyboard`, `text-entry`                                   |
+| `difficulty`       | For `rounds`: per band, the lowest and highest level on a 1 to 10 scale                                                                                   |
+| `roundsPerSession` | For `rounds`: how many rounds before the finish screen                                                                                                    |
+| `generateLevel`    | `(seed, difficulty, band) => Level`. Pure. No clock, no `Math.random`. For `sequence`, the second argument is the step index. For `free`, `(seed, band)`. |
+| `steps`            | For `sequence`: the ordered, authored steps, each with an id                                                                                              |
+| `stepsDirectory`   | For `sequence`: where the step modules live, relative to the activity's directory, or `null` for inline steps                                             |
+| `state`            | Optional `{ schema, defaults }` for state the activity saves per profile                                                                                  |
+| `spoken`           | The string handles the activity speaks. The first is the main instruction.                                                                                |
+| `load`             | `() => import('./<Name>Activity')`                                                                                                                        |
 
-`activity.ts` and `level.ts` import nothing from React. The component receives the level, the band, and a kit handle. It reports `kit.roundComplete({ mistakes, hintsUsed })`. A component uses no randomness of its own. Anything random comes from the level. A lint rule bans `Math.random` under `src/features/` and `src/core/`.
+`activity.ts` and `level.ts` import nothing from React. `defineActivity` in `src/core/activityKit/defineActivity.ts` checks the definition and throws on a mistake. `src/registry/activities.ts` finds every definition, and `src/registry/activityArt.ts` finds the art. The component receives the level, the band, and a kit handle, typed `ActivityProps<Level>` in `src/activityShell/kit.ts`. It reports `kit.roundComplete()`, which uses the mistakes and hints the kit counted, or `kit.roundComplete({ mistakes, hintsUsed })` to override them. A component uses no randomness of its own. Anything random comes from the level. A lint rule bans `Math.random` under `src/features/` and `src/core/`.
 
 ### Activity kinds
 
@@ -270,9 +273,9 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 ### What the kit supplies
 
 - **Instruction player.** Speaks the main instruction when a round starts and shows a replay control that is always visible. Bands above `band-3-5` also show the text. An activity whose instruction changes within a round calls `kit.setInstruction(handleOrSequence)`, and the replay control then plays that.
-- **Speech.** `kit.speak(handle)` and `kit.speakSequence([...])` play clips through the scope, so leaving cancels them.
-- **Feedback.** A gentle confirmation for a correct action and a neutral nudge for a wrong one. No character shows disappointment. A wrong action never ends the round.
-- **Difficulty adjustment.** `src/core/activityKit/difficulty.ts` is a pure model. It raises the level after clean rounds and lowers it after rounds with many mistakes, within the range for the band.
+- **Speech.** `kit.speak(handle)` and `kit.speakSequence([...])` play clips through the scope, so leaving cancels them. `kit.hint(say?)` counts a hint. `kit.play(name)` and `kit.startSound(name)` play effects.
+- **Feedback.** `kit.feedback.correct({ at, say, silent })` gives a soft chime and a check mark. `kit.feedback.wrong(...)` gives a low nudge and an open ring in a quiet color, and counts a mistake. No character shows disappointment. A wrong action never ends the round.
+- **Difficulty adjustment.** `src/core/activityKit/difficulty.ts` is a pure model. It raises the level by one after two clean rounds in a row at the current level, and lowers it by one right after a round with three or more mistakes and hints together, within the range for the band. Each saved round records the level it was played at. A test's difficulty is clamped into the band's range.
 - **Exit control.** A fixed place on every activity screen. It returns to the area screen.
 - **Finish screen.** After `roundsPerSession` rounds the child sees a calm screen with two equal choices: play again, or go back. It shows no score, star, or count.
 - **Scope.** `kit.scope` owns every timer, animation frame, listener, and sound the activity starts. Leaving the activity cancels all of them. Activities call `scope.setTimeout`, `scope.setInterval`, `scope.requestFrame`, and `scope.listen`. They never call the global timer functions. A lint rule bans the global timer functions under `src/features/`.
@@ -281,7 +284,8 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 - **Drag with click alternative.** `useCarry` implements one interaction for moving things. The child can press, drag, and release, or click to pick up and click to place. It supports drop targets, free positions such as a window on the toy desktop, and movement limited to an axis and a range such as a slider or a resize handle. A carried item also moves with the arrow keys and drops with Enter. Every drag in the app uses it. A lint rule bans `draggable`, `onDrag*` handlers, and `setPointerCapture` outside the kit and the paint studio.
 - **Drag exemptions.** Native form controls and text selection are exempt, because the platform already gives them a keyboard alternative. The exemption list lives next to the lint rule.
 - **Pictures.** `kit.pictures` lists the profile's gallery pictures for activities that use them, such as the jigsaw. Activities do not call the bridge.
-- **Session length.** The kit checks the session limit only between rounds, then routes to the closing screen.
+- **Session length.** The kit checks the session limit only between rounds, after a 1.2 second pause, and when it is reached routes to `SESSION_CLOSING_PATH` (`/closing`). `src/activityShell/paths.ts` exports it with `AREA_PATH(areaId)` and `ACTIVITY_PATH(id)`.
+- **Area screen.** `/area/$areaId` shows the activities of an area that serve the profile's band as picture tiles that speak their titles on hover and focus. It is the only step between the home map and an activity.
 
 ### Hard rule checks
 
@@ -294,19 +298,23 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 | No manipulative design                         | A test scans every string for banned reward words, with an allow list for false positives such as the star shape                           |
 | Spoken instructions                            | `check:voice`                                                                                                                              |
 | Timers cancelled on exit                       | The lint rule above, plus a kit test that the scope cancels everything                                                                     |
+| Levels are pure                                | Registry test: `generateLevel` gives the same level twice for the same arguments, at each band's lowest and highest difficulty             |
+| Playwright can import an activity              | Registry test: `activity.ts`, `level.ts`, and `strings.ts` import no registry, asset, CSS, React, or `.tsx` file                           |
+| No forgotten sequence step                     | Registry test: the files in `stepsDirectory` equal the ids in `steps`                                                                      |
+| Native drag only in the kit                    | Oxlint rule `wkc/no-native-drag`, with its exemption list `NATIVE_DRAG_EXEMPT` in `tools/oxlintPlugin.ts`                                  |
 | Original work only                             | A test scans strings and file names for the names of the two reference apps and their mascots. This catches only the obvious case.         |
 
 ### End-to-end tests
 
 - Tests run against the built Electron app with Playwright under a virtual display.
-- `e2e/support/` has `launchApp({ band, seed, difficulty, activity })`. It creates a temporary user data directory with a ready profile, so a test starts at the home map or directly at an activity.
+- `e2e/support/` has `launchApp({ band, seed, difficulty, activity })`. It creates a temporary user data directory with a ready profile. `openActivity(...)` in `e2e/support/activity.ts` launches it at 1280 by 800 and opens `/activity/<id>`. `forEachBand(bands, body)` repeats tests per band.
 - A fixed seed and difficulty make levels repeatable. A test imports the activity's `generateLevel` and `roundSeed` and computes the answer. It does not read the answer out of the page.
 - `e2e/support/` has `expectInstructionSpoken(page, handle)`, which presses the replay control and asserts that the clip for that string played.
-- The clock is real by default. A test that needs to control time uses the test hook that steps the kit clock and the scope's frames.
+- The clock is real by default. A test that needs to control time passes `pinClockAt` and steps with `kitTime(page).advance(ms)` or `.stepFrames(n)`, through `window.wkcKitTime`. Every scope runs on one switchable scheduler, `kitScheduler` in `src/activityShell/kitTime.ts`.
 - A keyboard-only test walks the shell screens: first launch, profile choice, home map, an area screen, and the parent corner.
 - Each activity test completes one round with real input events and asserts something the child would notice, such as the finish screen or a counted object on screen.
 - Each test calls `expectAccessible(page)`, which runs axe with WCAG 2.2 AA tags.
-- Each test saves a screenshot per band it serves to `test-results/screens/<band>/<activity-id>.png` for review.
+- Each test saves a screenshot per band it serves to `test-results/screens/<band>/<activity-id>.png` for review, with `saveBandScreenshot(page, band, id, variant?)`.
 - The app exposes test hooks only when `WKC_TEST=1`: a log of voice clips and sounds played, and the pinned clock.
 
 Build activities from DOM and SVG elements with real buttons and labels. Use `<canvas>` only where the content is a picture, such as the paint studio and the robot's drawing.
