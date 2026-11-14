@@ -28,6 +28,9 @@ const config = {
     // The alphabet and choice rules every letters and reading level generator builds on.
     'src/features/early-learning/reading/alphabet.ts',
     'src/features/early-learning/reading/choices.ts',
+    // The choice and scatter helpers the number and math level generators share.
+    'src/features/early-learning/math/choices.ts',
+    'src/features/early-learning/math/scatter.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],

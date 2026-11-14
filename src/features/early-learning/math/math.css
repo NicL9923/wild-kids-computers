@@ -1,0 +1,191 @@
+/*
+ * The look the number and math activities share: a picture area on top, and a row of big
+ * numeral buttons below, as in Count the flowers. Every value is a token.
+ */
+
+.math-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--wk-space-container);
+  justify-items: center;
+}
+
+/* The space above the choices. Children size themselves to it with container units. */
+.math-board {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+/* Objects to count, in rows like a ten frame. Set --cols and --rows; each cell is square. */
+.math-objects {
+  --math-cell: min(100cqw / var(--cols), 100cqh / var(--rows));
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--math-cell));
+  grid-auto-rows: var(--math-cell);
+  place-items: center;
+}
+
+.math-object {
+  display: block;
+  width: 84%;
+  height: 84%;
+}
+
+/* A number sentence such as 3 + 2 = ?, in large type. */
+.math-sentence {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--wk-space-item) * 1.5);
+  margin: 0;
+  color: var(--wk-color-text);
+  font-size: calc(var(--wk-target-min) * 0.9);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.math-blank {
+  display: inline-grid;
+  place-items: center;
+  min-width: calc(var(--wk-target-min) * 1.2);
+  min-height: calc(var(--wk-target-min) * 1.2);
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-primary);
+}
+
+.math-blank[data-filled='true'] {
+  border-style: solid;
+  color: var(--wk-color-text);
+}
+
+/*
+ * Groups to choose from, in one row of equal cards. Set --cols and --rows on the row: each card
+ * keeps that shape, so the things in it are as large as the space allows.
+ */
+.math-groups {
+  container-type: size;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  height: 100%;
+  box-sizing: border-box;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: calc(var(--wk-space-container) * 1.5);
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0 0 var(--wk-press-depth);
+  border: 0;
+}
+
+.math-group {
+  container-type: size;
+  width: min(100%, calc((100cqh - var(--wk-press-depth)) * var(--cols) / var(--rows)));
+  aspect-ratio: var(--cols) / var(--rows);
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-height: var(--wk-target-large);
+  padding: var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.math-group:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+.math-choices {
+  margin: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  padding: 0 0 var(--wk-press-depth);
+}
+
+.math-choice {
+  min-width: calc(var(--wk-target-large) * 1.1);
+  min-height: calc(var(--wk-target-large) * 1.1);
+  padding: 0 var(--wk-space-item);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  font: inherit;
+  font-size: calc(var(--wk-target-large) * 0.45);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.math-choice:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+/*
+ * A choice already tried steps back: dashed edge and lighter text, so it is not color alone.
+ * A hint makes the answer plainer with a thick ring and two slow, small swells.
+ */
+.math-stage [data-look='tried'] {
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--wk-color-text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.math-stage [data-look='done'] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.math-stage [data-look='answer'] {
+  border-width: calc(var(--wk-border-width) * 2);
+  background: var(--wk-color-selected);
+}
+
+.math-stage [data-look='hint'] {
+  outline: calc(var(--wk-focus-width) * 1.5) solid var(--wk-color-accent);
+  outline-offset: var(--wk-focus-offset);
+  animation: math-hint calc(var(--wk-duration-calm) * 2) var(--wk-ease-in-out) 4 alternate;
+}
+
+@keyframes math-hint {
+  to {
+    scale: calc(1 + 0.06 * var(--wk-motion-scale));
+  }
+}
+
+/* A scattered group: a board of 10 by 9 that fits its container, with things at their spots. */
+.math-scatter {
+  position: relative;
+  display: block;
+  width: min(100cqw, 100cqh * 10 / 9);
+  aspect-ratio: 10 / 9;
+}
+
+.math-spot {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+}
+
+.math-spot .math-object {
+  width: 100%;
+  height: 100%;
+}

@@ -1,0 +1,65 @@
+/*
+ * A written fraction is the numerator over a bar over the denominator. Pictures draw parts with a
+ * dark outline; shaded parts are the primary color and the rest are white.
+ */
+
+.fraction-stage {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.fraction-written {
+  display: inline-grid;
+  justify-items: center;
+  gap: calc(var(--wk-space-unit) * 1.5);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.fraction-line {
+  width: 100%;
+  min-width: 1.4em;
+  height: max(3px, 0.1em);
+  border-radius: var(--wk-radius-round);
+  background: currentcolor;
+}
+
+.fraction-card {
+  min-width: var(--wk-target-large);
+  min-height: var(--wk-target-large);
+  padding: var(--wk-space-item) var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: var(--wk-shadow-raised);
+  font: inherit;
+  font-size: calc(var(--wk-target-large) * 0.38);
+  cursor: pointer;
+}
+
+.fraction-choice {
+  padding-block: var(--wk-space-item);
+  font-size: calc(var(--wk-target-large) * 0.32);
+}
+
+.fraction-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  stroke: var(--wk-color-text);
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.fraction-picture [data-shaded='true'] {
+  fill: var(--wk-color-primary);
+}
+
+.fraction-picture [data-shaded='false'] {
+  fill: var(--wk-color-surface);
+}
+
+.fraction-shown {
+  width: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+}

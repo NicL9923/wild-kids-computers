@@ -1,0 +1,108 @@
+/*
+ * The line fills the width of the board at a fixed 5:1 shape, with labels under the marks. In a
+ * place round each unlabeled mark is a tall button as wide as the gap between marks.
+ */
+
+.line-area {
+  /* Labels grow with a wide window, but never below a readable size for the band. */
+  --line-text: clamp(var(--wk-target-min) * 0.6, 3cqw, var(--wk-target-min) * 1.1);
+  display: grid;
+  justify-items: center;
+  gap: var(--wk-space-section);
+  width: 100%;
+}
+
+.line-number {
+  min-width: var(--wk-target-large);
+  min-height: var(--wk-target-large);
+  padding: 0 var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: var(--wk-shadow-raised);
+  font: inherit;
+  font-size: max(calc(var(--wk-target-large) * 0.55), calc(var(--line-text) * 1.4));
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.line-board {
+  position: relative;
+  width: min(100cqw, 100cqh * 5 * 0.6);
+  aspect-ratio: 5;
+}
+
+.line-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  stroke: var(--wk-color-text);
+  stroke-linecap: round;
+  stroke-width: 6;
+  fill: none;
+}
+
+.line-arrow {
+  fill: var(--wk-color-text);
+  stroke-width: 2;
+}
+
+.line-label {
+  position: absolute;
+  top: 62%;
+  translate: -50% 0;
+  color: var(--wk-color-text);
+  font-size: var(--line-text);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.line-label.math-blank {
+  top: 58%;
+  min-width: calc(var(--wk-target-min) * 1.05);
+  min-height: calc(var(--wk-target-min) * 1.05);
+}
+
+/* A place to click: a tall, rounded column centered on its mark, quiet until the pointer is on it. */
+.line-spot {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: var(--wk-target-min);
+  translate: -50% 0;
+  padding: 0;
+  border: var(--wk-border-width) dashed transparent;
+  border-radius: var(--wk-radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.line-spot:hover:not(:disabled),
+.line-spot:focus-visible {
+  border-color: var(--wk-color-primary);
+  background: color-mix(in srgb, var(--wk-color-selected) 70%, transparent);
+}
+
+.line-stage .line-spot[data-look='tried'] {
+  border-color: var(--wk-color-border);
+  background: transparent;
+}
+
+.line-stage .line-spot[data-look='answer'] {
+  border-style: solid;
+  border-color: var(--wk-color-primary);
+}
+
+.line-placed {
+  position: absolute;
+  top: 62%;
+  left: 50%;
+  translate: -50% 0;
+  color: var(--wk-color-primary);
+  font-size: var(--line-text);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
