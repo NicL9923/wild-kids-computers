@@ -13,7 +13,7 @@ import { Path } from './path.ts';
 
 export const GLYPH_TABLE_FORMAT = 1;
 
-export interface Glyph {
+interface Glyph {
   readonly advance: number;
   readonly d: string;
 }

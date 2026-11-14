@@ -18,7 +18,6 @@ function channel(value: number): number {
 
 export const WHITE: Color = Object.freeze(rgba(255, 255, 255));
 export const BLACK: Color = Object.freeze(rgba(0, 0, 0));
-export const TRANSPARENT: Color = Object.freeze(rgba(0, 0, 0, 0));
 
 /** Mixes two colors channel by channel. t = 0 gives a, t = 1 gives b. */
 export function mixColors(a: Color, b: Color, t: number): Color {

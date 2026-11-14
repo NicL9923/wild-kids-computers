@@ -18,7 +18,7 @@ const TILE_BYTES = TILE_SIZE * TILE_SIZE * 4;
 /** 256 MiB. Thirty full-canvas steps at 1600 by 1000 take about 197 MB, so they fit. */
 export const DEFAULT_BYTE_CAP = 256 * 1024 * 1024;
 /** A ceiling on step count, so many tiny steps cannot pile up without limit. */
-export const DEFAULT_MAX_STEPS = 100;
+const DEFAULT_MAX_STEPS = 100;
 
 const swapRow = new Uint8ClampedArray(TILE_SIZE * 4);
 

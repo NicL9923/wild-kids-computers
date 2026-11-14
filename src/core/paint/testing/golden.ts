@@ -40,12 +40,12 @@ if (process.versions.node !== pinnedNode) {
 /** Golden names are <kind>-<id> or <kind>-<id>-<variant>. The registry test reads them back. */
 const GOLDEN_NAME = /^(tool|tip|effect)-[a-z][a-zA-Z0-9]*(-[a-z0-9-]+)?$/;
 
-export function decodePng(bytes: Buffer): Surface {
+function decodePng(bytes: Buffer): Surface {
   const png = PNG.sync.read(bytes);
   return surfaceFromData(png.width, png.height, png.data);
 }
 
-export function encodePng(surface: Surface): Buffer {
+function encodePng(surface: Surface): Buffer {
   const png = new PNG({ width: surface.width, height: surface.height });
   png.data.set(surface.data);
   return PNG.sync.write(png, { colorType: 6 });
@@ -117,8 +117,8 @@ export function drawStroke(
 }
 
 /** The size of a golden picture: small enough to keep goldens tiny, with the 16:10 shape of the real canvas. */
-export const GOLDEN_WIDTH = 200;
-export const GOLDEN_HEIGHT = 125;
+const GOLDEN_WIDTH = 200;
+const GOLDEN_HEIGHT = 125;
 
 /** One wave across a width by height area, a few pixels apart like pointer events. */
 export function wave(width = GOLDEN_WIDTH, height = GOLDEN_HEIGHT, count = 48): ToolPoint[] {

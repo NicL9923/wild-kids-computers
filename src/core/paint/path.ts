@@ -125,7 +125,7 @@ function segmentCount(squared: number): number {
 }
 
 /** Segments so that the chord of each one strays at most tolerance from a circle of this radius. */
-export function ellipseSegments(radius: number, tolerance: number): number {
+function ellipseSegments(radius: number, tolerance: number): number {
   if (radius <= tolerance) return 8;
   // The sagitta of a chord spanning angle theta is about r theta^2 / 8.
   const step = Math.sqrt((8 * tolerance) / radius);

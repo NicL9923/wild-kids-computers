@@ -44,7 +44,7 @@ export type FillStyle =
   /** The main color in a pattern over `background`. */
   | { readonly kind: 'pattern'; readonly pattern: PatternId; readonly background: Color };
 
-export interface TextSettings {
+interface TextSettings {
   readonly content: string;
   readonly font: GlyphTable;
 }
@@ -134,10 +134,9 @@ export interface BrushTip {
 }
 
 export const EFFECT_GROUPS = ['distort', 'color', 'paint-on', 'whole-picture'] as const;
-export type EffectGroup = (typeof EFFECT_GROUPS)[number];
 
 /** An effect the child paints on with strokes, like a brush. */
-export interface StrokeEffect {
+interface StrokeEffect {
   /** Matches the directory name: src/core/paint/effects/<id>/index.ts. */
   readonly id: string;
   readonly order: number;
