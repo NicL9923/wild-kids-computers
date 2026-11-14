@@ -187,6 +187,19 @@ export function createFakeBridge(options: FakeBridgeOptions = {}): FakeBridge {
         pictures.delete(`${profileId}/trash`);
         return Promise.resolve();
       },
+      listProfiles: () => {
+        calls.push('documents.listProfiles');
+        const ids = new Set<string>();
+        for (const name of documents.keys()) {
+          const [head, id] = name.split('/');
+          if (head === 'profile' && id !== undefined) ids.add(id);
+        }
+        for (const [key, found] of pictures) {
+          const [id] = key.split('/');
+          if (found.size > 0 && id !== undefined) ids.add(id);
+        }
+        return Promise.resolve([...ids].toSorted());
+      },
     },
     pictures: {
       save: (profileId, input: SavePictureInput) => {

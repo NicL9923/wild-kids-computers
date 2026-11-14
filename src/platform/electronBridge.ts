@@ -16,6 +16,7 @@ export function createElectronBridge(ipc: WkBridgeIpc): PlatformBridge {
       write: (name, text) => unwrap(ipc['documents.write'](name, text)),
       setAside: (name) => unwrap(ipc['documents.setAside'](name)),
       removeProfile: (profileId) => unwrap(ipc['documents.removeProfile'](profileId)),
+      listProfiles: () => unwrap(ipc['documents.listProfiles']()),
     },
     pictures: {
       save: (profileId, input) => unwrap(ipc['pictures.save'](profileId, input)),

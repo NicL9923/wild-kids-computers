@@ -194,6 +194,16 @@ export function defineBridgeContract(target: BridgeTarget): void {
         expect(await call(page, 'documents.read', 'app')).toEqual({ ok: true, value: '{}' });
         expect(await call(page, 'documents.removeProfile', '..')).toEqual(failure('invalid-argument'));
       });
+
+      test('lists every profile with documents or pictures, and forgets a removed one', async () => {
+        expect(await call(page, 'documents.listProfiles')).toEqual({ ok: true, value: [] });
+        unwrap(await call(page, 'documents.write', 'app', '{}'));
+        unwrap(await call(page, 'documents.write', 'profile/p2/activity/find-the-key', '{}'));
+        unwrap(await call(page, 'pictures.save', 'p1', { png: bytes(PICTURE), thumbnail: bytes(THUMBNAIL) }));
+        expect(await call(page, 'documents.listProfiles')).toEqual({ ok: true, value: ['p1', 'p2'] });
+        unwrap(await call(page, 'documents.removeProfile', 'p1'));
+        expect(await call(page, 'documents.listProfiles')).toEqual({ ok: true, value: ['p2'] });
+      });
     });
 
     test.describe('pictures', () => {

@@ -6,14 +6,17 @@ The session holds the saved documents of the app and of the active profile, and 
 
 ## Guarantees
 
-- **Bad saved data never crashes.** A corrupt document is set aside and replaced with defaults. `useStorageProblems().loadProblems` lists what happened.
+- **Bad saved data never crashes.** A corrupt document is set aside and replaced with defaults. `useStorageProblems().loadProblems` lists what happened. When it cannot be set aside, it counts as unreadable.
+- **The store never writes a document it has not read.** Defaults stand in only for a document the platform said does not exist, or a corrupt one it set aside. A read that fails or passes its deadline leaves the document unreadable: it holds no value, takes no update, and is never written until a later read succeeds.
 - **Writes land in order.** Writes to one document run one after another, and a burst of updates coalesces into the fewest writes that end with the newest value. A read waits behind writes queued for the same document, so it never brings back an older value.
 - **An update before a document loads waits for it**, so it applies to the saved value and not to the defaults.
 - **A failed write never rejects.** The change stays on screen, and `useStorageProblems().saveProblem` says what failed. The next successful write of the same target clears it.
 - **A bad value throws at once.** Updates are checked against the document's schema before anything changes. A value the schema rejects is a bug in the caller.
 - **Picture calls resolve to a result**, `{ ok: true, value }` or `{ ok: false, error }`, and never reject.
-- **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable for that attempt and sets nothing aside. A late read answer is dropped.
-- **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file. Deleting a profile whose write has not ended fails with `io` after the same deadline and removes nothing.
+- **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable and sets nothing aside. A late read answer is dropped.
+- **A profile whose settings or progress cannot be read does not become active.** The status is `unavailable`, the start screen offers to try again, and `retryStart()` reads them again. Updates made while they loaded are dropped. An activity whose state cannot be read shows the screen that says it did not open, and trying again reads it again.
+- **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file.
+- **Removing a profile happens at one write.** The profile list is saved without it. Until that write is answered, the profile stays listed and usable; when it fails or passes its deadline, the removal fails and the profile stays. A list write that lands after its deadline is followed by a write of the list in memory, which still names the profile. Once the write succeeds, the profile is gone for good, and its documents and pictures are deleted afterwards, after any work already queued for them ends. Files a removal left behind, because the deletion failed or the app stopped first, are deleted at the next start, but only when the profile list was read from a saved file.
 - **The app never guesses at the children it has.** When the app or profiles document cannot be read, the status is `unavailable`, nothing is replaced with defaults, and nothing is written until `retryStart()` reads them.
 
 ## Hooks
@@ -28,22 +31,22 @@ The session holds the saved documents of the app and of the active profile, and 
 | `useThemeSettings()`                 | Band, text size, letter spacing, and motion. `RootLayout` already applies them.                                 |
 | `useSettings()`                      | `settings` and `updateSettings(change)`. Settings are the defaults with no profile, and updating then throws.   |
 | `useProgress()`                      | `progress`, `progressOf(activityId)`, `recordRound(id, outcome, difficulty?)`, and `recordStep(id, step)`       |
-| `useActivityState(activityId, spec)` | `state`, `loaded`, and `update(fn)` for `profile/<id>/activity/<activity-id>`                                   |
+| `useActivityState(activityId, spec)` | `state`, `loaded`, `unreadable`, `update(fn)`, and `reopen()` for `profile/<id>/activity/<activity-id>`         |
 | `usePictures()`                      | `list`, `read`, `save`, `copy`, `trash`, `restore`, and `purge` for the active profile. Throws with no profile. |
 | `useTestInfo()`                      | The seed, difficulty, band, and activity an end-to-end test passed, or null                                     |
 | `useSessionLength()`                 | `isLimitReached()`, `playedMs()`, and `grantPlayTime(ms)`. Nothing re-renders on time. Call them when needed.   |
-| `useStorageProblems()`               | `saveProblem`, the newest failed write, and `loadProblems`, documents that came back as defaults                |
+| `useStorageProblems()`               | `saveProblem`, the newest failed write, and `loadProblems`, corrupt documents set aside for defaults            |
 | `useSessionStore()`                  | The store itself, for `flush()` before quitting and `retryStart()` from the start screen                        |
 
 ## Status
 
-| Status               | When                                                                                      |
-| -------------------- | ----------------------------------------------------------------------------------------- |
-| `loading`            | The app or profiles document is loading, or the chosen profile's settings or progress are |
-| `unavailable`        | The app or profiles document could not be read. The start screen offers to try again.     |
-| `needs-first-launch` | `firstLaunchDone` is false, or no profile exists, such as after the last one is deleted   |
-| `needs-profile`      | Profiles exist and none is active                                                         |
-| `ready`              | A profile is active and loaded                                                            |
+| Status               | When                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `loading`            | The app or profiles document is loading, or the chosen profile's settings or progress are                 |
+| `unavailable`        | The app, profiles, or chosen profile's documents could not be read. The start screen offers to try again. |
+| `needs-first-launch` | `firstLaunchDone` is false, or no profile exists, such as after the last one is deleted                   |
+| `needs-profile`      | Profiles exist and none is active                                                                         |
+| `ready`              | A profile is active and loaded                                                                            |
 
 At start the store makes `app.lastActiveProfileId` active when that profile still exists, so a returning child lands on the home map. The first-launch flow can create and choose a profile while the status is still `needs-first-launch`. The theme follows the chosen profile from then on. The flow sets `firstLaunchDone` last.
 
@@ -120,7 +123,7 @@ const { isLimitReached } = useSessionLength();
 if (isLimitReached()) navigate({ to: '/rest' });
 ```
 
-Delete a profile. Its documents and pictures go too, after any write already queued for it lands. When it was active, no profile is active afterwards:
+Delete a profile. It is removed when the list without it is saved, and its documents and pictures are deleted afterwards. When it was active, no profile is active afterwards:
 
 ```ts
 const result = await deleteProfile(profile.id);

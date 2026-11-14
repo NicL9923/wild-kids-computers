@@ -220,6 +220,24 @@ export function createBrowserBridge(options: BrowserBridgeOptions): PlatformBrid
         for (const key of keys) pictures.delete(key);
         await done(tx);
       },
+
+      async listProfiles() {
+        const tx = await transaction([DOCUMENTS, PICTURES], 'readonly');
+        const [documentKeys, pictureKeys] = await Promise.all([
+          request(tx.objectStore(DOCUMENTS).getAllKeys(IDBKeyRange.bound('profile/', 'profile/\uffff'))),
+          request(tx.objectStore(PICTURES).getAllKeys()),
+        ]);
+        const ids = new Set<string>();
+        for (const key of documentKeys) {
+          const id = typeof key === 'string' ? key.split('/')[1] : undefined;
+          if (isSafeId(id)) ids.add(id);
+        }
+        for (const key of pictureKeys) {
+          const id: unknown = Array.isArray(key) ? key[0] : undefined;
+          if (isSafeId(id)) ids.add(id);
+        }
+        return [...ids].toSorted();
+      },
     },
 
     pictures: {

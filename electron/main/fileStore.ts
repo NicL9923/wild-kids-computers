@@ -23,6 +23,7 @@ import {
   parseDocumentName,
   pictureDirSegments,
   profileDirSegments,
+  profilesDirSegments,
   setAsideFileName,
   type DocumentName,
   type PicturePlace,
@@ -269,6 +270,19 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     async removeProfile(profileId) {
       const dir = inside(profileDirSegments(requireId(profileId, 'profileId')));
       await queue.run(dir, async () => io.remove(await unlinked(dir), { recursive: true }));
+    },
+
+    async listProfiles() {
+      const dir = await unlinked(inside(profilesDirSegments()));
+      let names: string[];
+      try {
+        names = await io.list(dir);
+      } catch (error) {
+        if (errorCode(error) === 'ENOENT') return [];
+        throw error;
+      }
+      // Anything else in the folder is not a profile the store made, and no call can name it.
+      return names.filter((name) => isSafeId(name)).toSorted();
     },
   };
 

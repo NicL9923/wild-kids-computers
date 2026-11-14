@@ -27,6 +27,7 @@ import {
   type ActivityStateDocument,
   type AppDocument,
   type Profile,
+  type ProfilesDocument,
   type ProgressDocument,
   type Settings,
 } from '../../core/storage/schemas.ts';
@@ -52,7 +53,8 @@ export type SessionStatus =
   /** The app or profiles document, or the active profile's settings or progress, is loading. */
   | 'loading'
   /**
-   * The app or profiles document could not be read, so the app cannot know which children it has.
+   * The app or profiles document could not be read, so the app cannot know which children it has,
+   * or the chosen profile's settings or progress could not be read, so that profile is not active.
    * Nothing is replaced with defaults and nothing is written until `retryStart()` reads them.
    */
   | 'unavailable'
@@ -72,16 +74,20 @@ export interface SaveProblem {
   readonly message: string;
 }
 
-/** A saved document that came back as defaults, so the parent corner can say so. */
+/** A saved document whose bad data was set aside and replaced with defaults, so the parent corner can say so. */
 export interface LoadProblem {
   readonly document: DocumentName;
-  /** `reset`: bad data was set aside. `unreadable`: the platform could not read it. */
-  readonly status: 'reset' | 'unreadable';
+  readonly status: 'reset';
   readonly problem: string;
 }
 
 export interface ActivityStateEntry<S = unknown> {
   readonly loaded: boolean;
+  /**
+   * The saved state could not be read. Nothing is written and updates are dropped until
+   * `openActivityState` reads it again.
+   */
+  readonly unreadable: boolean;
   /** The activity's own state, unwrapped from its versioned document. */
   readonly state: S;
   /** The spec the state was opened with. Only that spec can read it. */
@@ -158,7 +164,8 @@ export interface SessionStore {
   readonly start: () => Promise<void>;
   /**
    * With status `unavailable`, reads the app and profiles documents that could not be read, and
-   * goes on as `start` does once both are open. A retry already running is reused.
+   * goes on as `start` does once both are open, or reads the chosen profile's settings and
+   * progress again and makes it active once both are open. A retry already running is reused.
    */
   readonly retryStart: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
@@ -175,10 +182,15 @@ export interface SessionStore {
   readonly updateProfile: (profileId: string, update: Update<NewProfile>) => void;
   /**
    * Removes a profile with its documents and pictures. When it is active, no profile is active
-   * afterwards. On failure the profile stays in the list and `saveProblem` says why.
+   * afterwards. The removal happens when the profile list without it is saved: on success the
+   * profile is gone for good, and its files are deleted afterwards. On failure the profile stays
+   * in the list, usable, and `saveProblem` says why.
    */
   readonly deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
-  /** Makes a profile active and loads its documents, or makes none active with null. Throws for a profile being deleted. */
+  /**
+   * Makes a profile active and loads its documents, or makes none active with null. When its
+   * settings or progress cannot be read, it does not stay active and the status is `unavailable`.
+   */
   readonly chooseProfile: (profileId: string | null) => void;
 
   /** Throws when no profile is active, because there are no settings to save. */
@@ -194,7 +206,10 @@ export interface SessionStore {
   /** Records that the child reached a step of a sequence activity. */
   readonly recordStep: (activityId: string, reachedStep: number) => void;
 
-  /** Starts loading an activity's state for the active profile. Repeat calls reuse the first load. */
+  /**
+   * Starts loading an activity's state for the active profile. Repeat calls reuse the first load,
+   * except after a read that failed, which they try again.
+   */
   readonly openActivityState: <S>(activityId: string, spec: DocumentSpec<ActivityStateDocument<S>>) => void;
   readonly updateActivityState: <S>(
     activityId: string,
@@ -281,6 +296,7 @@ function boundedBridge(bridge: PlatformBridge, timers: Pick<Scheduler, 'setTimeo
       write: held('documents.write', (name, text) => documents.write(name, text)),
       setAside: bound('documents.setAside', (name) => documents.setAside(name)),
       removeProfile: bound('documents.removeProfile', (profileId) => documents.removeProfile(profileId)),
+      listProfiles: bound('documents.listProfiles', () => documents.listProfiles()),
     },
     pictures: {
       save: bound('pictures.save', (profileId, input) => pictures.save(profileId, input)),
@@ -313,10 +329,13 @@ class Cell<T> {
   /** Reads and writes of this cell queued or running, including a write past its deadline. */
   tasks = 0;
   /**
-   * Set for a document the app cannot start without, when its read failed. The cell then stays
-   * unloaded with its value untouched, so nothing writes defaults over the saved file.
+   * Set when the read failed or passed its deadline. The cell then stays unloaded with its value
+   * untouched, so nothing writes defaults over the saved file. A required cell is read again in
+   * place by `retryStart`; any other cell is never written and a fresh cell reads the file again.
    */
   unreadable = false;
+  /** The value came from a saved file, not from defaults for a file that was missing or set aside. */
+  fromFile = false;
   /** Updates made before the load finished, oldest first. They apply in one queued task. */
   readonly early: EarlyUpdate<T>[] = [];
   readonly ready: Promise<void>;
@@ -339,6 +358,12 @@ class Cell<T> {
 
   finishLoad(): void {
     this.loaded = true;
+    this.markReady();
+  }
+
+  /** Ends the load of a cell that is not required without a value, so updates waiting for it are dropped. */
+  giveUp(): void {
+    this.unreadable = true;
     this.markReady();
   }
 }
@@ -389,8 +414,13 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   // replace them, so the app waits for both.
   const app = new Cell(documentNames.app, appDocument, true);
   const profiles = new Cell(documentNames.profiles, profilesDocument, true);
-  /** Profiles whose files are being removed. Their pictures take no more changes. */
+  /** Profiles removed from the list this session. Their pictures take no more changes. */
   const removed = new Set<string>();
+  /**
+   * The profile that was chosen but whose settings or progress could not be read. It is not
+   * active, the status is `unavailable`, and `retryStart` chooses it again.
+   */
+  let unopened: string | null = null;
   /**
    * Documents with a read or write still queued or running, by name. Choosing a profile again, or
    * opening an activity's state again, takes the cell from here instead of reading the file, which
@@ -411,7 +441,12 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     const band: Band = activeProfile?.band ?? DEFAULT_BAND;
     const activityStates: Record<string, ActivityStateEntry> = {};
     for (const [activityId, cell] of active?.activityStates ?? []) {
-      activityStates[activityId] = { loaded: cell.loaded, state: cell.value.state, spec: cell.spec };
+      activityStates[activityId] = {
+        loaded: cell.loaded,
+        unreadable: cell.unreadable,
+        state: cell.value.state,
+        spec: cell.spec,
+      };
     }
     return {
       status: statusOf(),
@@ -434,7 +469,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function statusOf(): SessionStatus {
-    if (app.unreadable || profiles.unreadable) return 'unavailable';
+    if (app.unreadable || profiles.unreadable || unopened !== null) return 'unavailable';
     if (!app.loaded || !profiles.loaded) return 'loading';
     if (!app.value.firstLaunchDone || profiles.value.profiles.length === 0) return 'needs-first-launch';
     if (active === null) return 'needs-profile';
@@ -492,18 +527,35 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       // loadDocument never throws on bad data. This covers a bridge that broke its contract.
       result = { value: cell.spec.defaults(), status: 'unreadable', problem: toBridgeError(error).message };
     }
-    cell.unreadable = cell.required && result.status === 'unreadable';
+    // Defaults never stand in for a document that could not be read: the next write would put
+    // them over the saved file. Only a read that answered "nothing saved" or "set aside" gives them.
+    cell.unreadable = result.status === 'unreadable';
     if (cell.unreadable) {
+      if (!cell.required) {
+        cell.giveUp();
+        leaveUnopened(cell);
+      }
       emit();
       return;
     }
-    if (result.status === 'reset' || result.status === 'unreadable') {
+    if (result.status === 'reset') {
       loadProblems = [...loadProblems, { document: cell.name, status: result.status, problem: result.problem ?? '' }];
     }
     cell.value = result.value;
+    cell.fromFile = result.status === 'loaded' || result.status === 'migrated';
     cell.finishLoad();
     if (result.status === 'migrated') queueWrite(cell);
     emit();
+  }
+
+  /**
+   * A profile whose settings or progress could not be read does not stay active, so nothing
+   * reads, shows, or writes defaults in their place. The status says `unavailable` until a retry.
+   */
+  function leaveUnopened(cell: Cell<unknown>): void {
+    if (active === null || (active.settings !== cell && active.progress !== cell)) return;
+    unopened = active.profileId;
+    active = null;
   }
 
   /** Runs a read or write of the cell in its document's queue, and keeps the cell findable meanwhile. */
@@ -542,17 +594,28 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     });
   }
 
-  async function writeNow<T>(cell: Cell<T>): Promise<void> {
-    let landed: Promise<void> = Promise.resolve();
+  /** Writes `value` as the cell's document. `landed` settles when the write really ends. */
+  function sendWrite<T>(cell: Cell<T>, value: T): HeldCall<void> {
+    let call: HeldCall<void> | null = null;
     const documents = {
       write(name: DocumentName, text: string): Promise<void> {
-        const call = bridge.documents.write(name, text);
-        landed = call.landed;
+        call = bridge.documents.write(name, text);
         return call.answer;
       },
     };
+    const answer = saveDocument(documents, cell.name, cell.spec, value);
+    const landed = answer.catch((error: unknown) => {
+      if (call === null) throw error;
+      return call.landed;
+    });
+    landed.catch(() => undefined);
+    return { answer, landed };
+  }
+
+  async function writeNow<T>(cell: Cell<T>): Promise<void> {
+    const call = sendWrite(cell, cell.value);
     try {
-      await saveDocument(documents, cell.name, cell.spec, cell.value);
+      await call.answer;
       clearProblem(cell.name);
       return;
     } catch (error) {
@@ -561,7 +624,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     // A write past its deadline may still land. Until it ends, no later read or write of this
     // document passes it, so the disk never takes an older value after a newer one.
     try {
-      await landed;
+      await call.landed;
       clearProblem(cell.name);
     } catch (error) {
       reportProblem(cell.name, 'write', error);
@@ -583,6 +646,13 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     if (cell.early.length > 1) return;
     void runFor(cell, async () => {
       await cell.ready;
+      if (!cell.loaded) {
+        // The read failed, so there is no saved value to apply these updates to. They are dropped,
+        // as is any later update until a fresh cell reads the file, and the screen says it did
+        // not open.
+        cell.early.length = 0;
+        return;
+      }
       for (const early of cell.early.splice(0)) {
         try {
           cell.value = cell.spec.schema.parse(early.apply(cell.value));
@@ -612,6 +682,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   // ---- profiles ---------------------------------------------------------------------------
 
   function activate(profileId: string | null): void {
+    unopened = null;
     if (profileId === null) {
       active = null;
       return;
@@ -627,11 +698,10 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function chooseProfile(profileId: string | null): void {
-    if ((active?.profileId ?? null) === profileId) return;
+    if (unopened === null && (active?.profileId ?? null) === profileId) return;
     if (profileId !== null && !profiles.value.profiles.some((p) => p.id === profileId)) {
       throw new Error(`No profile with id ${profileId}.`);
     }
-    if (profileId !== null && removed.has(profileId)) throw new Error(`Profile ${profileId} is being deleted.`);
     activate(profileId);
     change(app, { lastActiveProfileId: profileId });
     emit();
@@ -647,21 +717,97 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   async function deleteProfile(profileId: string): Promise<BridgeResult<void>> {
-    if (active?.profileId === profileId) chooseProfile(null);
-    removed.add(profileId);
-    try {
-      // Writes already queued for this profile finish first, so none lands after the removal. A
-      // write past its deadline holds its queue until it ends, so this wait has a deadline too.
-      const pending = Promise.all([queues.settled(`profile/${profileId}/`), queues.settled(`pictures/${profileId}`)]);
-      await withDeadline(pending, SESSION_CALL_DEADLINE_MS, timers, `Saving profile ${profileId} before its removal`);
-      await bridge.documents.removeProfile(profileId);
-    } catch (error) {
-      removed.delete(profileId);
-      return { ok: false, error: reportProblem(`profile/${profileId}`, 'remove-profile', error) };
+    if (!profiles.loaded || !profiles.value.profiles.some((p) => p.id === profileId)) {
+      return { ok: false, error: new BridgeError('not-found', `No profile with id ${profileId}.`) };
     }
-    change(profiles, (current) => ({ ...current, profiles: current.profiles.filter((p) => p.id !== profileId) }));
+    if (active?.profileId === profileId || unopened === profileId) chooseProfile(null);
+    const committed = await commitRemoval(profileId);
+    if (!committed.ok)
+      return { ok: false, error: reportProblem(`profile/${profileId}`, 'remove-profile', committed.error) };
+    // The profile is gone for good. It stays usable until the list is saved, so it may be active again.
+    removed.add(profileId);
+    if (active?.profileId === profileId) chooseProfile(null);
     if (app.value.lastActiveProfileId === profileId) change(app, { lastActiveProfileId: null });
+    emit();
+    void removeUnlisted([profileId]);
     return { ok: true, value: undefined };
+  }
+
+  /**
+   * Saves the profile list without the profile: the moment the removal happens. Until the write is
+   * answered the profile stays in memory, listed and usable. A write past its deadline is a failed
+   * removal, but it may still land: then memory, which still lists the profile, is saved again.
+   */
+  function commitRemoval(profileId: string): Promise<BridgeResult<void>> {
+    const without = (current: ProfilesDocument) => ({
+      ...current,
+      profiles: current.profiles.filter((p) => p.id !== profileId),
+    });
+    return new Promise((resolve) => {
+      // A list write past its deadline holds the list's queue. A removal that cannot start in time
+      // fails instead of waiting with it, and never starts later.
+      let started = false;
+      const stopWaiting = timers.setTimeout(() => {
+        if (started) return;
+        started = true;
+        resolve({ ok: false, error: new BridgeError('io', 'The profile list was still being saved.') });
+      }, SESSION_CALL_DEADLINE_MS);
+      void runFor(profiles, async () => {
+        if (started) return;
+        started = true;
+        stopWaiting();
+        // An earlier removal of the same profile already saved the list without it.
+        if (!profiles.value.profiles.some((p) => p.id === profileId)) {
+          resolve({ ok: true, value: undefined });
+          return;
+        }
+        const call = sendWrite(profiles, without(profiles.value));
+        try {
+          await call.answer;
+        } catch (error) {
+          resolve({ ok: false, error: toBridgeError(error) });
+          try {
+            await call.landed;
+          } catch {
+            return;
+          }
+          queueWrite(profiles);
+          return;
+        }
+        profiles.value = without(profiles.value);
+        clearProblem(profiles.name);
+        resolve({ ok: true, value: undefined });
+      });
+    });
+  }
+
+  /**
+   * Deletes the documents and pictures of profiles the list does not name: the ones given, and,
+   * when the list came from a saved file, every one the platform has stored. Those are what a
+   * removal left behind when the deletion failed, timed out, or the app stopped first. A list that
+   * was missing or corrupt names no one, so it never sends the stored profiles' files away.
+   */
+  function removeUnlisted(known: readonly string[]): Promise<void> {
+    return queues.run('unlisted', async () => {
+      let stored: string[] = [];
+      if (profiles.fromFile) {
+        try {
+          stored = await bridge.documents.listProfiles();
+        } catch {
+          // The next start or removal looks again.
+        }
+      }
+      for (const profileId of new Set([...known, ...stored])) {
+        if (profiles.value.profiles.some((p) => p.id === profileId)) continue;
+        // Work already queued for its documents or pictures ends first, so none brings a file back.
+        await Promise.all([queues.settled(`profile/${profileId}/`), queues.settled(`pictures/${profileId}`)]);
+        try {
+          await bridge.documents.removeProfile(profileId);
+        } catch {
+          // Left for the next start or removal.
+        }
+      }
+    });
   }
 
   async function setKioskLock(on: boolean): Promise<BridgeResult<void>> {
@@ -677,14 +823,15 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
   // ---- activity state ---------------------------------------------------------------------
 
-  function activityCell<S>(activityId: string, spec: DocumentSpec<ActivityStateDocument<S>>) {
+  /** `reopen` reads a state whose last read failed again, for the activity's "try again". */
+  function activityCell<S>(activityId: string, spec: DocumentSpec<ActivityStateDocument<S>>, reopen = false) {
     const profile = requireActive('Activity state');
     const existing = profile.activityStates.get(activityId);
     if (existing !== undefined) {
       if (!isCellOf(existing, spec)) {
         throw new Error(`Activity ${activityId} opened its state with two different specs. Define the spec once.`);
       }
-      return existing;
+      if (!(reopen && existing.unreadable)) return existing;
     }
     const cell = openCell(documentNames.activity(profile.profileId, activityId), spec);
     profile.activityStates.set(activityId, cell);
@@ -750,10 +897,17 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       before,
     ]);
     if (!app.loaded || !profiles.loaded) return;
+    void removeUnlisted([]);
     const last = app.value.lastActiveProfileId;
     if (last !== null && profiles.value.profiles.some((p) => p.id === last)) activate(last);
     if (app.value.kioskLock) void setKioskLock(true);
     emit();
+    await Promise.all([active?.settings.ready, active?.progress.ready]);
+  }
+
+  /** Chooses again the profile whose documents could not be read, and waits for them. */
+  async function reopenProfile(profileId: string): Promise<void> {
+    chooseProfile(profileId);
     await Promise.all([active?.settings.ready, active?.progress.ready]);
   }
 
@@ -784,7 +938,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     retryStart() {
       if (!started) throw new Error('The session has not started.');
       if (statusOf() !== 'unavailable') return Promise.resolve();
-      retrying ??= open(false).finally(() => {
+      retrying ??= (unopened === null ? open(false) : reopenProfile(unopened)).finally(() => {
         retrying = null;
       });
       return retrying;
@@ -835,9 +989,8 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     },
 
     openActivityState(activityId, spec) {
-      const before = active?.activityStates.size;
-      activityCell(activityId, spec);
-      if (active?.activityStates.size !== before) emit();
+      const before = active?.activityStates.get(activityId);
+      if (activityCell(activityId, spec, true) !== before) emit();
     },
 
     updateActivityState(activityId, spec, update) {

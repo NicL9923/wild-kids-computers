@@ -118,23 +118,27 @@ export function useProgress(): {
  * State one activity saves for the active profile, in `profile/<id>/activity/<activity-id>`.
  * Define `spec` once at module level with `activityStateDocument(...)`. Until the saved state
  * loads, `state` is the defaults and `loaded` is false. Updates made before then wait for it.
+ * When it cannot be read, `unreadable` is true, updates are dropped, and `reopen` reads it again.
  */
 export function useActivityState<S>(
   activityId: string,
   spec: DocumentSpec<ActivityStateDocument<S>>,
-): { state: S; loaded: boolean; update: (update: (state: S) => S) => void } {
+): { state: S; loaded: boolean; unreadable: boolean; update: (update: (state: S) => S) => void; reopen: () => void } {
   const store = useSessionStore();
   const entry = useSnapshot((s) => s.activityStates[activityId]);
-  useEffect(() => store.openActivityState(activityId, spec), [store, activityId, spec]);
+  const reopen = useCallback(() => store.openActivityState(activityId, spec), [store, activityId, spec]);
+  useEffect(reopen, [reopen]);
   const update = useCallback(
     (change: (state: S) => S) => store.updateActivityState(activityId, spec, change),
     [store, activityId, spec],
   );
   return useMemo(() => {
     // Before the effect opens the state, or with an entry from another spec, which the store refuses.
-    if (entry === undefined || !isEntryOf(entry, spec)) return { state: spec.defaults().state, loaded: false, update };
-    return { state: entry.state, loaded: entry.loaded, update };
-  }, [entry, spec, update]);
+    if (entry === undefined || !isEntryOf(entry, spec)) {
+      return { state: spec.defaults().state, loaded: false, unreadable: false, update, reopen };
+    }
+    return { state: entry.state, loaded: entry.loaded, unreadable: entry.unreadable, update, reopen };
+  }, [entry, spec, update, reopen]);
 }
 
 /** The active profile's pictures. Each call resolves to a result and never rejects. Throws with no profile. */

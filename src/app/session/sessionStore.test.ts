@@ -305,7 +305,7 @@ describe('profiles', () => {
     expect(store.getSnapshot().status).toBe('needs-first-launch');
   });
 
-  it('refuses picture changes for a profile that is being deleted', async () => {
+  it('refuses picture changes for a profile that was removed', async () => {
     const { store, fake } = await startSession({ documents: savedApp([FOX], FOX.id) });
     const pictures = store.pictures();
     await store.deleteProfile(FOX.id);
@@ -314,29 +314,29 @@ describe('profiles', () => {
     expect(fake.calls).not.toContain(`pictures.save ${FOX.id}`);
   });
 
-  it('refuses to make a profile active while it is being deleted', async () => {
+  it('keeps a profile listed and usable until the list without it is saved, then leaves it', async () => {
     const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], FOX.id) });
     fake.holdWrites();
-    store.updateSettings({ muted: true });
     const deleting = store.deleteProfile(FOX.id);
-    expect(() => store.chooseProfile(FOX.id)).toThrow(/Profile fox-kid is being deleted/);
     expect(store.getSnapshot().activeProfile).toBeNull();
-    fake.resumeWrites();
-    await deleting;
-    expect(store.getSnapshot().activeProfile).toBeNull();
-  });
-
-  it('lets a profile be chosen again after its deletion failed', async () => {
-    const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], null) });
-    fake.failNext('removeProfile', FOX.id, new BridgeError('io', 'disk full'));
-    await store.deleteProfile(FOX.id);
+    await fake.heldWritesReach(2);
+    expect(fake.heldWrites.map((write) => write.name)).toEqual(['app', 'profiles']);
+    expect(store.getSnapshot().profiles).toEqual([FOX, OWL]);
     store.chooseProfile(FOX.id);
     expect(store.getSnapshot().activeProfile).toEqual(FOX);
+
+    fake.resumeWrites();
+    expect(await deleting).toEqual({ ok: true, value: undefined });
+    expect(store.getSnapshot()).toMatchObject({ activeProfile: null, profiles: [OWL] });
+    expect(() => store.chooseProfile(FOX.id)).toThrow(/No profile with id fox-kid/);
+    await store.flush();
+    expect(saved(fake, 'app', appDocument).lastActiveProfileId).toBeNull();
+    expect([...fake.documents.keys()].filter((name) => name.startsWith(`profile/${FOX.id}/`))).toEqual([]);
   });
 
-  it('keeps a profile whose files could not be removed and says why', async () => {
+  it('keeps a profile whose list could not be saved, usable, and says why', async () => {
     const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], null) });
-    fake.failNext('removeProfile', FOX.id, new BridgeError('io', 'disk full'));
+    fake.failNext('write', 'profiles', new BridgeError('io', 'disk full'));
     const result = await store.deleteProfile(FOX.id);
     expect(result).toMatchObject({ ok: false, error: { code: 'io', message: 'disk full' } });
     expect(store.getSnapshot().profiles).toEqual([FOX, OWL]);
@@ -346,6 +346,51 @@ describe('profiles', () => {
       code: 'io',
       message: 'disk full',
     });
+    expect(fake.calls).not.toContain(`documents.removeProfile ${FOX.id}`);
+    store.chooseProfile(FOX.id);
+    expect(store.getSnapshot().activeProfile).toEqual(FOX);
+  });
+
+  it('removes a profile whose files could not be deleted, and deletes them at the next start', async () => {
+    const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], null) });
+    fake.failNext('removeProfile', FOX.id, new BridgeError('io', 'disk busy'));
+    expect(await store.deleteProfile(FOX.id)).toEqual({ ok: true, value: undefined });
+    await store.flush();
+    expect(store.getSnapshot().profiles).toEqual([OWL]);
+    expect(fake.documents.has(documentNames.settings(FOX.id))).toBe(true);
+
+    const next = createSessionStore({ bridge: fake.bridge });
+    await next.start();
+    await next.flush();
+    expect(fake.documents.has(documentNames.settings(FOX.id))).toBe(false);
+    expect(fake.documents.has(documentNames.settings(OWL.id))).toBe(true);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['corrupt', '{'],
+  ])('never deletes stored profiles when the profile list was %s', async (_label, list) => {
+    const documents = savedApp([FOX], FOX.id);
+    documents.profiles = list;
+    const fake = createFakeBridge({ documents });
+    const store = createSessionStore({ bridge: fake.bridge });
+    await store.start();
+    // A profile made now, then removed, has its own files deleted, and no other profile's.
+    const kid = store.createProfile({ avatarId: 'cat', colorId: 'sun', band: 'band-3-5' });
+    await store.flush();
+    expect(await store.deleteProfile(kid.id)).toEqual({ ok: true, value: undefined });
+    await store.flush();
+    expect(fake.calls.filter((call) => call.startsWith('documents.removeProfile'))).toEqual([
+      `documents.removeProfile ${kid.id}`,
+    ]);
+    expect(fake.documents.has(documentNames.settings(FOX.id))).toBe(true);
+  });
+
+  it('refuses to remove a profile that is not listed, and deletes nothing', async () => {
+    const { store, fake } = await startSession({ documents: savedApp([FOX], FOX.id) });
+    expect(await store.deleteProfile('nobody')).toMatchObject({ ok: false, error: { code: 'not-found' } });
+    await store.flush();
+    expect(fake.calls.filter((call) => /^documents\.(write profiles|removeProfile)/.test(call))).toEqual([]);
   });
 });
 
@@ -773,8 +818,8 @@ async function hasSettled(promise: Promise<unknown>): Promise<boolean> {
 }
 
 describe('bridge calls that never answer', () => {
-  it('ends a document read at the deadline as unreadable for that attempt, without setting the file aside', async () => {
-    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+  it('ends a profile read at the deadline as unreadable, without setting the file aside or making the profile active', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id, { voiceVolume: 0.2 }) });
     const settingsName = documentNames.settings(FOX.id);
     const read = fake.bridge.documents.read.bind(fake.bridge.documents);
     const hung = hangCalls<string | null>();
@@ -786,17 +831,17 @@ describe('bridge calls that never answer', () => {
     expect(await hasSettled(started)).toBe(false);
     timers.advance(1);
     await started;
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', settings: { muted: false } });
-    expect(store.getSnapshot().loadProblems).toEqual([
-      { document: settingsName, status: 'unreadable', problem: expect.stringMatching(/did not finish within/) },
-    ]);
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null, loadProblems: [] });
     expect(fake.calls).not.toContain(`documents.setAside ${settingsName}`);
 
-    // The late answer is dropped: it never replaces what the child changed since.
-    store.updateSettings({ voiceVolume: 0.5 });
-    hung.answerAll(json({ ...settingsDocument.defaults(), muted: true, voiceVolume: 0.2 }));
-    await store.flush();
-    expect(store.getSnapshot().settings).toMatchObject({ muted: false, voiceVolume: 0.5 });
+    // The late answer is dropped: only trying again reads the file, and then the profile opens.
+    hung.answerAll(json({ ...settingsDocument.defaults(), muted: true }));
+    await settle();
+    expect(store.getSnapshot().status).toBe('unavailable');
+    fake.bridge.documents.read = read;
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX, settings: { voiceVolume: 0.2 } });
+    expect(fake.calls.filter((call) => call.startsWith('documents.write profile/'))).toEqual([]);
   });
 
   it('turns a write that passes its deadline into a save problem, and holds the next write of that document until it ends', async () => {
@@ -832,33 +877,57 @@ describe('bridge calls that never answer', () => {
     expect(store.getSnapshot().saveProblem).toBeNull();
   });
 
-  it('refuses to remove a profile while its write past the deadline has not ended, and removes it after', async () => {
+  it('removes a profile while its write past the deadline is held, and deletes its files only after that write ends', async () => {
     const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], FOX.id) });
     await store.start();
     const write = fake.bridge.documents.write.bind(fake.bridge.documents);
     const hung = hangCalls<void>();
-    fake.bridge.documents.write = hung.call;
+    fake.bridge.documents.write = (name, text) =>
+      name === documentNames.settings(FOX.id) ? hung.call() : write(name, text);
     store.updateSettings({ muted: true });
     await settle();
     timers.advance(SESSION_CALL_DEADLINE_MS);
     await settle();
-    fake.bridge.documents.write = write;
 
-    const refused = store.deleteProfile(FOX.id);
-    await settle();
-    timers.advance(SESSION_CALL_DEADLINE_MS);
-    expect(await refused).toMatchObject({
-      ok: false,
-      error: { code: 'io', message: expect.stringMatching(/before its removal/) },
-    });
-    // Removing now would let the late write put the settings file back.
-    expect(fake.calls).not.toContain(`documents.removeProfile ${FOX.id}`);
-    expect(store.getSnapshot().profiles.map((p) => p.id)).toContain(FOX.id);
-
-    hung.answerAll(undefined);
-    await settle();
     expect(await store.deleteProfile(FOX.id)).toEqual({ ok: true, value: undefined });
     expect(store.getSnapshot().profiles.map((p) => p.id)).toEqual([OWL.id]);
+    await settle();
+    // Deleting now would let the late write put the settings file back.
+    expect(fake.calls).not.toContain(`documents.removeProfile ${FOX.id}`);
+
+    hung.answerAll(undefined);
+    await store.flush();
+    expect(fake.calls).toContain(`documents.removeProfile ${FOX.id}`);
+  });
+
+  it('fails a removal whose list write never answers at the deadline, and keeps the profile', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], null) });
+    await store.start();
+    const write = fake.bridge.documents.write.bind(fake.bridge.documents);
+    let listWrites = 0;
+    fake.bridge.documents.write = (name, text) => {
+      if (name !== 'profiles') return write(name, text);
+      listWrites += 1;
+      return never();
+    };
+    const result = store.deleteProfile(FOX.id);
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS - 1);
+    expect(await hasSettled(result)).toBe(false);
+    timers.advance(1);
+    expect(await result).toMatchObject({
+      ok: false,
+      error: { code: 'io', message: expect.stringMatching(/did not finish within/) },
+    });
+    expect(store.getSnapshot().profiles).toEqual([FOX, OWL]);
+
+    // A second removal waits behind the list write that never ended, and fails instead of waiting forever.
+    const second = store.deleteProfile(FOX.id);
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    expect(await second).toMatchObject({ ok: false, error: { code: 'io', message: /still being saved/ } });
+    expect(listWrites).toBe(1);
+    expect(fake.calls).not.toContain(`documents.removeProfile ${FOX.id}`);
   });
 
   it.each([
@@ -890,7 +959,6 @@ describe('bridge calls that never answer', () => {
       (store: SessionStore) => store.pictures().save({ png: new Uint8Array(), thumbnail: new Uint8Array() }),
     ],
     ['a picture list', (store: SessionStore) => store.pictures().list('gallery')],
-    ['a profile removal', (store: SessionStore) => store.deleteProfile(FOX.id)],
     ['a kiosk lock change', (store: SessionStore) => store.setKioskLock(true)],
   ] as const)('ends %s that never answers as an io failure, so the queue moves on', async (_name, act) => {
     const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
@@ -960,5 +1028,291 @@ describe('saved things that cannot be opened at start', () => {
     await store.retryStart();
     await store.flush();
     expect(saved(fake, 'app', appDocument)).toMatchObject({ firstLaunchDone: true, lastActiveProfileId: FOX.id });
+  });
+});
+
+describe('documents that could not be read', () => {
+  const lessonState = activityStateDocument({
+    schema: z.object({ furthestLesson: z.int().min(0) }),
+    defaults: () => ({ furthestLesson: 0 }),
+  });
+
+  it('shows activity state that could not be read as not opened, drops updates to it, and reads it again on reopen', async () => {
+    const documents = savedApp([FOX], FOX.id);
+    const name = documentNames.activity(FOX.id, 'typing-course');
+    documents[name] = json({ version: 1, state: { furthestLesson: 3 } });
+    const { fake, store } = storeWithDeadlines({ documents });
+    await store.start();
+    fake.failNext('read', name, new BridgeError('io', 'disk busy'));
+
+    store.openActivityState('typing-course', lessonState);
+    // Made while the read runs, so it waits for it, and is dropped when the read fails.
+    store.updateActivityState('typing-course', lessonState, (state) => ({ furthestLesson: state.furthestLesson + 1 }));
+    await until(store, () => store.getSnapshot().activityStates['typing-course']?.unreadable === true);
+    store.updateActivityState('typing-course', lessonState, () => ({ furthestLesson: 0 }));
+    await store.flush();
+    expect(store.getSnapshot().activityStates['typing-course']).toMatchObject({ loaded: false, unreadable: true });
+    expect(fake.calls).not.toContain(`documents.write ${name}`);
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+
+    store.openActivityState('typing-course', lessonState);
+    await until(store, () => store.getSnapshot().activityStates['typing-course']?.loaded === true);
+    expect(store.getSnapshot().activityStates['typing-course']).toMatchObject({
+      unreadable: false,
+      state: { furthestLesson: 3 },
+    });
+  });
+
+  it.each([
+    ['settings', (id: string) => documentNames.settings(id)],
+    ['progress', (id: string) => documentNames.progress(id)],
+  ] as const)('does not make a profile active when its %s cannot be read', async (_label, nameOf) => {
+    const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], OWL.id) });
+    await store.start();
+    fake.failNext('read', nameOf(FOX.id), new BridgeError('io', 'disk busy'));
+    store.chooseProfile(FOX.id);
+    store.updateSettings({ muted: true });
+    await until(store, () => store.getSnapshot().status !== 'loading');
+    await store.flush();
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null });
+    expect(fake.calls).not.toContain(`documents.write ${nameOf(FOX.id)}`);
+
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+  });
+
+  it('leaves the try-again state when the profile that could not be opened is deleted', async () => {
+    const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], FOX.id) });
+    fake.failNext('read', documentNames.settings(FOX.id), new BridgeError('io', 'disk busy'));
+    await store.start();
+    expect(store.getSnapshot().status).toBe('unavailable');
+    expect(await store.deleteProfile(FOX.id)).toEqual({ ok: true, value: undefined });
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profiles: [OWL] });
+  });
+
+  it('never writes a document without a successful read of it, through random reads that fail, pass their deadline, or answer late', async () => {
+    const profiles = [FOX, OWL];
+    for (let seed = 1; seed <= 30; seed++) {
+      const random = createRandom(seed);
+      const documents = savedApp(profiles, FOX.id, { sessionLengthMinutes: 15 });
+      for (const profile of profiles) {
+        documents[documentNames.progress(profile.id)] = json({
+          version: 1,
+          activities: { old: { recentRounds: [], daysPracticed: [], furthestStep: 7 } },
+        });
+        documents[documentNames.activity(profile.id, 'typing-course')] = json({
+          version: 1,
+          state: { furthestLesson: 3 },
+        });
+      }
+      const { fake, timers, store } = storeWithDeadlines({ documents });
+      const read = fake.bridge.documents.read.bind(fake.bridge.documents);
+      const write = fake.bridge.documents.write.bind(fake.bridge.documents);
+      /** How the store last saw a read of each document end: answered in time, or not. */
+      const lastRead = new Map<string, 'ok' | 'failed'>();
+      const unread: string[] = [];
+      const held: Array<{ name: DocumentName; expired: boolean; answer: () => void }> = [];
+      let chaos = true;
+
+      fake.bridge.documents.read = (name) => {
+        const roll = chaos ? random.next() : 1;
+        if (roll < 0.15) {
+          lastRead.set(name, 'failed');
+          return Promise.reject(new BridgeError('io', 'disk busy'));
+        }
+        const answered = (text: string | null) => {
+          lastRead.set(name, 'ok');
+          return text;
+        };
+        if (roll < 0.4) {
+          return new Promise((resolve) => {
+            const entry = {
+              name,
+              expired: false,
+              // An answer after the deadline is dropped, so it never counts as a read.
+              answer: () => void read(name).then((text) => resolve(entry.expired ? text : answered(text))),
+            };
+            held.push(entry);
+          });
+        }
+        return read(name).then(answered);
+      };
+      fake.bridge.documents.write = (name, text) => {
+        if (lastRead.get(name) !== 'ok') unread.push(name);
+        return write(name, text);
+      };
+      const expire = () => {
+        for (const entry of held) {
+          if (entry.expired) continue;
+          entry.expired = true;
+          lastRead.set(entry.name, 'failed');
+        }
+        timers.advance(SESSION_CALL_DEADLINE_MS);
+      };
+
+      void store.start();
+      for (let step = 0; step < 80; step++) {
+        const roll = random.next();
+        const hasProfile = store.getSnapshot().activeProfile !== null;
+        if (roll < 0.15 && store.getSnapshot().profiles.length > 0) {
+          store.chooseProfile(random.pick(profiles).id);
+        } else if (roll < 0.35 && hasProfile) {
+          store.updateSettings({ voiceVolume: random.int(0, 10) / 10 });
+        } else if (roll < 0.45 && hasProfile) {
+          store.recordStep('new', random.int(1, 5));
+        } else if (roll < 0.55 && hasProfile) {
+          store.openActivityState('typing-course', lessonState);
+          store.updateActivityState('typing-course', lessonState, (s) => ({ furthestLesson: s.furthestLesson + 1 }));
+        } else if (roll < 0.7) {
+          expire();
+        } else if (roll < 0.85) {
+          held.splice(random.int(0, Math.max(held.length - 1, 0)), 1)[0]?.answer();
+        } else if (store.getSnapshot().status === 'unavailable') {
+          void store.retryStart();
+        }
+        if (random.next() < 0.5) await settle();
+      }
+
+      // Everything answers now, and every profile opens.
+      chaos = false;
+      expire();
+      for (const entry of held.splice(0)) entry.answer();
+      await settle();
+      for (const profile of profiles) {
+        for (
+          let tries = 0;
+          store.getSnapshot().status !== 'ready' || store.getSnapshot().activeProfile?.id !== profile.id;
+          tries++
+        ) {
+          if (tries > 20) throw new Error(`seed ${seed}: ${profile.id} is still ${store.getSnapshot().status}`);
+          if (store.getSnapshot().status === 'unavailable') await store.retryStart();
+          else if (store.getSnapshot().profiles.length > 0 && store.getSnapshot().activeProfile?.id !== profile.id) {
+            store.chooseProfile(profile.id);
+          }
+          await settle();
+        }
+      }
+      await store.flush();
+
+      expect(unread, `seed ${seed}: writes without a read`).toEqual([]);
+      for (const profile of profiles) {
+        const settings = saved(fake, documentNames.settings(profile.id), settingsDocument);
+        expect(settings.sessionLengthMinutes, `seed ${seed}, ${profile.id} settings`).toBe(15);
+        const progress = saved(fake, documentNames.progress(profile.id), progressDocument);
+        expect(progress.activities.old?.furthestStep, `seed ${seed}, ${profile.id} progress`).toBe(7);
+        const lesson = savedJson(fake, documentNames.activity(profile.id, 'typing-course'));
+        expect(lesson, `seed ${seed}, ${profile.id} activity`).toMatchObject({
+          state: { furthestLesson: expect.any(Number) },
+        });
+        expect(lessonState.schema.parse(lesson).state.furthestLesson).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+});
+
+describe('removing profiles while the platform is slow', () => {
+  it('leaves every listed profile with its documents and pictures, through random removals, creations, choices, and late answers', async () => {
+    const png = new Uint8Array([1]);
+    for (let seed = 1; seed <= 30; seed++) {
+      const random = createRandom(seed);
+      const documents = savedApp([FOX, OWL], FOX.id);
+      const fake = createFakeBridge({ documents });
+      for (const profile of [FOX, OWL]) {
+        await fake.bridge.pictures.save(profile.id, { id: `${profile.id}-art`, png, thumbnail: png });
+      }
+      const timers = createManualScheduler({ wall: 0 });
+      const store = createSessionStore({ bridge: fake.bridge, clock: createClock().sessionClock, timers });
+      await store.start();
+
+      // Calls that change what is listed or stored answer late, early, or fail, as the test decides.
+      const parked: Array<() => void> = [];
+      let chaos = true;
+      function slow<A extends unknown[], T>(
+        call: (...args: A) => Promise<T>,
+        canFail: (...args: A) => boolean = () => true,
+      ): (...args: A) => Promise<T> {
+        return (...args) => {
+          const roll = chaos ? random.next() : 1;
+          if (roll < 0.1 && canFail(...args)) return Promise.reject(new BridgeError('io', 'disk busy'));
+          if (roll < 0.5)
+            return new Promise<T>((resolve, reject) => parked.push(() => void call(...args).then(resolve, reject)));
+          return call(...args);
+        };
+      }
+      const { documents: docs, pictures } = fake.bridge;
+      const write = docs.write.bind(docs);
+      // Only the list write fails here: a settings write that fails is a save problem, not a removal.
+      docs.write = slow(
+        (name, text) => write(name, text),
+        (name) => name === 'profiles',
+      );
+      docs.removeProfile = slow(docs.removeProfile.bind(docs));
+      pictures.save = slow(pictures.save.bind(pictures));
+
+      /** Pictures whose save answered ok, by profile. Each must still be there while its profile is listed. */
+      const savedPictures = new Map<string, string[]>([
+        [FOX.id, [`${FOX.id}-art`]],
+        [OWL.id, [`${OWL.id}-art`]],
+      ]);
+      const settingsSaved = new Set([FOX.id, OWL.id]);
+      let pictureCount = 0;
+
+      for (let step = 0; step < 80; step++) {
+        const roll = random.next();
+        const { profiles, status, activeProfile } = store.getSnapshot();
+        if (roll < 0.1 && profiles.length < 5) {
+          store.createProfile({ avatarId: 'cat', colorId: 'sun', band: 'band-3-5' });
+        } else if (roll < 0.25 && profiles.length > 0) {
+          store.chooseProfile(random.pick(profiles).id);
+        } else if (roll < 0.35 && status === 'ready' && activeProfile !== null) {
+          store.updateSettings({ voiceVolume: random.int(0, 10) / 10 });
+          settingsSaved.add(activeProfile.id);
+        } else if (roll < 0.45 && status === 'ready' && activeProfile !== null) {
+          const id = `picture-${String((pictureCount += 1))}`;
+          const owner = activeProfile.id;
+          const pending = store.pictures().save({ id, png, thumbnail: png });
+          void (async () => {
+            if ((await pending).ok) savedPictures.set(owner, [...(savedPictures.get(owner) ?? []), id]);
+          })();
+        } else if (roll < 0.6 && profiles.length > 0) {
+          void store.deleteProfile(random.pick(profiles).id);
+        } else if (roll < 0.75) {
+          timers.advance(SESSION_CALL_DEADLINE_MS);
+        } else {
+          parked.splice(random.int(0, Math.max(parked.length - 1, 0)), 1)[0]?.();
+        }
+        if (random.next() < 0.5) await settle();
+      }
+
+      // Everything answers, and the app starts again over the same storage.
+      chaos = false;
+      while (parked.length > 0 || store.hasPendingWork()) {
+        for (const release of parked.splice(0)) release();
+        timers.advance(SESSION_CALL_DEADLINE_MS);
+        await settle();
+      }
+      const next = createSessionStore({ bridge: fake.bridge, clock: createClock().sessionClock });
+      await next.start();
+      await next.flush();
+
+      const listed = saved(fake, 'profiles', profilesDocument).profiles.map((p) => p.id);
+      expect(
+        next.getSnapshot().profiles.map((p) => p.id),
+        `seed ${seed}: listed`,
+      ).toEqual(listed);
+      for (const id of listed) {
+        expect(fake.pictureIds(id, 'gallery'), `seed ${seed}: pictures of ${id}`).toEqual(
+          expect.arrayContaining(savedPictures.get(id) ?? []),
+        );
+      }
+      const withoutSettings = listed.filter(
+        (id) => settingsSaved.has(id) && !fake.documents.has(documentNames.settings(id)),
+      );
+      expect(withoutSettings, `seed ${seed}: listed without their settings`).toEqual([]);
+      // Nothing a removal left behind outlives the next start.
+      for (const id of await fake.bridge.documents.listProfiles()) {
+        expect(listed, `seed ${seed}: ${id} is stored but not listed`).toContain(id);
+      }
+    }
   });
 });

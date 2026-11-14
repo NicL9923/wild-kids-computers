@@ -45,9 +45,9 @@ import { ExitControl, InstructionControl, MuteControl } from './ShellControls.ts
 import { StepPicker } from './StepPicker.tsx';
 import { strings } from './strings.ts';
 import { ACTIVITY_LOAD_DEADLINE_MS, BETWEEN_ROUNDS_MS, FEEDBACK_MARK_MS, IDLE_CHECK_MS } from './timing.ts';
-import { TryAgainScreen } from './TryAgainScreen.tsx';
 import { useScope } from './useScope.ts';
 import { WithActivityState } from './WithActivityState.tsx';
+import { ActivityNotOpened } from './ActivityNotOpened.tsx';
 
 type LoadedComponent = ComponentType<{ level: unknown; band: Band; kit: ActivityKit<unknown> }>;
 
@@ -96,8 +96,6 @@ function forgetComponent(definition: ActivityDefinition): void {
   components.delete(definition);
 }
 
-const NOT_OPENED = [strings.notOpened] as const;
-
 /**
  * Shows the calm try-again screen, with the way out to the area, when the activity's component did
  * not load. Trying again starts the visit afresh. Any other error is a bug and goes on up.
@@ -117,9 +115,8 @@ class LoadBoundary extends Component<
     const { definition, children } = this.props;
     if (this.state.failed) {
       return (
-        <TryAgainScreen
-          message={NOT_OPENED}
-          exit={<ExitControl to={AREA_PATH(definition.area)} label={strings.exitToArea} />}
+        <ActivityNotOpened
+          definition={definition}
           onTryAgain={() => {
             forgetComponent(definition);
             this.setState(({ attempt }) => ({ failed: false, attempt: attempt + 1 }));

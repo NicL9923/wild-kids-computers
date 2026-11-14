@@ -133,6 +133,18 @@ describe('documents', () => {
     await documents.removeProfile('p1');
   });
 
+  it('lists the profiles that have documents or pictures, and none once removed', async () => {
+    const { documents, pictures } = store();
+    expect(await documents.listProfiles()).toEqual([]);
+    await documents.write('profile/p2/settings', '{}');
+    await pictures.save('p1', { png: png(1), thumbnail: png(2) });
+    // Something another program left that no profile id can name.
+    await writeFile(path.join(root, 'profile', 'Notes.txt'), 'not a profile');
+    expect(await documents.listProfiles()).toEqual(['p1', 'p2']);
+    await documents.removeProfile('p1');
+    expect(await documents.listProfiles()).toEqual(['p2']);
+  });
+
   it('removes a profile from a store with nothing saved yet', async () => {
     await expect(store().documents.removeProfile('p1')).resolves.toBeUndefined();
   });
@@ -338,6 +350,14 @@ describe('links under the data directory', () => {
     if (kind === 'parent') {
       await rm(path.join(outside, 'p1'), { recursive: true });
     }
+    await outsideUntouched();
+  });
+
+  it('refuses to list profiles through a linked profile folder', async () => {
+    await mkdir(path.join(outside, 'p1'));
+    await symlink(outside, path.join(root, 'profile'), 'dir');
+    expect(await rejection(store().documents.listProfiles())).toMatchObject({ code: 'forbidden' });
+    await rm(path.join(outside, 'p1'), { recursive: true });
     await outsideUntouched();
   });
 
