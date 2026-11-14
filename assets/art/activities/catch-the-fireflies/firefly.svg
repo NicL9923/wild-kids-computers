@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 14 176 176">
+  <!-- a round little beetle seen from above, with see-through wings and a glowing tail -->
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fffbb0" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#f3ef6a" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#f3ef6a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="138" r="58" fill="url(#glow)"/>
+  <path d="M86 44c-6-14-16-22-26-24M114 44c6-14 16-22 26-24" fill="none" stroke="#2b2740" stroke-width="6" stroke-linecap="round"/>
+  <ellipse cx="100" cy="140" rx="24" ry="28" fill="#f6f27a" stroke="#2b2740" stroke-width="6"/>
+  <ellipse cx="100" cy="146" rx="12" ry="14" fill="#fffde0"/>
+  <path d="M100 66c-30 4-56 26-58 62 18-4 40-20 56-46z" fill="#d7e8ff" fill-opacity="0.85" stroke="#2b2740" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M100 66c30 4 56 26 58 62-18-4-40-20-56-46z" fill="#d7e8ff" fill-opacity="0.85" stroke="#2b2740" stroke-width="5" stroke-linejoin="round"/>
+  <ellipse cx="100" cy="88" rx="20" ry="30" fill="#4b4466" stroke="#2b2740" stroke-width="6"/>
+  <circle cx="100" cy="54" r="17" fill="#e0553f" stroke="#2b2740" stroke-width="6"/>
+  <circle cx="93" cy="50" r="4" fill="#2b2740"/>
+  <circle cx="107" cy="50" r="4" fill="#2b2740"/>
+</svg>
