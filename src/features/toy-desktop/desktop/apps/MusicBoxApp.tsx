@@ -12,7 +12,7 @@ import { isHighlighted } from '../parts.ts';
 import { strings } from '../strings.ts';
 
 /** Time between steps while a tune plays. Slow enough to follow each note. */
-export const MUSIC_BEAT_MS = 360;
+const MUSIC_BEAT_MS = 360;
 
 const STEPS = Array.from({ length: TUNE_STEPS }, (_, step) => step);
 /** Rows top to bottom: the highest note on top, as on a page of music. */

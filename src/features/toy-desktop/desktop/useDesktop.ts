@@ -4,7 +4,7 @@ import { reduce, type DesktopAction, type DesktopEnv, type Transition } from '..
 import type { DesktopState } from '../model/state.ts';
 
 /** Called after every action with what happened. */
-export type DesktopListener = (transition: Transition, action: DesktopAction) => void;
+type DesktopListener = (transition: Transition, action: DesktopAction) => void;
 
 /**
  * A running toy desktop: the state now, and `dispatch`, which applies an action through the

@@ -42,7 +42,11 @@ export function titleBar(window: Locator): Locator {
   return window.locator('.td-title');
 }
 
-/** The center of a locator, for a real mouse click with `page.mouse`. */
+/**
+ * The center of a locator, for a real mouse click with `page.mouse`. Lesson specs use it.
+ *
+ * @public
+ */
 export async function centerOfLocator(locator: Locator): Promise<{ x: number; y: number }> {
   const box = await locator.boundingBox();
   if (box === null) throw new Error('The element is not on screen.');
