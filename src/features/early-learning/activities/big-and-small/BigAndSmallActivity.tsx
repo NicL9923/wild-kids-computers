@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ActivityKit, ActivityProps } from '../../../../activityShell/kit.ts';
 import { Emoji } from '../../../../components/ui/Emoji.tsx';
 import { t, type SpokenHandle } from '../../../../core/strings/defineStrings.ts';
-import { feedback } from '../../../../core/strings/shared/index.ts';
+import { emojiNames, feedback, numberHandle } from '../../../../core/strings/shared/index.ts';
 import { ANSWER_PAUSE_MS, HINT_AFTER_TRIES, useChoiceRound } from '../../reading/useChoiceRound.ts';
 import { useRoundInstruction } from '../../reading/useRoundInstruction.ts';
 import './bigAndSmall.css';
@@ -15,6 +15,14 @@ function instructionFor(level: BigAndSmallLevel): SpokenHandle {
   if (level.items.length === 2) return level.direction === 'big' ? strings.bigger : strings.smaller;
   return level.direction === 'big' ? strings.biggest : strings.smallest;
 }
+
+/**
+ * What a screen reader hears for a picture: its name and its size as a number, such as "teddy
+ * bear, size 30", so sizes can be compared without seeing them. A tenth of the board size keeps
+ * the numbers small, and sizes in a round are far enough apart that no two round the same.
+ */
+const itemName = (level: BigAndSmallLevel, item: Item) =>
+  `${t(emojiNames[level.kind])}, ${t(strings.size)} ${t(numberHandle(Math.round(item.size / 10)))}`;
 
 /**
  * The row's measures for CSS: its width in board units and its tallest picture, so the row fills
@@ -58,6 +66,7 @@ function Pick({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
               className='bs-item'
               data-item={item.id}
               data-size={item.size}
+              aria-label={itemName(level, item)}
               data-tried={round.tried.has(item.id)}
               data-answer={round.answered && item.id === answer}
               data-hint={round.hinted && item.id === answer}
@@ -127,6 +136,7 @@ function Order({ level, kit }: { level: BigAndSmallLevel; kit: ActivityKit }) {
                 className='bs-item'
                 data-item={item.id}
                 data-size={item.size}
+                aria-label={itemName(level, item)}
                 data-hint={hinted && item.id === wanted}
                 onClick={(event) => choose(item.id, event.currentTarget)}
               >

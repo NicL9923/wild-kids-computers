@@ -7,4 +7,5 @@ export const strings = defineStrings('mirror-symmetry', {
   picture: { text: 'Mirror picture', silent: 'decorative' },
   row: { text: 'Row', silent: 'decorative' },
   column: { text: 'column', silent: 'decorative' },
+  painted: { text: 'painted', silent: 'decorative' },
 });

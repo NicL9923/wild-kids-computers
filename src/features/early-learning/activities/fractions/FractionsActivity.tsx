@@ -27,8 +27,15 @@ function Written({ fraction }: { fraction: Fraction }) {
   );
 }
 
-const pictureName = (picture: Picture) =>
-  t(picture.fraction === null ? strings.notEqual : fractionName(picture.fraction));
+/**
+ * What a screen reader hears for a picture: "A circle cut into 3 equal parts, 2 shaded". It
+ * says what the picture shows, as a child sees it, and never the fraction, which is the answer.
+ */
+function describePicture(picture: Picture): string {
+  const parts = picture.fraction === null ? strings.unequalParts : strings.equalParts;
+  const cut = [t(strings[picture.shape]), t(strings.cutInto), t(numberHandle(picture.parts.length)), t(parts)];
+  return `${cut.join(' ')}, ${t(numberHandle(picture.shaded.length))} ${t(strings.shaded)}`;
+}
 
 /**
  * Either a fraction and pictures to choose from, or a picture and fractions to choose from. Each
@@ -66,7 +73,7 @@ export default function FractionsActivity({ level, kit }: ActivityProps<Fraction
                 className='math-group fraction-choice-picture'
                 data-picture={picture.id}
                 data-look={look}
-                aria-label={pictureName(picture)}
+                aria-label={describePicture(picture)}
                 disabled={look === 'tried' || look === 'done'}
                 onClick={(event) => round.choose(picture.id, event.currentTarget)}
               >
@@ -86,7 +93,9 @@ export default function FractionsActivity({ level, kit }: ActivityProps<Fraction
         {picture !== undefined && (
           <div className='fraction-shown'>
             <FractionPicture picture={picture} />
-            <span className='wk-visually-hidden'>{pictureName(picture)}</span>
+            <span className='wk-visually-hidden' data-picture-description>
+              {describePicture(picture)}
+            </span>
           </div>
         )}
       </div>

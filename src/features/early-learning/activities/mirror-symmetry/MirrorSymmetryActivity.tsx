@@ -25,7 +25,8 @@ const ARROWS: Readonly<Record<string, Cell>> = {
 };
 
 /**
- * A grid split by a dashed mirror line. One half shows its part of the picture. In the other
+ * A grid split by a dashed mirror line. One half shows its part of the picture, and a screen
+ * reader hears each painted square of it by row and column. In the other
  * half every square is a button: a square the mirror needs fills with the picture's paint, and
  * any other square gives a neutral nudge and stays empty. After two such tries the next square
  * to fill stands out. The arrow keys move between the squares to fill.
@@ -86,7 +87,13 @@ export default function MirrorSymmetryActivity({ level, kit }: ActivityProps<Mir
         {Array.from({ length: level.size * level.size }, (_, index) => {
           const cell = { row: Math.floor(index / level.size), column: index % level.size };
           if (!inChildHalf(level, cell)) {
-            return <span key={key(cell)} className='ms-cell' data-shown={isFilled(level, cell)} />;
+            // A painted square of the given half says where it is, so the picture can be heard too.
+            const shown = isFilled(level, cell);
+            return (
+              <span key={key(cell)} className='ms-cell' data-shown={shown}>
+                {shown && <span className='wk-visually-hidden'>{paintedName(cell)}</span>}
+              </span>
+            );
           }
           const isActive = cell.row === active.row && cell.column === active.column;
           return (
@@ -118,6 +125,9 @@ export default function MirrorSymmetryActivity({ level, kit }: ActivityProps<Mir
 /** The square's name for a screen reader, such as "Row 2 column 3". */
 const label = (cell: Cell) =>
   [t(strings.row), t(numberHandle(cell.row + 1)), t(strings.column), t(numberHandle(cell.column + 1))].join(' ');
+
+/** A painted square of the given half for a screen reader, such as "Row 2 column 3, painted". */
+const paintedName = (cell: Cell) => `${label(cell)}, ${t(strings.painted)}`;
 
 /** The top left square of the child's half, where keyboard focus starts. */
 function firstChildCell(level: MirrorLevel): Cell {

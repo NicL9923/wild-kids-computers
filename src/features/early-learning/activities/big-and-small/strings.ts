@@ -14,4 +14,6 @@ export const strings = defineStrings('big-and-small', {
   bigToSmall: { text: 'Click them from the biggest to the smallest.' },
   pictures: { text: 'Pictures to choose from', silent: 'decorative' },
   line: { text: 'In order of size', silent: 'decorative' },
+  // For screen readers: each picture's size as a number to compare, not a word that answers.
+  size: { text: 'size', silent: 'decorative' },
 });
