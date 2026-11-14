@@ -153,17 +153,25 @@
 /* ---- the arrow pad: a cross with go in the middle ---- */
 
 .rp-pad {
-  --rp-pad-cell: calc(var(--wk-target-min) * 1.75);
+  /* Large arrows, never under 1.25 times the band's target, that give the paper more room in a
+     smaller window. At 1280 by 800 a cell is about 102 px; at 1920 by 1080 it is the full size. */
+  --rp-pad-cell: min(calc(var(--wk-target-min) * 1.75), max(calc(var(--wk-target-min) * 1.25), 8vw));
 
   display: grid;
-  grid-template-columns: repeat(3, var(--rp-pad-cell));
-  grid-template-rows: repeat(3, var(--rp-pad-cell));
+  /* A puzzle that offers only some arrows leaves their tracks empty, and an empty track takes no
+     room, so the paper gets it. */
+  grid-template-columns: repeat(3, auto);
+  grid-template-rows: repeat(3, auto);
   gap: var(--wk-space-item);
 }
 
+.rp-pad .rp-control,
+.rp-pad-center {
+  width: var(--rp-pad-cell);
+  height: var(--rp-pad-cell);
+}
+
 .rp-pad .rp-control {
-  width: 100%;
-  height: 100%;
   padding: 0;
 }
 
@@ -226,8 +234,8 @@
 }
 
 .rp-plan-place {
-  width: calc(var(--wk-target-min) * 1.4);
-  height: calc(var(--wk-target-min) * 1.4);
+  width: calc(var(--wk-target-min) * 1.25);
+  height: calc(var(--wk-target-min) * 1.25);
 }
 
 .rp-plan-empty {
