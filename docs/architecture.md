@@ -208,7 +208,7 @@ Rules:
 ## Storage
 
 - `src/core/storage/` holds one Zod schema per document, each with a `version` field and a migration chain.
-- `loadDocument` reads the text, parses it, migrates it, and validates it. On any failure it asks the bridge to set the file aside under a `.corrupt-<timestamp>` name and returns defaults. It never throws on bad saved data. A read the platform could not perform returns defaults with status `unreadable` and moves nothing.
+- `loadDocument` reads the text, parses it, migrates it, and validates it. On any failure it asks the bridge to set the file aside under a `.corrupt-<timestamp>` name and returns defaults. It never throws on bad saved data. A read the platform could not perform, or a bad document it could not set aside, returns status `unreadable` and moves nothing. The session never saves over an unreadable document.
 - `migrations[n]` turns version n into n + 1, and the chain sets `version` after each step. `src/core/storage/document.test.ts` proves the chain with a test-only document that migrates from version 0 to 2.
 - Lists that grow with use, such as recent rounds and practice days, are trimmed by the schema instead of rejected, so a busy year never resets progress.
 - Each guard has a test that feeds it the bad input: invalid JSON, a wrong type, a missing field, an unknown version, an oversized document.
