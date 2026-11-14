@@ -237,14 +237,19 @@ function focusAfterLeaving(state: DesktopState, leavingId: string): Transition {
 
 function openWindow(state: DesktopState, app: AppState): Step {
   if (state.windows.length >= MAX_WINDOWS) return 'too-many-windows';
-  const windowId = `w${state.nextId}`;
+  const windowId = `w${state.nextWindowId}`;
   const rect = cascadeRect(
     DEFAULT_WINDOW_SIZES[app.kind],
     state.size,
     state.windows.map((window) => window.rect),
   );
   const window: WindowState = { id: windowId, rect, minimized: false, maximized: false, app };
-  const next = { ...state, nextId: state.nextId + 1, windows: [...state.windows, window], focusedWindowId: windowId };
+  const next = {
+    ...state,
+    nextWindowId: state.nextWindowId + 1,
+    windows: [...state.windows, window],
+    focusedWindowId: windowId,
+  };
   return done(next, { type: 'window-opened', windowId, app: app.kind }, { type: 'window-focused', windowId });
 }
 

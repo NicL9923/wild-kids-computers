@@ -98,8 +98,10 @@ export interface DesktopState {
   settings: ToySettings;
   /** The last command the child ran, and in which app. */
   lastCommand: { command: CommandId; app: AppKind } | null;
-  /** The next number for a new window or file id. Ids are never reused. */
+  /** The next number for a new file or folder id, such as "n12". Ids are never reused. */
   nextId: number;
+  /** The next number for a new window id, such as "w3". Ids are never reused. */
+  nextWindowId: number;
 }
 
 export function findWindow(state: DesktopState, windowId: string): WindowState | undefined {

@@ -193,9 +193,8 @@ const settingsSchema = z.object({
   alertSound: z.enum(ALERT_SOUNDS),
 }) satisfies z.ZodType<ToySettings>;
 
-/** The highest number in an id such as "w12" or "n40", so a loaded desktop never reuses one. */
-function highestIdNumber(state: DesktopState): number {
-  const ids = [...state.windows.map((window) => window.id), ...Object.keys(state.fs.nodes)];
+/** The highest number in ids such as "w12" or "n40", so a loaded desktop never reuses one. */
+function highestIdNumber(ids: readonly string[]): number {
   return Math.max(0, ...ids.map((value) => Number(/^[a-z](\d+)$/.exec(value)?.[1] ?? 0)));
 }
 
@@ -203,7 +202,13 @@ function highestIdNumber(state: DesktopState): number {
 function repairLoaded(state: DesktopState): DesktopState {
   const size = clampDesktopSize(state.size);
   const windows = state.windows.map((window) => ({ ...window, rect: clampWindowRect(window.rect, size) }));
-  const placed = { ...state, size, windows, nextId: Math.max(state.nextId, highestIdNumber(state) + 1) };
+  const placed = {
+    ...state,
+    size,
+    windows,
+    nextId: Math.max(state.nextId, highestIdNumber(Object.keys(state.fs.nodes)) + 1),
+    nextWindowId: Math.max(state.nextWindowId, highestIdNumber(state.windows.map((window) => window.id)) + 1),
+  };
   const focused = placed.windows.find((window) => window.id === placed.focusedWindowId && !window.minimized);
   const focusedWindowId = focused?.id ?? topVisibleWindow(placed)?.id ?? null;
   return repairWindows({ ...placed, focusedWindowId });
@@ -225,6 +230,7 @@ export const desktopStateSchema = z
     settings: settingsSchema,
     lastCommand: z.object({ command: z.enum(COMMAND_IDS), app: z.enum(APP_KINDS) }).nullable(),
     nextId: z.int().min(1),
+    nextWindowId: z.int().min(1),
   })
   .transform(repairLoaded) satisfies z.ZodType<DesktopState>;
 

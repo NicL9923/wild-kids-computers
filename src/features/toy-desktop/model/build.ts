@@ -78,6 +78,7 @@ export function emptyDesktop(size: Size = DEFAULT_DESKTOP_SIZE): DesktopState {
     settings: defaultSettings(),
     lastCommand: null,
     nextId: 1,
+    nextWindowId: 1,
   };
 }
 

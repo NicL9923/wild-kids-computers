@@ -8,7 +8,9 @@ const config = {
   // pixel arithmetic: the golden image tests cover the tools, tips, and effects built on them.
   mutate: [
     'src/core/**/*.ts',
-    '!src/core/**/*.test.ts',
+    // The toy desktop model, which every toy desktop lesson's level and goal check builds on.
+    'src/features/toy-desktop/model/**/*.ts',
+    '!src/**/*.test.ts',
     '!src/core/**/testing/**',
     '!src/core/paint/**',
     'src/core/paint/math.ts',
