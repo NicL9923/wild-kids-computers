@@ -40,7 +40,11 @@ describe('first launch', () => {
     fireEvent.click(screen.getByRole('button', { name: strings.playSound.text }));
     fireEvent.click(screen.getByRole('button', { name: strings.heardNo.text }));
     expect(screen.getAllByRole('status').map((status) => status.textContent)).toContain(strings.volumeHint.text);
-    fireEvent.click(screen.getByRole('button', { name: strings.heardYes.text }));
+    // One way forward, which works whether or not the computer made a sound. The replay control
+    // has a picture and no text.
+    const labelled = screen.getAllByRole('button').flatMap((button) => button.textContent || []);
+    expect(labelled).toEqual([strings.playSound.text, strings.heardNo.text, strings.back.text, strings.next.text]);
+    next();
 
     await heading(strings.kioskHeading.text);
     fireEvent.click(screen.getByRole('switch', { name: strings.kioskLabel.text }));

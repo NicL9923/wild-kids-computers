@@ -15,7 +15,6 @@ export const strings = defineStrings('first-launch', {
   playSound: { text: 'Play the sound' },
   testSentence: { text: 'Hello! Can you hear me?' },
   heardQuestion: { text: 'Did you hear it?' },
-  heardYes: { text: 'Yes, I heard it' },
   heardNo: { text: 'No, play it again' },
   volumeHint: { text: 'Check that the volume is up and that the speakers or headphones are on.' },
   kioskHeading: { text: 'Keep the app on the whole screen?' },

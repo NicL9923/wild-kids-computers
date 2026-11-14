@@ -60,7 +60,7 @@ for (const size of WINDOW_SIZES) {
     await page.getByRole('button', { name: strings.heardNo.text }).click();
     await expect(page.getByText(strings.volumeHint.text)).toBeVisible();
     await check('sound');
-    await page.getByRole('button', { name: strings.heardYes.text }).click();
+    await page.getByRole('button', { name: strings.next.text }).click();
 
     await expect(heading(strings.kioskHeading.text)).toBeVisible();
     await check('kiosk');

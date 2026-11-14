@@ -195,7 +195,6 @@ export default function FirstLaunch() {
               <fieldset className='wk-setup-question'>
                 <legend className='wk-setup-question-text'>{t(strings.heardQuestion)}</legend>
                 <div className='wk-setup-actions'>
-                  <Button onClick={() => void next()}>{t(strings.heardYes)}</Button>
                   <Button
                     onClick={() => {
                       setHearing('not-heard');
