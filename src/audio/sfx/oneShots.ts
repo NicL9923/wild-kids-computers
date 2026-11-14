@@ -85,4 +85,17 @@ export const ONE_SHOTS: Readonly<Record<SfxName, SfxPlayer>> = {
     tone(context, out, { type: 'square', from: 1400, duration: 0.025, peak: 0.06 });
     tone(context, out, { type: 'square', from: 1800, duration: 0.025, peak: 0.06, delay: 0.035 });
   },
+
+  // The toy desktop's music box: soft plucked notes of a C major pentatonic scale.
+  'note-1': (context, out) => musicBoxNote(context, out, 523.25),
+  'note-2': (context, out) => musicBoxNote(context, out, 587.33),
+  'note-3': (context, out) => musicBoxNote(context, out, 659.25),
+  'note-4': (context, out) => musicBoxNote(context, out, 783.99),
+  'note-5': (context, out) => musicBoxNote(context, out, 880),
 };
+
+/** A music box tine: a sine with a quick attack and a soft octave partial, gone within half a second. */
+function musicBoxNote(context: AudioContext, out: AudioNode, frequency: number): void {
+  tone(context, out, { type: 'sine', from: frequency, duration: 0.45, peak: 0.14, attack: 0.005 });
+  tone(context, out, { type: 'sine', from: frequency * 2, duration: 0.2, peak: 0.04, attack: 0.005 });
+}

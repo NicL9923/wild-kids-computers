@@ -8,6 +8,7 @@ import { defineStrings } from '../../core/strings/defineStrings.ts';
 import {
   checkActivity,
   findTaughtPointerHandlers,
+  importedSources,
   orphanSpecs,
   stepFilesMismatch,
   type ActivityFacts,
@@ -132,6 +133,26 @@ describe('checkActivity', () => {
     expect(checkActivity(facts({ sources }))).toEqual([
       `pack-it: level.ts imports ${what} (${JSON.stringify(text.match(/['"]([^'"]+)['"]/)?.[1])}).`,
     ]);
+  });
+
+  it('finds useCarry in a shared component the activity imports', () => {
+    const sources = [{ path: `${DIR}/PackItActivity.tsx`, text: "import { Desk } from '../../desk/Desk.tsx';" }];
+    const imported = [{ path: 'src/features/computer-skills/desk/Desk.tsx', text: 'useCarry(kit, x)' }];
+    expect(checkActivity(facts({ sources, imported }))).toEqual([]);
+    expect(checkActivity(facts({ sources }))).toEqual([
+      'pack-it: an activity with drag in inputs must move things with useCarry.',
+    ]);
+  });
+
+  it('follows relative imports at any depth, once each, and skips packages and missing files', () => {
+    const files: Record<string, string> = {
+      'src/a/Main.tsx': "import { b } from './b.ts';\nimport { useState } from 'react';\nimport x from './gone.ts';",
+      'src/a/b.ts': "import { c } from '../c/c.ts';\nimport { b2 } from './b.ts';",
+      'src/c/c.ts': "export { b } from '../a/b.ts';",
+    };
+    const read = (at: string) => (at in files ? { path: at, text: files[at] ?? '' } : null);
+    const start = [{ path: 'src/a/Main.tsx', text: files['src/a/Main.tsx'] ?? '' }];
+    expect(importedSources(start, read).map((file) => file.path)).toEqual(['src/a/b.ts', 'src/c/c.ts']);
   });
 
   it('does not ask a click activity for useCarry or a click to place test', () => {

@@ -12,7 +12,7 @@ A new `speak` stops the clip that is playing, so a replay button pressed twice n
 
 ## Play a sound
 
-- A short effect: `audio.play('pop')`. The names are in [sfx/sfxNames.ts](sfx/sfxNames.ts): `pop`, `chime`, `nudge`, `pick-up`, `put-down`, `tap`, `whoosh`, `sparkle`, `page-turn`, `key-tap`, `open`, `close`, `bloom`, `stamp`, `fill`, `snap`.
+- A short effect: `audio.play('pop')`. The names are in [sfx/sfxNames.ts](sfx/sfxNames.ts): `pop`, `chime`, `nudge`, `pick-up`, `put-down`, `tap`, `whoosh`, `sparkle`, `page-turn`, `key-tap`, `open`, `close`, `bloom`, `stamp`, `fill`, `snap`, and the music box notes `note-1` to `note-5`, lowest first.
 - Use `chime` to confirm a right action and `nudge` for a wrong one. Neither celebrates or scolds.
 - A sound an action drives: `const brush = audio.startContinuous('brush')`, then `brush.set(speed)` with a value from 0 to 1 on each move, and `brush.stop()` on release. Intensity 0 is silent.
 

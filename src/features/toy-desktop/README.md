@@ -113,3 +113,48 @@ The types and reason codes are in `model/events.ts`.
 ## Saving
 
 `desktopDocument` in `model/schema.ts` is the document spec for free play, built with `activityStateDocument`. `loadDocument` sets aside a corrupt file and returns `sampleDesktop()`. Structure is checked strictly. Things that can drift without being wrong, such as a window outside a smaller desktop, a focus on a minimized window, or a selection of a removed file, are repaired on load.
+
+## Screens
+
+`desktop/` draws the model. `<ToyDesktop desktop={useDesktop(() => state)} kit={kit} band={band} parts={parts} />` renders a monitor with the menu bar of the app in front, desktop icons, windows, dialogs, and a task strip. Every click, key, carry, and menu goes through `reduce`, and `desktop.listen((transition, action) => ...)` hears each transition. Windows move by the title bar and resize by the corner with `useCarry`, so click to pick up and click to place work everywhere. Copy, cut, and paste use the app's toy clipboard only.
+
+The desktop is at least 1024 by 640 units and scales to fit, while the controls keep the band's real target size. New windows from an icon or the launcher open at a size measured in the band's targets. `parts` (in `desktop/parts.ts`) chooses what shows: `icons`, `menuBar`, `taskStrip`, `launcher`, `windowControls`, `move`, `resize`, `openMaximized`, and `systemSound`. Show only what the goal needs. End-to-end helpers are in `e2e/support/toyDesktop.ts`.
+
+## Writing a lesson
+
+A lesson is a `rounds` activity in `lessons/<id>/`. Copy [open-and-close](lessons/open-and-close/). Build the desktop with `size: LESSON_DESKTOP_SIZE` so every window is in view on every screen, and keep windows left of the icons, which stand at the right edge.
+
+```ts
+// level.ts: pure. The starting desktop and what the goal needs.
+export interface TrashLevel extends LessonLevel { file: string }
+export function generateLevel(seed: number, difficulty: number, band: Band): TrashLevel {
+  const file = createRandom(seed).pick(['Fox', 'Owl']);
+  return {
+    file,
+    parts: { icons: [{ app: 'file-explorer' }, { trash: true }], launcher: [] },
+    desktop: buildDesktop({ size: LESSON_DESKTOP_SIZE, files: { Fox: picture('fox'), Owl: picture('owl') } }),
+  };
+}
+
+// steps.ts: pure. One or more steps; each is done when its check passes after an action.
+export function trashSteps({ file }: TrashLevel): LessonStep[] {
+  return [
+    { done: (state) => isInTrash(state, file), wrong: ({ events }) => hasEvent(events, 'node-moved') },
+    {
+      instruction: strings.restore, // spoken when this step starts; replay says it again
+      done: (state) => fileExists(state, file),
+      hint: () => ({ kind: 'command', command: 'restore' }), // pointed at after two wrong tries
+    },
+  ];
+}
+
+// TrashActivity.tsx
+export default function TrashActivity({ level, band, kit }: ActivityProps<TrashLevel>) {
+  const steps = useMemo(() => trashSteps(level), [level]);
+  return <LessonDesktop level={level} band={band} kit={kit} steps={steps} />;
+}
+```
+
+`activity.ts` and `strings.ts` follow [adding-an-activity.md](../../../docs/adding-an-activity.md); the first spoken string is the main instruction. `LessonDesktop` speaks a step's `instruction` when the step starts (leave it out on the first step to keep the main one), gives `feedback.wrong` for each wrong try, points at `hint` after `HINT_AFTER_TRIES` wrong tries and counts one hint, and calls `kit.roundComplete()` `LESSON_DONE_PAUSE_MS` after the last step. A `wrong` check is optional; most lessons only count a try that undoes progress.
+
+Test `steps.ts` through `LessonDesktop` as `lessons/harness/LessonDesktop.test.tsx` does, and `level.ts` as `open-and-close/level.test.ts` does. The end-to-end spec clicks with `page.mouse` on `[data-desktop-icon]`, `[data-window][data-app]`, `[data-window-control]`, `[data-menu]`, and `[data-command]`, and saves screenshots with `saveReviewScreenshot`. Point a `hint` at an app's own button with `{ kind: 'key', key }` and `data-highlight-key` on that button.

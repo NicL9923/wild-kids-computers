@@ -119,9 +119,13 @@ export type DialogAction =
 export type MusicBoxAction = { type: 'toggle'; step: number; note: number } | { type: 'tick' };
 
 export type DesktopAction =
-  | { type: 'open-app'; app: AppKind }
-  /** Opens a file in its app, or brings forward the window that already shows it. */
-  | { type: 'open-file'; fileId: string }
+  /**
+   * Opens an app in a new window. `size` replaces the app's usual size, such as a size that suits
+   * the screen; it is clamped to the desktop.
+   */
+  | { type: 'open-app'; app: AppKind; size?: Size }
+  /** Opens a file in its app, or brings forward the window that already shows it. `size` as for open-app. */
+  | { type: 'open-file'; fileId: string; size?: Size }
   | { type: 'close-window'; windowId: string }
   /** A click on a window that is not minimized. */
   | { type: 'focus-window'; windowId: string }
@@ -251,11 +255,12 @@ function refocus(state: DesktopState): Transition {
   return front === undefined ? done({ ...state, focusedWindowId: null }) : bringToFront(state, front);
 }
 
-function openWindow(state: DesktopState, app: AppState): Step {
+function openWindow(state: DesktopState, app: AppState, size?: Size): Step {
+  if (size !== undefined && !(Number.isFinite(size.width) && Number.isFinite(size.height))) return 'not-an-option';
   if (state.windows.length >= MAX_WINDOWS) return 'too-many-windows';
   const windowId = `w${state.nextWindowId}`;
   const rect = cascadeRect(
-    DEFAULT_WINDOW_SIZES[app.kind],
+    size ?? DEFAULT_WINDOW_SIZES[app.kind],
     state.size,
     state.windows.map((window) => window.rect),
   );
@@ -281,14 +286,14 @@ function openedEvents(windowId: string, file: FileNode): DesktopEvent[] {
   return file.kind === 'picture' ? [opened, { type: 'picture-shown', windowId, nodeId: file.id }] : [opened];
 }
 
-function openFile(state: DesktopState, fileId: string): Step {
+function openFile(state: DesktopState, fileId: string, size?: Size): Step {
   const file = getNode(state.fs, fileId);
   if (file === undefined) return 'not-found';
   if (!isFile(file)) return 'not-a-file';
   if (isTrashed(state.fs, fileId)) return 'in-trash';
   const showing = state.windows.find((window) => 'fileId' in window.app && window.app.fileId === fileId);
   if (showing !== undefined) return activate(state, showing);
-  const opened = openWindow(state, appForFile(file));
+  const opened = openWindow(state, appForFile(file), size);
   if (typeof opened === 'string') return opened;
   return { ...opened, events: [...opened.events, ...openedEvents(`w${state.nextWindowId}`, file)] };
 }
@@ -947,9 +952,9 @@ export function repairWindows(state: DesktopState): DesktopState {
 function handle(state: DesktopState, action: DesktopAction, env: DesktopEnv): Step {
   switch (action.type) {
     case 'open-app':
-      return openWindow(state, createApp(action.app, state));
+      return openWindow(state, createApp(action.app, state), action.size);
     case 'open-file':
-      return openFile(state, action.fileId);
+      return openFile(state, action.fileId, action.size);
     case 'focus-next-window': {
       const back = state.windows[0];
       return back === undefined ? done(state) : activate(state, back);

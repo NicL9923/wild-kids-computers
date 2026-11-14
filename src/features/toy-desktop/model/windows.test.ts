@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createToyClipboard } from '../../../app/inputGuards.ts';
-import { buildDesktop, note, pathId } from './build.ts';
+import { buildDesktop, note, pathId, picture } from './build.ts';
 import { reduce, reduceAll, windowFrame, type DesktopAction, type Transition } from './desktop.ts';
 import type { DesktopEvent } from './events.ts';
 import {
   CASCADE_STEP,
+  DEFAULT_DESKTOP_SIZE,
   MIN_DESKTOP_SIZE,
   MIN_VISIBLE_TITLE_BAR,
   MIN_WINDOW_SIZE,
@@ -40,6 +41,27 @@ describe('opening windows', () => {
       { type: 'window-opened', windowId: 'w1', app: 'calculator' },
       { type: 'window-focused', windowId: 'w1' },
     ]);
+  });
+
+  it('opens at a size the screen asks for, clamped to the desktop', () => {
+    const asked = act(buildDesktop(), { type: 'open-app', app: 'calculator', size: { width: 700, height: 500 } });
+    expect(asked.state.windows[0]?.rect).toMatchObject({ width: 700, height: 500 });
+    const huge = act(buildDesktop(), { type: 'open-app', app: 'notepad', size: { width: 5000, height: 5000 } });
+    expect(huge.state.windows[0]?.rect).toMatchObject(DEFAULT_DESKTOP_SIZE);
+    const file = buildDesktop({ files: { Fox: picture('fox') } });
+    const opened = act(file, { type: 'open-file', fileId: pathId(file, 'Fox'), size: { width: 400, height: 300 } });
+    expect(opened.state.windows[0]?.rect).toMatchObject({ width: 400, height: 300 });
+  });
+
+  it('refuses a size that is not a number', () => {
+    const start = buildDesktop();
+    const { state, events } = act(start, {
+      type: 'open-app',
+      app: 'notepad',
+      size: { width: Number.NaN, height: 300 },
+    });
+    expect(state).toBe(start);
+    expect(events).toEqual([{ type: 'rejected', action: 'open-app', reason: 'not-an-option' }]);
   });
 
   it('cascades several windows', () => {
