@@ -251,7 +251,6 @@ function insert(editor: TextEditorState, raw: string, kind: 'typing' | 'paste'):
   const normalized = normalize(raw, editor.multiline);
   // In a one-line field Enter is for the screen, such as a dialog's confirm button.
   const typed = kind === 'typing' && !editor.multiline ? raw.replace(/[\r\n]/g, '') : normalized;
-  if (typed === '') return unchanged(editor);
   const [start, end] = selectionRange(editor);
   const room = editor.maxLength - (codePointLength(editor.text) - codePointLength(editor.text.slice(start, end)));
   const fitted = limit(typed, room);

@@ -109,6 +109,7 @@ describe('music box history', () => {
     const redone = redoGrid(redoGrid(undone));
     expect(sameTune(redone.tune, grid.tune)).toBe(true);
     expect(redone.redo).toEqual([]);
+    expect(isEmptyTune(undoGrid(undoGrid(redone)).tune)).toBe(true);
   });
 
   it('forgets redo when the grid is cleared', () => {

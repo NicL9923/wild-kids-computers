@@ -71,9 +71,9 @@ export const SHORTCUTS: Readonly<Partial<Record<CommandId, Shortcut>>> = {
   stop: plain(' '),
 };
 
-/** Shortcuts that also work but a menu does not show. Ctrl+Y redoes on Windows and Linux. */
-const EXTRA_SHORTCUTS: readonly { command: CommandId; shortcut: Shortcut; os: 'not-mac' }[] = [
-  { command: 'redo', shortcut: primary('Y'), os: 'not-mac' },
+/** Shortcuts that also work on Windows and Linux but a menu does not show. Ctrl+Y redoes there. */
+const EXTRA_SHORTCUTS: readonly { command: CommandId; shortcut: Shortcut }[] = [
+  { command: 'redo', shortcut: primary('Y') },
 ];
 
 export type OsFamily = 'mac' | 'windows' | 'linux';

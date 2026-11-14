@@ -189,3 +189,18 @@ describe('fault details', () => {
     expect(isFaultFixed(fixed, fault)).toBe(true);
   });
 });
+
+describe('more fault details', () => {
+  it('pushes a window off to the left with a grab-sized part showing', () => {
+    const broken = applyFault(desktop(), { kind: 'window-off-side', windowId: 'w1', side: 'left' });
+    const rect = broken.windows[0]?.rect;
+    expect(rect && rect.x + rect.width).toBe(MIN_VISIBLE_TITLE_BAR);
+  });
+
+  it('counts a minimized window as fixed once restored, even if it is off to the side', () => {
+    const fault: Fault = { kind: 'window-minimized', windowId: 'w1' };
+    const offSide = applyFault(desktop(), { kind: 'window-off-side', windowId: 'w1', side: 'right' });
+    const fixed = act(applyFault(offSide, fault), { type: 'activate-window', windowId: 'w1' });
+    expect(isFaultFixed(fixed, fault)).toBe(true);
+  });
+});

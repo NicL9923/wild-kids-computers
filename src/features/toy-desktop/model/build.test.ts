@@ -169,6 +169,7 @@ describe('goal checks', () => {
     expect(isInFolder(state, 'Fox', 'Notes')).toBe(false);
     expect(isInFolder(state, 'Fox', 'Pictures/Fox')).toBe(false);
     expect(isInFolder(state, 'Notes', '')).toBe(true);
+    expect(isInFolder(state, 'List', 'Nowhere')).toBe(false);
     expect(folderExists(state, 'Pictures')).toBe(true);
     expect(folderExists(state, 'Pictures/Fox')).toBe(false);
     expect(folderExists(state, 'Games')).toBe(false);

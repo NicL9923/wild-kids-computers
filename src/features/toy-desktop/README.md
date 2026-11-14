@@ -70,28 +70,28 @@ For the "Fix it" lesson, `model/faults.ts` has `applyFault(state, fault)` and `i
 
 ## Actions
 
-| Action                                                                                    | What it does                                                                                      |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `open-app { app }`                                                                        | Opens a new window, cascaded, in front, with focus. At most 8 windows.                            |
-| `open-file { fileId }`                                                                    | Opens a note, picture, or tune in its app, or brings forward the window already showing it.       |
-| `close-window`, `focus-window`, `minimize-window`, `maximize-window`, `unmaximize-window` | The window buttons and a click on a window. Each takes `windowId`.                                |
-| `move-window { windowId, x, y }`                                                          | The title bar. Clamped so the title bar stays reachable. A maximized window is restored first.    |
-| `resize-window { windowId, width, height }`                                               | The bottom right handle. Clamped to 240 by 160 and to the desktop.                                |
-| `activate-window { windowId }`                                                            | The task strip: restores a minimized window and brings it forward.                                |
-| `focus-next-window`                                                                       | The keyboard window switch. The back window comes forward, so repeats reach every window.         |
-| `set-desktop-size { width, height }`                                                      | The screen changed size. Windows are clamped into the new area.                                   |
-| `command { windowId, command }`                                                           | A menu command or its shortcut. Refused with `command-disabled` when `isCommandEnabled` is false. |
-| `text { windowId, field, op }`                                                            | Typing, Backspace, Delete, arrows with or without Shift, and pointer selection in a text field.   |
-| `dialog { windowId, action }`                                                             | The save and open dialogs: `open-folder`, `go-up`, `select`, `confirm`, `cancel`.                 |
-| `explorer { windowId, action }`                                                           | `open-node`, `select`, `move`, `start-rename`, `commit-rename`, `cancel-rename`, `clear-search`.  |
-| `music-box { windowId, action }`                                                          | `toggle { step, note }`, and `tick`, which the screen sends on its own beat while playing.        |
-| `calculator { windowId, key }`                                                            | Digits, point, add, subtract, multiply, divide, equals, clear, and backspace.                     |
-| `settings { windowId, action }`                                                           | The checkbox, radio group, dropdown, slider, and scrollable list of the settings panel.           |
-| `set-volume { volume }`, `set-muted { muted }`                                            | Toy sound. Raising the volume unmutes, as on real computers.                                      |
+| Action                                                                                    | What it does                                                                                               |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `open-app { app }`                                                                        | Opens a new window, cascaded, in front, with focus. At most 8 windows.                                     |
+| `open-file { fileId }`                                                                    | Opens a note, picture, or tune in its app, or brings forward the window already showing it.                |
+| `close-window`, `focus-window`, `minimize-window`, `maximize-window`, `unmaximize-window` | The window buttons and a click on a window. Each takes `windowId`.                                         |
+| `move-window { windowId, x, y }`                                                          | The title bar. Clamped so the title bar stays reachable. A maximized window is restored first.             |
+| `resize-window { windowId, width, height }`                                               | The bottom right handle. Clamped to 240 by 160 and to the desktop.                                         |
+| `activate-window { windowId }`                                                            | The task strip: restores a minimized window and brings it forward.                                         |
+| `focus-next-window`                                                                       | The keyboard window switch. The back window comes forward, so repeats reach every window.                  |
+| `set-desktop-size { width, height }`                                                      | The screen changed size. Windows are clamped into the new area.                                            |
+| `command { windowId, command }`                                                           | A menu command or its shortcut. Refused with a reason, usually `command-disabled`, when it cannot run now. |
+| `text { windowId, field, op }`                                                            | Typing, Backspace, Delete, arrows with or without Shift, and pointer selection in a text field.            |
+| `dialog { windowId, action }`                                                             | The save and open dialogs: `open-folder`, `go-up`, `select`, `confirm`, `cancel`.                          |
+| `explorer { windowId, action }`                                                           | `open-node`, `select`, `move`, `start-rename`, `commit-rename`, `cancel-rename`, `clear-search`.           |
+| `music-box { windowId, action }`                                                          | `toggle { step, note }`, and `tick`, which the screen sends on its own beat while playing.                 |
+| `calculator { windowId, key }`                                                            | Digits, point, add, subtract, multiply, divide, equals, clear, and backspace.                              |
+| `settings { windowId, action }`                                                           | The checkbox, radio group, dropdown, slider, and scrollable list of the settings panel.                    |
+| `set-volume { volume }`, `set-muted { muted }`                                            | Toy sound. Raising the volume unmutes, as on real computers.                                               |
 
 Text fields are `document` (the notepad), `file-name` (the save dialog), `search` and `rename` (the file explorer), and `computer-name` (the settings panel).
 
-Commands are `new`, `open`, `save`, `save-as`, `close`, `undo`, `redo`, `cut`, `copy`, `paste`, `select-all`, `new-folder`, `rename`, `delete`, `restore`, `empty-trash`, `go-up`, `previous`, `next`, `play`, `stop`, and `clear`. `menuBar(state, windowId, clipboard)` lists each app's menus with each command's enabled state and shortcut. A shortcut is "primary modifier plus key": `shortcutKeys(shortcut, os)` gives Command on a Mac and Ctrl elsewhere, and `commandForKey(state, windowId, keyPress, os, clipboard)` turns a key press into the enabled command.
+Commands are `new`, `open`, `save`, `save-as`, `close`, `undo`, `redo`, `cut`, `copy`, `paste`, `select-all`, `new-folder`, `rename`, `delete`, `restore`, `empty-trash`, `go-up`, `previous`, `next`, `play`, `stop`, and `clear`. `menuBar(state, windowId, clipboard)` lists each app's menus with each command's enabled state and shortcut. A command is enabled exactly when the reducer would run it: `isCommandEnabled` asks `reduce` with a clipboard that keeps nothing, so a menu and the reducer cannot disagree. A shortcut is "primary modifier plus key": `shortcutKeys(shortcut, os)` gives Command on a Mac and Ctrl elsewhere, and `commandForKey(state, windowId, keyPress, os, clipboard)` turns a key press into the enabled command.
 
 ## Events
 

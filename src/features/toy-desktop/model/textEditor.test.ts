@@ -351,7 +351,8 @@ describe('editor edges', () => {
   });
 
   it('joins typed text that starts with a space to the word before it', () => {
-    const typed = run(type(createEditor({ multiline: true }), 'a'), { type: 'insert', text: ' z' });
+    const typed = run(type(createEditor({ multiline: true }), 'a '), { type: 'insert', text: ' z' });
+    expect(typed.text).toBe('a  z');
     expect(run(typed, { type: 'undo' }).text).toBe('');
   });
 

@@ -40,6 +40,9 @@ function busyDesktop(): DesktopState {
     { type: 'calculator', windowId: 'w5', key: { type: 'digit', digit: 4 } },
     { type: 'calculator', windowId: 'w5', key: { type: 'digit', digit: 2 } },
     { type: 'calculator', windowId: 'w5', key: { type: 'operator', operator: 'add' } },
+    { type: 'calculator', windowId: 'w5', key: { type: 'digit', digit: 1 } },
+    { type: 'calculator', windowId: 'w5', key: { type: 'equals' } },
+    { type: 'command', windowId: 'w2', command: 'open' },
     { type: 'settings', windowId: 'w6', action: { type: 'set-brightness', value: 70 } },
     { type: 'settings', windowId: 'w6', action: { type: 'scroll-list', firstRow: 3 } },
     { type: 'set-volume', volume: 40 },
@@ -349,6 +352,11 @@ describe('saved data at the limits', () => {
     ['a calculator showing a negative decimal', (state: Json) => (at(windows(state)[4], 'app').display = '-1.25')],
     ['a calculator in the middle of a decimal', (state: Json) => (at(windows(state)[4], 'app').display = '0.')],
     ['a calculator showing all ten digits', (state: Json) => (at(windows(state)[4], 'app').display = '1234567890')],
+    [
+      'a calculator showing a divide by zero',
+      (state: Json) => (at(windows(state)[4], 'app').problem = 'divide-by-zero'),
+    ],
+    ['a calculator showing a number too big', (state: Json) => (at(windows(state)[4], 'app').problem = 'too-big')],
     [
       'a list scrolled to its last row',
       (state: Json) => (at(windows(state)[5], 'app').listScroll = ALERT_SOUNDS.length - LIST_VISIBLE_ROWS),

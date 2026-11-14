@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createToyClipboard, type ToyClipboard } from '../../../app/inputGuards.ts';
 import { buildDesktop, note, pathId, picture, tune } from './build.ts';
+import type { CommandId } from './commands.ts';
 import { reduceAll, type DesktopAction, type DesktopEnv, type Transition } from './desktop.ts';
 import { getNode, MAX_NODES, nodeAtPath, TRASH_ID } from './fileSystem.ts';
 import {
@@ -958,3 +959,95 @@ function createdNotepad(): NotepadState {
   const state = buildDesktop({ windows: [{ app: 'notepad' }] });
   return notepad(state, 'w1');
 }
+
+describe('more document edges', () => {
+  it('keeps a saved tune open in its window', () => {
+    const { act } = setup();
+    const { state } = act(
+      buildDesktop({ windows: [{ app: 'music-box' }] }),
+      { type: 'music-box', windowId: 'w1', action: { type: 'toggle', step: 0, note: 0 } },
+      ...saveAs('Song'),
+    );
+    expect(win(state, 'w1').app).toMatchObject({ kind: 'music-box', fileId: pathId(state, 'Song'), dialog: null });
+  });
+
+  it('opens a tune in a new window when this music box already has notes', () => {
+    const { act } = setup();
+    const start = buildDesktop({ files: { Song: tune([[1, 1]]) }, windows: [{ app: 'music-box' }] });
+    const { state } = act(
+      start,
+      { type: 'music-box', windowId: 'w1', action: { type: 'toggle', step: 0, note: 0 } },
+      command('w1', 'open'),
+      dialog('w1', { type: 'select', nodeId: pathId(start, 'Song') }),
+      dialog('w1', { type: 'confirm' }),
+    );
+    expect(state.windows).toHaveLength(2);
+    expect(win(state, 'w1').app).toMatchObject({ fileId: null });
+  });
+
+  it('never reuses the id of a file that is already there', () => {
+    const { act } = setup();
+    const { state } = act(
+      buildDesktop({ files: { A: note('keep'), B: note('keep') }, windows: [{ app: 'notepad', text: 'x' }] }),
+      ...saveAs('One'),
+      ...saveAs('Two'),
+    );
+    expect(['A', 'B', 'One', 'Two'].map((name) => nodeAtPath(state.fs, name)?.kind)).toEqual([
+      'note',
+      'note',
+      'note',
+      'note',
+    ]);
+    expect(nodeAtPath(state.fs, 'A')).toMatchObject({ text: 'keep' });
+  });
+
+  it('steps from the first picture to the second', () => {
+    const { act } = setup();
+    const start = buildDesktop({
+      files: { P: { Ant: picture('ant'), Bee: picture('bee'), Cow: picture('cow') } },
+      windows: [{ file: 'P/Ant' }],
+    });
+    expect(act(start, command('w1', 'next')).events.at(-1)).toEqual({
+      type: 'picture-shown',
+      windowId: 'w1',
+      nodeId: pathId(start, 'P/Bee'),
+    });
+  });
+
+  it('copies the calculator display as text', () => {
+    const { act, clipboard } = setup();
+    act(buildDesktop({ windows: [{ app: 'calculator' }] }), command('w1', 'copy'));
+    expect(clipboard.read()).toEqual({ kind: 'text', text: '0' });
+  });
+
+  it.each<[string, () => DesktopState, CommandId]>([
+    ['undo with nothing to undo', () => buildDesktop({ windows: [{ app: 'music-box' }] }), 'undo'],
+    ['redo with nothing to redo', () => buildDesktop({ windows: [{ app: 'music-box' }] }), 'redo'],
+    ['clear with no notes', () => buildDesktop({ windows: [{ app: 'music-box' }] }), 'clear'],
+    ['stop while stopped', () => buildDesktop({ windows: [{ app: 'music-box' }] }), 'stop'],
+    [
+      'play while playing',
+      () => setup().act(buildDesktop({ windows: [{ app: 'music-box' }] }), command('w1', 'play')).state,
+      'play',
+    ],
+    ['open with nothing selected', () => buildDesktop({ windows: [{ app: 'file-explorer' }] }), 'open'],
+    ['rename with nothing selected', () => buildDesktop({ windows: [{ app: 'file-explorer' }] }), 'rename'],
+    ['delete with nothing selected', () => buildDesktop({ windows: [{ app: 'file-explorer' }] }), 'delete'],
+    [
+      'copy while the calculator shows a problem',
+      () =>
+        setup().act(
+          buildDesktop({ windows: [{ app: 'calculator' }] }),
+          ...[{ type: 'operator', operator: 'divide' }, { type: 'equals' }].map(
+            (key) => ({ type: 'calculator', windowId: 'w1', key }) as DesktopAction,
+          ),
+        ).state,
+      'copy',
+    ],
+    ['select all with no text', () => buildDesktop({ windows: [{ app: 'notepad' }] }), 'select-all'],
+  ])('refuses %s as a command that cannot run now', (_label, make, name) => {
+    expect(setup().act(make(), command('w1', name)).events).toEqual([
+      { type: 'rejected', action: 'command', reason: 'command-disabled' },
+    ]);
+  });
+});

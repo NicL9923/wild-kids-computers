@@ -127,6 +127,7 @@ describe('cascadeRect places', () => {
     const size = { width: 560, height: 400 };
     const first = cascadeRect(size, desktop, []);
     expect(cascadeRect(size, desktop, [{ ...first, y: first.y + 200 }])).toEqual(first);
+    expect(cascadeRect(size, desktop, [{ ...first, x: first.x + 200 }])).toEqual(first);
   });
 
   it.each([

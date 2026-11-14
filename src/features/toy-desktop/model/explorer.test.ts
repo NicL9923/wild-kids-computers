@@ -390,3 +390,50 @@ function folderNames(state: DesktopState): string[] {
     .filter((node) => node.kind === 'folder')
     .map((node) => node.name);
 }
+
+describe('explorer commands and repairs', () => {
+  it('starts a rename from the menu and deletes nothing', () => {
+    const state = start();
+    const toys = pathId(state, 'Toys');
+    const { state: next, events } = act(state, ex({ type: 'select', nodeId: toys }), run('rename'));
+    expect(events.at(-1)).toEqual({ type: 'rename-started', windowId: 'w1', nodeId: toys });
+    expect(getNode(next.fs, toys)?.parentId).toBe(HOME_ID);
+  });
+
+  it('clears the selection after a restore and keeps showing the trash', () => {
+    const state = start();
+    const toys = pathId(state, 'Toys');
+    const { state: next } = act(
+      state,
+      ex({ type: 'move', nodeId: toys, toId: TRASH_ID }),
+      ex({ type: 'open-node', nodeId: TRASH_ID }),
+      ex({ type: 'select', nodeId: toys }),
+      run('restore'),
+    );
+    expect(explorer(next)).toMatchObject({ kind: 'file-explorer', folderId: TRASH_ID, selectedId: null });
+  });
+
+  it('stays in its folder, or in the trash, when another window changes the files', () => {
+    const state = buildDesktop({
+      files,
+      windows: [{ app: 'file-explorer', folder: 'Pictures' }, { app: 'file-explorer' }, { app: 'file-explorer' }],
+    });
+    const inTrash = act(state, ex({ type: 'open-node', nodeId: TRASH_ID }, 'w3')).state;
+    const { state: next } = act(inTrash, ex({ type: 'move', nodeId: pathId(state, 'Toys'), toId: TRASH_ID }, 'w2'));
+    expect(explorer(next, 'w1').folderId).toBe(pathId(state, 'Pictures'));
+    expect(explorer(next, 'w3').folderId).toBe(TRASH_ID);
+  });
+
+  it('keeps a dialog selection when another window changes unrelated files', () => {
+    const state = buildDesktop({ files, windows: [{ app: 'notepad' }, { app: 'file-explorer' }] });
+    const chosen = act(
+      state,
+      { type: 'command', windowId: 'w1', command: 'open' },
+      { type: 'dialog', windowId: 'w1', action: { type: 'open-folder', folderId: pathId(state, 'Notes') } },
+      { type: 'dialog', windowId: 'w1', action: { type: 'select', nodeId: pathId(state, 'Notes/Fox facts') } },
+    ).state;
+    const { state: next } = act(chosen, ex({ type: 'move', nodeId: pathId(state, 'Toys'), toId: TRASH_ID }, 'w2'));
+    const app = findWindow(next, 'w1')?.app;
+    expect(app?.kind === 'notepad' && app.dialog?.selectedId).toBe(pathId(state, 'Notes/Fox facts'));
+  });
+});
