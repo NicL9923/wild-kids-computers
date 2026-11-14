@@ -19,8 +19,9 @@ import type { ActivityKit } from '../kit.ts';
  * it goes back to where it was.
  *
  * A carried item always ends one of two ways: it lands on a place that is still there and still
- * takes it, or it goes back. The item, its target, its area, or its track leaving the screen puts
- * it back.
+ * takes it, or it goes back. Anything that interrupts a carry puts it back: the browser cancelling
+ * the pointer, the window losing focus, the button let go outside the window, Escape, or the item,
+ * its target, its area, or its track leaving the screen.
  *
  * Three kinds of move:
  * - `targets`: the item goes onto a drop target, such as a picnic basket.
@@ -266,9 +267,15 @@ export function useCarry<I extends string, T extends string = never>(
     [axisValue, targetAt],
   );
 
-  // Window listeners while something is held or carried. They live in the activity's scope, so
-  // leaving the activity removes them.
+  // Window listeners while anything is carried. They live in the activity's scope, so leaving the
+  // activity removes them.
+  const engaged = active !== null;
   const byPointer = active !== null && active.how !== 'keyboard';
+  useEffect(() => {
+    if (!engaged) return undefined;
+    // Losing the window, such as to another program, puts back whatever is carried, however.
+    return scope.listen(window, 'blur', () => finish(false));
+  }, [engaged, finish, scope]);
 
   // An item that leaves the screen while carried is let go of, so a later click places nothing.
   useLayoutEffect(() => {
@@ -287,6 +294,13 @@ export function useCarry<I extends string, T extends string = never>(
       scope.listen(window, 'pointermove', (event: PointerEvent) => {
         const now = carriedFor(event);
         if (now === null) return;
+        if (now.how === 'held' && event.buttons === 0) {
+          // The button went up where the page could not hear it, such as outside the window.
+          // A press that never moved was a pick-up click; a drag goes back.
+          if (now.pending) setActive({ ...now, how: 'clicked' });
+          else finish(false);
+          return;
+        }
         const at = point(event);
         if (now.pending) {
           const moved = Math.hypot(at.x - now.start.x, at.y - now.start.y);

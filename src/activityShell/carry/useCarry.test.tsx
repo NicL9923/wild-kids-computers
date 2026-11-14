@@ -98,6 +98,7 @@ const hover = (point: Point, pointerId = MOUSE) =>
 const up = (point: Point, pointerId = MOUSE) =>
   fireEvent.pointerUp(window, { clientX: point.x, clientY: point.y, buttons: 0, pointerId });
 const cancel = (pointerId = MOUSE) => fireEvent.pointerCancel(window, { pointerId });
+const blur = () => fireEvent.blur(window);
 const key = (element: Element, name: string) => fireEvent.keyDown(element, { key: name });
 
 /** A toolbox: a click on the pear acts at once; the apple is carried as usual. */
@@ -214,6 +215,44 @@ describe('useCarry with drop targets', () => {
     cancel();
     expect(apple.dataset.carried).toBe('false');
     up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it.each([
+    ['the browser cancels the drag', () => cancel()],
+    ['the window loses focus', blur],
+  ])('puts a dragged item back, and a later release drops nothing, when %s', (_reason, interrupt) => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    interrupt();
+    expect(apple.dataset.carried).toBe('false');
+    expect(apple.style.translate).toBe('');
+    // A release that belongs to some other gesture.
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it('puts a clicked item back when the window loses focus, so a click on return places nothing', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    blur();
+    expect(apple.dataset.carried).toBe('false');
+    down(document.body, { x: 450, y: 50 });
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it('puts a dragged item back when the button was let go outside the window', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    // The release happened outside, where the page could not hear it. The pointer comes back
+    // over the basket with no button held.
+    hover({ x: 460, y: 60 });
+    expect(apple.dataset.carried).toBe('false');
+    up({ x: 460, y: 60 });
     expect(log.drops).toEqual([]);
   });
 
@@ -452,6 +491,16 @@ describe('useCarry with free positions', () => {
     expect(placed).toEqual([]);
   });
 
+  it('places nothing when the window loses focus during a drag', () => {
+    const { placed, item } = renderDesk();
+    down(item, { x: 150, y: 120 });
+    move({ x: 350, y: 220 });
+    blur();
+    up({ x: 350, y: 220 });
+    expect(placed).toEqual([]);
+    expect(item.style.translate).toBe('');
+  });
+
   it('places nothing when Escape cancels', () => {
     const { placed, item } = renderDesk();
     key(item, 'Enter');
@@ -521,6 +570,20 @@ describe('useCarry along an axis', () => {
     key(knob(), 'ArrowLeft');
     key(knob(), 'Enter');
     expect(log).toEqual(['change 50', 'change 60', 'change 50', 'change 40', 'change 30', 'drop 30']);
+  });
+
+  it.each([
+    ['the browser cancels the drag', () => cancel()],
+    ['the window loses focus', blur],
+  ])('puts the value back where it started when %s', (_reason, interrupt) => {
+    const { log, knob } = renderDial();
+    down(knob(), { x: 300, y: 25 });
+    move({ x: 362, y: 25 });
+    expect(knob().textContent).toBe('knob 50');
+    interrupt();
+    expect(knob().textContent).toBe('knob 40');
+    up({ x: 500, y: 25 });
+    expect(log).toEqual(['change 50', 'change 40']);
   });
 
   it('puts the value back where it started when the track leaves the screen before the release', () => {
