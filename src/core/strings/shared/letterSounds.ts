@@ -19,7 +19,7 @@ export const strings = defineStrings('letter-sounds', {
   g: { text: 'g', speech: '/ɡə/' },
   h: { text: 'h', speech: '/hə/' },
   i: { text: 'i', speech: '/ˈɪ/' },
-  j: { text: 'j', speech: '/dʒə/' },
+  j: { text: 'j', speech: '/ʤə/' },
   k: { text: 'k', speech: '/kə/' },
   l: { text: 'l', speech: '/lːː/' },
   m: { text: 'm', speech: '/mːː/' },

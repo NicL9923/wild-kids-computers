@@ -128,6 +128,8 @@ describe('toKokoroPhonemes', () => {
     ['dʒˈuːs', 'ʤˈus'],
     ['ɐbˈaʊt', 'əbˈWt'],
     ['ɡrˈiːn', 'ɡɹˈin'],
+    ['ʃˈɜːt', 'ʃˈɜɹt'],
+    ['bˈɜːɹd', 'bˈɜɹd'],
   ])('maps %j to %j', (espeak, kokoro) => {
     expect(toKokoroPhonemes(espeak)).toBe(kokoro);
   });

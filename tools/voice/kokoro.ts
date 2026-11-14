@@ -97,20 +97,26 @@ const PUNCTUATION = /((?:\s*[;:,.!?¡¿—…"«»“”(){}[\]]+\s*)+)/u;
  * Python pipeline uses for its espeak fallback, which fixed those words in the round trip.
  */
 export function toKokoroPhonemes(espeak: string): string {
-  return espeak
-    .replaceAll('ʲ', 'j')
-    .replaceAll('r', 'ɹ')
-    .replaceAll('x', 'k')
-    .replaceAll('ɬ', 'l')
-    .replaceAll('aɪ', 'I')
-    .replaceAll('aʊ', 'W')
-    .replaceAll('eɪ', 'A')
-    .replaceAll('oʊ', 'O')
-    .replaceAll('ɔɪ', 'Y')
-    .replaceAll('dʒ', 'ʤ')
-    .replaceAll('tʃ', 'ʧ')
-    .replaceAll('ɐ', 'ə')
-    .replaceAll('ː', '');
+  return (
+    espeak
+      .replaceAll('ʲ', 'j')
+      .replaceAll('r', 'ɹ')
+      .replaceAll('x', 'k')
+      .replaceAll('ɬ', 'l')
+      .replaceAll('aɪ', 'I')
+      .replaceAll('aʊ', 'W')
+      .replaceAll('eɪ', 'A')
+      .replaceAll('oʊ', 'O')
+      .replaceAll('ɔɪ', 'Y')
+      .replaceAll('dʒ', 'ʤ')
+      .replaceAll('tʃ', 'ʧ')
+      .replaceAll('ɐ', 'ə')
+      // misaki writes the vowel of "girl" with its r. Dropping only the length mark lost the r, and
+      // "shirt" was heard as "shot".
+      .replaceAll('ɜːɹ', 'ɜɹ')
+      .replaceAll('ɜː', 'ɜɹ')
+      .replaceAll('ː', '')
+  );
 }
 
 /**

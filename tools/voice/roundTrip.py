@@ -49,7 +49,8 @@ LETTER_HOMOPHONES = {
 # these are not voice errors. Each pair is (heard, expected).
 HOMOPHONES = {
     ("dear", "deer"), ("knows", "nose"), ("pi", "pie"), ("son", "sun"),
-    ("flour", "flower"), ("donut", "doughnut"), ("genes", "jeans"),
+    ("flour", "flower"), ("donut", "doughnut"), ("genes", "jeans"), ("pair", "pear"),
+    ("thai", "tie"), ("lama", "llama"),
 }
 
 # Spellings a recognizer writes as one word or with digits.
@@ -85,6 +86,9 @@ def normalize_words(text: str) -> list[str]:
     text = re.sub(r"[^a-z0-9' ]+", " ", text)
     words = [w.strip("'") for w in text.split()]
     words = [w for w in words if w]
+    # Whisper sometimes loops on a short clip ("apple, apple, apple, ..."). A one-word clip cannot
+    # say a word twice in a row, so collapse repeats instead of counting the loop as errors.
+    words = [w for i, w in enumerate(words) if i == 0 or w != words[i - 1]]
     # Whisper often writes "spacebar" or "ok" where a reader would split or spell it out.
     joined = " ".join(words).replace("t rex", "trex").replace("space bar", "spacebar")
     words = joined.split()
@@ -198,7 +202,7 @@ def write_report(profile: dict, words: list[WordResult], sounds: list[SoundResul
         "  stripped of punctuation, and numerals become words. A lone letter name may come back as a",
         "  word that sounds the same (\"bee\" for b), which counts as the letter. A true homophone of",
         "  the expected word (\"son\" for sun) and a spelling variant (\"trashcan\", \"6th\") count as",
-        "  right, because no recognizer can hear the difference.",
+        "  right, because no recognizer can hear the difference. A word Whisper repeats in a loop counts once.",
         f"- Letter sounds: `{PHONEMES}`, a phoneme recognizer. A clip passes when its first sound,",
         "  ignoring a glottal stop, is the letter's sound. The recognizer is trained on sentences and",
         "  blurs isolated vowels, so it can confirm that a vowel clip starts with a clean vowel but",
