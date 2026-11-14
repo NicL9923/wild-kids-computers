@@ -13,8 +13,8 @@ export default defineColoringPage({
   regions: [
     { x: 1260, y: 338 },
     { x: 1040, y: 374 },
-    { x: 470, y: 625 },
+    { x: 469, y: 626 },
     { x: 724, y: 630 },
-    { x: 1089, y: 808 },
+    { x: 1102, y: 813 },
   ],
 });

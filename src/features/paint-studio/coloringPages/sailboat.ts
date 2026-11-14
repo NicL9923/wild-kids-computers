@@ -23,6 +23,6 @@ export default defineColoringPage({
     { x: 559, y: 751 },
     { x: 799, y: 751 },
     { x: 1039, y: 751 },
-    { x: 1416, y: 825 },
+    { x: 203, y: 827 },
   ],
 });
