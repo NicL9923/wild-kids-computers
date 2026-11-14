@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
     // Relative asset URLs, so one build runs under app://bundle/ and as a static site.
     base: './',
     plugins: [react(), tailwindcss(), contentSecurityPolicyMeta()],
+    // The paint studio's effect worker imports the paint registry, whose font tables load lazily,
+    // so the worker is a module that can split chunks.
+    worker: { format: 'es' },
     build: {
       outDir: 'dist/renderer',
       emptyOutDir: true,
