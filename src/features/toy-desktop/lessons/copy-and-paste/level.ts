@@ -7,7 +7,7 @@ import { reduceAll, type DesktopAction } from '../../model/desktop.ts';
 import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 
 /** Which way the number travels. */
-export type Direction = 'calculator-to-note' | 'note-to-calculator';
+type Direction = 'calculator-to-note' | 'note-to-calculator';
 
 /** How the child runs copy and paste: from the Edit menu, or with shortcuts and no menu bar. */
 export type Route = 'menu' | 'keys';

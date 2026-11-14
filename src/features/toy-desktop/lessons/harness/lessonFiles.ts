@@ -17,7 +17,7 @@ export const LESSON_PICTURES: readonly { readonly id: LessonPictureId; readonly 
   { id: 'tractor', name: 'Tractor' },
 ];
 
-export const LESSON_NOTES: readonly { readonly name: string; readonly text: string }[] = [
+const LESSON_NOTES: readonly { readonly name: string; readonly text: string }[] = [
   { name: 'Shopping list', text: 'apples\nbread\nmilk' },
   { name: 'Animal names', text: 'fox\nowl\nfrog' },
   { name: 'Birthday ideas', text: 'a kite\na book' },

@@ -9,7 +9,7 @@ import { smallestTargets } from './toyDesktop.ts';
  */
 
 /** The smallest target of each band in CSS pixels, from `--wk-target-min`. */
-export const TARGET_MIN: Readonly<Record<Band, number>> = { 'band-3-5': 72, 'band-6-8': 56, 'band-9-12': 44 };
+const TARGET_MIN: Readonly<Record<Band, number>> = { 'band-3-5': 72, 'band-6-8': 56, 'band-9-12': 44 };
 
 /** The modifier of a shortcut on the computer running the tests, as Playwright names it. */
 export const PRIMARY = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -64,7 +64,7 @@ export async function expectHitArea(page: Page, band: Band, control: Locator): P
 }
 
 /** The modifier of a shortcut on the computer running the tests, as Electron's input events name it. */
-const NATIVE_PRIMARY = process.platform === 'darwin' ? 'meta' : 'control';
+const NATIVE_PRIMARY: 'meta' | 'control' = process.platform === 'darwin' ? 'meta' : 'control';
 
 /**
  * Presses a shortcut, the primary modifier with a key and Shift when asked, through
@@ -72,7 +72,7 @@ const NATIVE_PRIMARY = process.platform === 'darwin' ? 'meta' : 'control';
  * application menu's edit shortcuts. Playwright's keyboard skips that path.
  */
 export async function pressShortcut(app: LaunchedApp, keyCode: string, shift = false): Promise<void> {
-  const modifiers = shift ? [NATIVE_PRIMARY, 'shift'] : [NATIVE_PRIMARY];
+  const modifiers: ('meta' | 'control' | 'shift')[] = shift ? [NATIVE_PRIMARY, 'shift'] : [NATIVE_PRIMARY];
   await app.app.evaluate(
     ({ BrowserWindow }, press) => {
       const contents = BrowserWindow.getAllWindows()[0]?.webContents;

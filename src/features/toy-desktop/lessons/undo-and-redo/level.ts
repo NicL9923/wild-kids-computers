@@ -8,7 +8,7 @@ import { reduceAll, type DesktopAction } from '../../model/desktop.ts';
 import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 import { LESSON_TUNES } from '../harness/lessonFiles.ts';
 
-export type UndoApp = 'notepad' | 'music-box';
+type UndoApp = 'notepad' | 'music-box';
 export type Route = 'menu' | 'keys';
 
 /** Difficulty goes notepad, music box, then both, first from the Edit menu and then with shortcuts. */
@@ -22,7 +22,7 @@ const SHAPES: Readonly<Record<number, { apps: readonly UndoApp[]; route: Route }
 };
 
 /** A sentence and the word typed last, which Undo takes back. */
-export const SENTENCES: readonly (readonly [string, string])[] = [
+const SENTENCES: readonly (readonly [string, string])[] = [
   ['I like ', 'frogs'],
   ['We saw a ', 'rainbow'],
   ['My dog can ', 'jump'],
