@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import { candidates, generateLevel, MAX_DIFFICULTY, peersOf, solvesBySingles, type SudokuLevel } from './level.ts';
 
@@ -110,7 +109,9 @@ describe('generateLevel', () => {
 
   it("stays fair at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('picture-sudoku is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS.slice(0, 60)) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }
@@ -138,9 +139,10 @@ describe('generateLevel', () => {
   });
 });
 
+const key = (cells: [number, number][]) => cells.map(([r, c]) => `${String(r)}${String(c)}`).toSorted();
+
 describe('the solving rules', () => {
   it('finds the peers of a square in its row, its column, and its box', () => {
-    const key = (cells: [number, number][]) => cells.map(([r, c]) => `${String(r)}${String(c)}`).toSorted();
     expect(key(peersOf(3, false, 1, 1))).toEqual(['01', '10', '12', '21']);
     expect(key(peersOf(4, true, 0, 0))).toEqual(['01', '02', '03', '10', '11', '20', '30']);
     expect(key(peersOf(4, true, 3, 2))).toEqual(['02', '12', '22', '23', '30', '31', '33']);

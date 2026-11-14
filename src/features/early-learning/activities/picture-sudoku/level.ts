@@ -11,7 +11,7 @@ import { PICTURE_SETS, type Picture } from '../../logic/pictures.ts';
  * That makes the solution the only one, which the level test checks again with a full solver.
  */
 
-export type Grid = readonly (readonly number[])[];
+type Grid = readonly (readonly number[])[];
 
 interface Tier {
   readonly size: 3 | 4;
@@ -19,7 +19,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. Each step empties one or two more squares. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { size: 3, blanks: 1 },
   { size: 3, blanks: 2 },
   { size: 3, blanks: 3 },

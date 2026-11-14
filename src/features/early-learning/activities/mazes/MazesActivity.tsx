@@ -2,7 +2,6 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useActivityKeys } from '../../../../activityShell/activityKeys.ts';
 import type { ActivityProps } from '../../../../activityShell/kit.ts';
 import { Emoji } from '../../../../components/ui/Emoji.tsx';
-import { t } from '../../../../core/strings/defineStrings.ts';
 import { feedback } from '../../../../core/strings/shared/index.ts';
 import { ANSWER_PAUSE_MS, HINT_AFTER_TRIES } from '../../reading/useChoiceRound.ts';
 import { keyOf, neighbor, OPEN, straightRun, waysFrom, type Cell, type Direction, type MazeLevel } from './level.ts';
@@ -116,9 +115,6 @@ export default function MazesActivity({ level, kit }: ActivityProps<MazeLevel>) 
         <div
           ref={board}
           className='mz-board'
-          role='group'
-          tabIndex={0}
-          aria-label={t(strings.maze)}
           style={{
             aspectRatio: `${String(level.columns)} / ${String(level.rows)}`,
             width: `min(100cqw, calc(100cqh * ${String(level.columns)} / ${String(level.rows)}))`,

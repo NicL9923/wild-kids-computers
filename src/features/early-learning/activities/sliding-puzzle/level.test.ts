@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import {
   distanceHome,
@@ -133,7 +132,9 @@ describe('generateLevel', () => {
 
   it("stays fair at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('sliding-puzzle is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS.slice(0, 50)) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }
@@ -155,10 +156,10 @@ describe('the sliding rules', () => {
   });
 
   it('finds neighbors only on the board, never across a row end', () => {
-    expect(neighborsOf(0, 3, 2).toSorted()).toEqual([1, 3]);
-    expect(neighborsOf(2, 3, 2).toSorted()).toEqual([1, 5]);
-    expect(neighborsOf(3, 3, 2).toSorted()).toEqual([0, 4]);
-    expect(neighborsOf(4, 3, 3).toSorted()).toEqual([1, 3, 5, 7]);
+    expect(neighborsOf(0, 3, 2).toSorted((a, b) => a - b)).toEqual([1, 3]);
+    expect(neighborsOf(2, 3, 2).toSorted((a, b) => a - b)).toEqual([1, 5]);
+    expect(neighborsOf(3, 3, 2).toSorted((a, b) => a - b)).toEqual([0, 4]);
+    expect(neighborsOf(4, 3, 3).toSorted((a, b) => a - b)).toEqual([1, 3, 5, 7]);
   });
 
   it('knows a finished board only with the space last', () => {

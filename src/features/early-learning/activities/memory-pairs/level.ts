@@ -15,7 +15,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. Each step adds at most two pairs or narrows the pictures. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { pairs: 2, oneSet: false },
   { pairs: 3, oneSet: false },
   { pairs: 4, oneSet: false },

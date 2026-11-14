@@ -7,5 +7,4 @@ export const strings = defineStrings('mazes', {
     text: 'Help the animal find the way to its snack. Move the pointer along the path, or press the arrow keys.',
   },
   thisWay: { text: 'Try this way.' },
-  maze: { text: 'The maze', silent: 'decorative' },
 });

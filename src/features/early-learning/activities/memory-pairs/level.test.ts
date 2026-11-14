@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import { PICTURE_SET_IDS, PICTURE_SETS } from '../../logic/pictures.ts';
 import activity from './activity.ts';
 import { columnsFor, generateLevel, MAX_DIFFICULTY, type MemoryPairsLevel } from './level.ts';
@@ -58,12 +57,16 @@ describe('generateLevel', () => {
       expect(used.size).toBe(1);
       for (const set of used) sets.add(set);
     }
-    expect([...sets].toSorted()).toEqual([...PICTURE_SET_IDS].toSorted());
+    expect([...sets].toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual(
+      [...PICTURE_SET_IDS].toSorted((a, b) => a.localeCompare(b)),
+    );
   });
 
   it("stays fair at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('memory-pairs is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS.slice(0, 50)) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }

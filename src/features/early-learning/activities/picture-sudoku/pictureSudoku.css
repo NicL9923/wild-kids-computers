@@ -26,6 +26,9 @@
 }
 
 .ps-grid {
+  min-width: 0;
+  margin: 0;
+  border: 0;
   /* The grid is square and as big as its area allows. */
   --ps-board: min(100cqh, 100cqw);
   --ps-cell: calc((var(--ps-board) - (var(--ps-size) + 1) * var(--ps-gap)) / var(--ps-size));

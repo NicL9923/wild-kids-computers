@@ -7,6 +7,5 @@ export const strings = defineStrings('sliding-puzzle', {
   canMove: { text: 'These tiles can slide.' },
   board: { text: 'The puzzle', silent: 'decorative' },
   tile: { text: 'Tile', silent: 'decorative' },
-  space: { text: 'Empty space', silent: 'decorative' },
   picture: { text: 'The finished picture', silent: 'decorative' },
 });

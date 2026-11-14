@@ -9,6 +9,7 @@ function image(width: number, height: number, paint: (x: number, y: number) => r
 }
 
 const WHITE = [255, 255, 255, 255];
+const gray = (value: number) => [value, value, value, 255];
 const BLACK = [0, 0, 0, 255];
 
 describe('pieceDetail', () => {
@@ -54,7 +55,6 @@ describe('fitForPieces', () => {
 
   it('needs at least the least detail, not more', () => {
     // A piece of two grays MIN_DETAIL * 2 apart has a spread of exactly MIN_DETAIL.
-    const gray = (value: number) => [value, value, value, 255];
     const edge = image(2, 1, (x) => (x === 0 ? gray(100) : gray(100 + MIN_DETAIL * 2)));
     expect(fitForPieces(edge, 2, 1, 1, 1)).toBe(true);
     const below = image(2, 1, (x) => (x === 0 ? gray(100) : gray(100 + MIN_DETAIL * 2 - 2)));

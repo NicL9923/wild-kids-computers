@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import { generateLevel, MAX_DIFFICULTY, PICTURE, type JigsawLevel } from './level.ts';
 
@@ -63,7 +62,9 @@ describe('generateLevel', () => {
 
   it("stays fair at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('jigsaw is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS.slice(0, 50)) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }

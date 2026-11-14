@@ -80,9 +80,8 @@ export default function SlidingPuzzleActivity({ level, band, kit }: ActivityProp
   return (
     <div className='sp-stage'>
       <div className='sp-board-area'>
-        <div
+        <fieldset
           className='sp-board'
-          role='group'
           aria-label={t(strings.board)}
           data-done={done}
           style={{
@@ -109,7 +108,7 @@ export default function SlidingPuzzleActivity({ level, band, kit }: ActivityProp
                 data-home={tile === index}
                 data-hint={hinted && movable.has(index)}
                 data-wobble={wobble?.tile === tile ? wobble.count % 2 : 'none'}
-                aria-label={`${t(strings.tile)} ${t(numberHandle(tile + 1))}`}
+                aria-label={[t(strings.tile), t(numberHandle(tile + 1))].join(' ')}
                 onClick={(event) => move(index, event.currentTarget)}
               >
                 <PictureCrop source={source} crop={crop} />
@@ -134,15 +133,9 @@ export default function SlidingPuzzleActivity({ level, band, kit }: ActivityProp
               />
             </div>
           ) : (
-            <div
-              className='sp-space'
-              style={place(space)}
-              data-place={space}
-              aria-label={t(strings.space)}
-              role='img'
-            />
+            <div className='sp-space' style={place(space)} data-place={space} aria-hidden='true' />
           )}
-        </div>
+        </fieldset>
       </div>
       <figure className='sp-goal' aria-label={t(strings.picture)}>
         <PictureCrop source={source} />

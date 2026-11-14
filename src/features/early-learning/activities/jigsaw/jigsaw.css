@@ -24,6 +24,9 @@
 
 .jg-board {
   position: relative;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(var(--jg-columns), minmax(0, 1fr));
   grid-template-rows: repeat(var(--jg-rows), minmax(0, 1fr));

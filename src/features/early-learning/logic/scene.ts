@@ -94,7 +94,7 @@ const POOLS: Readonly<Record<Theme, { readonly sky: readonly EmojiId[]; readonly
   },
 };
 
-export interface ScenePicture {
+interface ScenePicture {
   readonly emoji: EmojiId;
   /** The picture's center, in scene units. */
   readonly x: number;
@@ -113,7 +113,7 @@ export interface Scene {
 }
 
 /** The largest grid a scene supports, by its pools: one sky row of up to 10 and ground cells up to 20. */
-export const MAX_SCENE_CELLS = { sky: 10, ground: 20 } as const;
+const MAX_SCENE_CELLS = { sky: 10, ground: 20 } as const;
 
 /**
  * A scene `width` by `height` with one picture in each of `columns` by `rows` cells. Throws when

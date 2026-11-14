@@ -20,8 +20,11 @@ export function shapeName(shape: ShapeId) {
 export function ShapePicture({ shape }: { shape: ShapeId }) {
   const [color, name] = shapeName(shape);
   return (
-    <svg viewBox='0 0 100 100' role='img' aria-label={`${t(color)} ${t(name)}`} className='wn-shape'>
-      <path d={PATHS[shape]} className='wn-shape-fill' data-color={SHAPE_COLORS[shape]} />
-    </svg>
+    <>
+      <svg viewBox='0 0 100 100' aria-hidden='true' focusable='false' className='wn-shape'>
+        <path d={PATHS[shape]} className='wn-shape-fill' data-color={SHAPE_COLORS[shape]} />
+      </svg>
+      <span className='wk-visually-hidden'>{[t(color), t(name)].join(' ')}</span>
+    </>
   );
 }

@@ -88,7 +88,7 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
   return (
     <div className='jg-stage' style={layout} data-source={picture.from} data-done={done}>
       <div className='jg-board-area'>
-        <div className='jg-board' role='group' aria-label={t(strings.board)}>
+        <fieldset className='jg-board' aria-label={t(strings.board)}>
           {level.guide && <PictureCrop source={source} className='jg-guide' />}
           {Array.from({ length: count }, (_, index) => (
             <div
@@ -98,13 +98,11 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
               data-place={index}
               data-filled={placed.has(index)}
               data-hint={hintPlace === index}
-              aria-label={`${t(strings.place)} ${t(numberHandle(index + 1))}`}
-              role='img'
             >
               {placed.has(index) && <PictureCrop source={source} crop={crop(index)} />}
             </div>
           ))}
-        </div>
+        </fieldset>
       </div>
       <div className='jg-tray-area'>
         <ul className='jg-tray' ref={tray} aria-label={t(strings.tray)}>
@@ -116,7 +114,7 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
                   className='jg-piece'
                   {...carry.item(pieceId(index))}
                   data-piece={index}
-                  aria-label={`${t(strings.piece)} ${t(numberHandle(index + 1))}`}
+                  aria-label={[t(strings.piece), t(numberHandle(index + 1))].join(' ')}
                 >
                   <PictureCrop source={source} crop={crop(index)} />
                 </button>

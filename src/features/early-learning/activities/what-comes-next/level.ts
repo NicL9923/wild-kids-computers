@@ -28,7 +28,7 @@ export const SHAPE_COLORS = {
   diamond: 'orange',
 } as const satisfies Readonly<Record<ShapeId, keyof typeof colors>>;
 
-export type PatternKind = 'pictures' | 'shapes';
+type PatternKind = 'pictures' | 'shapes';
 
 /** A pattern unit written as letters, one letter per kind of item: "aab" is two of one, then one of another. */
 type Unit = string;
@@ -42,7 +42,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. Each step lengthens the unit or adds a choice, never both. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { units: ['ab'], shown: [4, 5], choices: 3 },
   { units: ['ab'], shown: [4, 7], choices: 3 },
   { units: ['aab', 'abb'], shown: [6, 8], choices: 3 },
@@ -94,11 +94,11 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Wh
   const pool: readonly PatternItem[] = kind === 'pictures' ? ALL_PICTURES : SHAPES;
   // One item per letter, in order of first appearance, and the distractors after them. They come
   // from one draw, so none repeats.
-  const kinds = [...new Set(unit)];
+  const kinds = [...new Set(unit.split(''))];
   const drawn = random.sample(pool, Math.max(kinds.length, tier.choices));
   const length = random.int(Math.max(tier.shown[0], unit.length * 2), tier.shown[1]);
   const sequence = Array.from({ length: length + 1 }, (_, index) =>
-    at(drawn, kinds.indexOf(at([...unit], index % unit.length))),
+    at(drawn, kinds.indexOf(at(unit.split(''), index % unit.length))),
   );
   return {
     kind,

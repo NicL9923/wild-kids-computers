@@ -23,7 +23,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. Each step adds a few pieces or takes the guide away. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { columns: 2, rows: 1, guide: true },
   { columns: 2, rows: 2, guide: true },
   { columns: 2, rows: 2, guide: false },

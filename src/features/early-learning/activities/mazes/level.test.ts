@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import {
   canMove,
@@ -80,6 +79,10 @@ function deadEnds(level: MazeLevel): number {
   return count;
 }
 
+/** Dead ends per maze at a difficulty, on average over the seeds. */
+const average = (difficulty: number) =>
+  SEEDS.reduce((sum, seed) => sum + deadEnds(generateLevel(seed, difficulty, 'band-6-8')), 0) / SEEDS.length;
+
 describe('generateLevel', () => {
   // The design: maze size per difficulty.
   it.each([
@@ -103,7 +106,9 @@ describe('generateLevel', () => {
 
   it("stays solvable at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('mazes is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS.slice(0, 50)) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }
@@ -111,8 +116,6 @@ describe('generateLevel', () => {
   });
 
   it('branches more once the walk jumps back, so harder mazes have more dead ends', () => {
-    const average = (difficulty: number) =>
-      SEEDS.reduce((sum, seed) => sum + deadEnds(generateLevel(seed, difficulty, 'band-6-8')), 0) / SEEDS.length;
     // Same size, with and without jumping back.
     const winding = average(3);
     expect(average(4)).toBeGreaterThan(winding);
@@ -122,7 +125,7 @@ describe('generateLevel', () => {
 
   it('starts in every corner over many rounds', () => {
     const starts = new Set(SEEDS.map((seed) => keyOf(generateLevel(seed, 5, 'band-6-8').start)));
-    expect([...starts].toSorted()).toEqual(['0,0', '0,3', '5,0', '5,3']);
+    expect([...starts].toSorted((a, b) => a.localeCompare(b))).toEqual(['0,0', '0,3', '5,0', '5,3']);
   });
 
   it.each([0, MAX_DIFFICULTY + 1, 2.5])('rejects difficulty %s', (difficulty) => {

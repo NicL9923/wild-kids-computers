@@ -106,7 +106,7 @@ export default function MemoryPairsActivity({ level, kit }: ActivityProps<Memory
                 data-matched={isMatched}
                 data-hint={hintCard === card.id}
                 aria-disabled={isMatched}
-                aria-label={isUp ? undefined : `${t(strings.card)} ${t(numberHandle(index + 1))}`}
+                aria-label={isUp ? undefined : [t(strings.card), t(numberHandle(index + 1))].join(' ')}
                 onClick={(event) => turn(card, event.currentTarget)}
               >
                 {isUp ? <Emoji id={card.picture} className='mp-picture' /> : <CardBack />}

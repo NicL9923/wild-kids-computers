@@ -27,7 +27,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { columns: 2, rows: 2, slides: 1, away: 1 },
   { columns: 2, rows: 2, slides: 2, away: 2 },
   { columns: 2, rows: 2, slides: 4, away: 3 },

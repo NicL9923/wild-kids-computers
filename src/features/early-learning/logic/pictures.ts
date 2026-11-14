@@ -79,7 +79,7 @@ export type PictureSetId = keyof typeof PICTURE_SETS;
 
 export type Picture = (typeof PICTURE_SETS)[PictureSetId][number];
 
-export const PICTURE_SET_IDS = Object.keys(PICTURE_SETS) as readonly PictureSetId[];
+export const PICTURE_SET_IDS = ['animals', 'food', 'things'] as const satisfies readonly PictureSetId[];
 
 /** Every picture in every set, in set order. */
 export const ALL_PICTURES: readonly Picture[] = PICTURE_SET_IDS.flatMap((id) => PICTURE_SETS[id]);

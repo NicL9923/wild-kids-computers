@@ -47,13 +47,13 @@ export default function PictureSudokuActivity({ level, kit }: ActivityProps<Sudo
   function place(value: number, element: HTMLElement): void {
     if (done || activeCell === null || active === null) return;
     const [row, column] = activeCell;
-    const cell = document.querySelector(`[data-cell="${active}"]`) ?? element;
+    const square = document.querySelector(`[data-cell="${active}"]`) ?? element;
     if (value === answer) {
       const next = new Set(filled).add(active);
       setFilled(next);
       setTries(0);
       setConflicts(new Set());
-      kit.feedback.correct({ at: cell });
+      kit.feedback.correct({ at: square });
       const picture = level.pictures[value];
       const nextBlank = level.blanks.find(([r, c]) => !next.has(keyOf(r, c)));
       setActive(nextBlank === undefined ? null : keyOf(nextBlank[0], nextBlank[1]));
@@ -73,7 +73,7 @@ export default function PictureSudokuActivity({ level, kit }: ActivityProps<Sudo
     if (clash.length > 0) kit.scope.setTimeout(() => setConflicts(new Set()), CONFLICT_MS);
     const nextTries = tries + 1;
     setTries(nextTries);
-    kit.feedback.wrong({ at: cell });
+    kit.feedback.wrong({ at: square });
     if (nextTries === HINT_AFTER_TRIES) kit.hint(feedback.hereItIs);
     else void kit.speak(clash.length > 0 ? feedback.lookAgain : feedback.tryAnother);
   }
@@ -112,7 +112,7 @@ export default function PictureSudokuActivity({ level, kit }: ActivityProps<Sudo
   return (
     <div className='ps-stage' style={layout} data-size={level.size}>
       <div className='ps-board-area'>
-        <div className='ps-grid' role='group' aria-label={t(strings.grid)} data-boxes={level.boxes}>
+        <fieldset className='ps-grid' aria-label={t(strings.grid)} data-boxes={level.boxes}>
           {level.boxes
             ? [0, 2].flatMap((top) =>
                 [0, 2].map((left) => (
@@ -122,7 +122,7 @@ export default function PictureSudokuActivity({ level, kit }: ActivityProps<Sudo
                 )),
               )
             : level.solution.flatMap((row, r) => row.map((_, c) => cell(r, c)))}
-        </div>
+        </fieldset>
       </div>
       <fieldset className='ps-palette' aria-label={t(strings.animals)}>
         {level.pictures.map((picture, value) => (

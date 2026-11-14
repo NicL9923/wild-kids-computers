@@ -32,9 +32,10 @@ test.afterEach(async () => {
   launched = undefined;
 });
 
+const key = (board: Board) => board.join(',');
+
 /** The places to click, in order, for the fewest slides home, by breadth-first search. */
 function solution(level: SlidingLevel): number[] {
-  const key = (board: Board) => board.join(',');
   const from = new Map<string, { board: Board; previous: string | null; moved: number }>([
     [key(level.board), { board: level.board, previous: null, moved: -1 }],
   ]);

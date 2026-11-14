@@ -14,7 +14,7 @@ export interface Crop {
   readonly height: number;
 }
 
-export const sizeOf = (source: PictureSource) =>
+const sizeOf = (source: PictureSource) =>
   source.kind === 'scene' ? { width: source.scene.width, height: source.scene.height } : source;
 
 /**

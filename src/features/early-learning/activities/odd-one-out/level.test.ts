@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import {
   generateLevel,
@@ -91,7 +90,9 @@ describe('generateLevel', () => {
 
   it("stays fair at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('odd-one-out is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }
@@ -105,7 +106,7 @@ describe('generateLevel', () => {
         return level.items.indexOf(level.odd);
       }),
     );
-    expect([...places].toSorted()).toEqual([0, 1, 2, 3, 4]);
+    expect([...places].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
   });
 
   it('uses every group that can fill a round, at the easiest and the hardest level', () => {
@@ -113,7 +114,9 @@ describe('generateLevel', () => {
       const used = new Set(SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-6-8').group));
       const tier = TIERS[difficulty - 1];
       if (tier === undefined) throw new Error('no tier');
-      expect([...used].toSorted()).toEqual(groupsFor(tier).toSorted());
+      expect([...used].toSorted((a, b) => a.localeCompare(b))).toEqual(
+        groupsFor(tier).toSorted((a, b) => a.localeCompare(b)),
+      );
     }
   });
 

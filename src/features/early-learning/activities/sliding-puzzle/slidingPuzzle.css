@@ -23,6 +23,10 @@
 }
 
 .sp-board {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
   position: relative;
   border-radius: var(--wk-radius-card);
   background: var(--wk-color-primary-base);

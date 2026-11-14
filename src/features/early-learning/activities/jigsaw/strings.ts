@@ -7,5 +7,4 @@ export const strings = defineStrings('jigsaw', {
   board: { text: 'The picture', silent: 'decorative' },
   tray: { text: 'Pieces', silent: 'decorative' },
   piece: { text: 'Piece', silent: 'decorative' },
-  place: { text: 'Place', silent: 'decorative' },
 });

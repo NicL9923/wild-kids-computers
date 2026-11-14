@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import { generateLevel, MAX_DIFFICULTY, SHAPES, type PatternItem, type WhatComesNextLevel } from './level.ts';
 
@@ -66,7 +65,9 @@ describe('generateLevel', () => {
 
   it("stays fair at both ends of every band's range", () => {
     if (activity.kind !== 'rounds') throw new Error('what-comes-next is a rounds activity');
-    for (const [band, range] of Object.entries(activity.difficulty) as [Band, { min: number; max: number }][]) {
+    for (const band of activity.bands) {
+      const range = activity.difficulty[band];
+      if (range === undefined) throw new Error(`No range for ${band}`);
       for (const difficulty of [range.min, range.max]) {
         for (const seed of SEEDS) expect(problems(generateLevel(seed, difficulty, band))).toEqual([]);
       }
@@ -75,7 +76,7 @@ describe('generateLevel', () => {
 
   it('uses pictures in some rounds and shapes in others', () => {
     const kinds = new Set(SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5').kind));
-    expect([...kinds].toSorted()).toEqual(['pictures', 'shapes']);
+    expect([...kinds].toSorted((a, b) => a.localeCompare(b))).toEqual(['pictures', 'shapes']);
   });
 
   it('asks for every place in the unit over many rounds, not always the first', () => {
@@ -85,7 +86,7 @@ describe('generateLevel', () => {
         return level.unit[level.shown.length % level.unit.length];
       }),
     );
-    expect([...answers].toSorted()).toEqual(['a', 'b']);
+    expect([...answers].toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual(['a', 'b']);
   });
 
   it('puts the answer in every place among the choices', () => {
@@ -95,7 +96,7 @@ describe('generateLevel', () => {
         return level.choices.indexOf(level.answer);
       }),
     );
-    expect([...places].toSorted()).toEqual([0, 1, 2, 3]);
+    expect([...places].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3]);
   });
 
   it.each([0, MAX_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {

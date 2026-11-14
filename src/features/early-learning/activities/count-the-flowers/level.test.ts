@@ -131,7 +131,7 @@ describe('generateLevel', () => {
 
   it('uses every kind of flower across rounds, one kind per round', () => {
     const kinds = new Set(SEEDS.map((seed) => generateLevel(seed, 2, 'band-3-5').kind));
-    expect([...kinds].toSorted()).toEqual([...FLOWERS].toSorted());
+    expect([...kinds].toSorted((a, b) => a.localeCompare(b))).toEqual([...FLOWERS].toSorted());
   });
 
   it('repeats a round for the same seed and changes it for another', () => {

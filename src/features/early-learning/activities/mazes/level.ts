@@ -34,7 +34,7 @@ export interface Cell {
 }
 
 /** The animal and the snack it walks to. */
-export const PAIRS = [
+const PAIRS = [
   ['rabbit', 'carrot'],
   ['mouse', 'cheese'],
   ['monkey', 'banana'],
@@ -55,7 +55,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. Each step grows the maze by a row or a column or two. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { columns: 3, rows: 2, branching: 0 },
   { columns: 4, rows: 3, branching: 0 },
   { columns: 5, rows: 3, branching: 0 },
