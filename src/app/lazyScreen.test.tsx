@@ -9,6 +9,7 @@ import {
   type RouteComponent,
 } from '@tanstack/react-router';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { Suspense } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createAudioEngine } from '../audio/audioEngine.ts';
 import { AudioProvider } from '../audio/AudioProvider.tsx';
@@ -92,6 +93,25 @@ describe('a lazy screen', () => {
     slow.first.answer();
     await flush();
     expect(screen.queryByText('the screen')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: shellStrings.tryAgain.text }));
+    await screen.findByText('the screen');
+    expect(slow.loads()).toBe(2);
+  });
+
+  it('loads a lazy screen inside a route again on try again, after its load did not answer in time', async () => {
+    const slow = slowScreen();
+    const Nested = slow.component;
+    show(() => (
+      <Suspense fallback={null}>
+        <Nested />
+      </Suspense>
+    ));
+    await flush();
+    await act(async () => slow.timers.advance(SCREEN_LOAD_DEADLINE_MS));
+    await screen.findByRole('heading', { name: shellStrings.notOpened.text });
+    slow.first.answer();
+    await flush();
 
     fireEvent.click(screen.getByRole('button', { name: shellStrings.tryAgain.text }));
     await screen.findByText('the screen');
