@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDateKey, recordRound } from './progress.ts';
+import { localDateKey, recordRound, recordStep } from './progress.ts';
 import { progressDocument, RECENT_ROUNDS, type ProgressDocument } from './schemas.ts';
 
 describe('localDateKey', () => {
@@ -64,5 +64,49 @@ describe('recordRound', () => {
     expect(() =>
       recordRound(progressDocument.defaults(), 'pop-the-seed-pods', { mistakes: -1, hintsUsed: 0 }, finishedAt),
     ).toThrow(/mistakes/);
+  });
+
+  it('saves the difficulty the kit computed for the next round', () => {
+    const before = recordRound(
+      progressDocument.defaults(),
+      'find-the-key',
+      { mistakes: 0, hintsUsed: 0 },
+      finishedAt,
+      3,
+    );
+    const next = recordRound(before, 'find-the-key', { mistakes: 0, hintsUsed: 0 }, finishedAt, 4);
+    expect(before.activities['find-the-key']?.difficulty).toBe(3);
+    expect(next.activities['find-the-key']?.difficulty).toBe(4);
+  });
+
+  it.each([0, 11, 2.5])('rejects difficulty %s outside the 1 to 10 scale', (difficulty) => {
+    expect(() =>
+      recordRound(progressDocument.defaults(), 'find-the-key', { mistakes: 0, hintsUsed: 0 }, finishedAt, difficulty),
+    ).toThrow(/difficulty/);
+  });
+});
+
+describe('recordStep', () => {
+  const finishedAt = new Date(2026, 10, 13, 10, 30);
+
+  it('starts a sequence at the step reached and marks the day', () => {
+    const next = recordStep(progressDocument.defaults(), 'typing-course', 1, finishedAt);
+    expect(next.activities['typing-course']).toEqual({
+      recentRounds: [],
+      daysPracticed: ['2026-11-13'],
+      furthestStep: 1,
+    });
+  });
+
+  it('moves the furthest step forward and never back', () => {
+    const ahead = recordStep(progressDocument.defaults(), 'typing-course', 5, finishedAt);
+    const replayed = recordStep(ahead, 'typing-course', 2, new Date(2026, 10, 14, 9));
+    expect(replayed.activities['typing-course']?.furthestStep).toBe(5);
+    expect(replayed.activities['typing-course']?.daysPracticed).toEqual(['2026-11-13', '2026-11-14']);
+    expect(recordStep(ahead, 'typing-course', 6, finishedAt).activities['typing-course']?.furthestStep).toBe(6);
+  });
+
+  it('rejects a negative step instead of saving it', () => {
+    expect(() => recordStep(progressDocument.defaults(), 'typing-course', -1, finishedAt)).toThrow(/furthestStep/);
   });
 });

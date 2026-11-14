@@ -14,18 +14,45 @@ function emptyActivityProgress(): ActivityProgress {
 /**
  * Adds a finished round to an activity's progress and marks the day practiced. Returns a new
  * document. The schema trims the lists, so the result always saves.
+ *
+ * `difficulty` is the level for the next round, which the activity kit's difficulty model
+ * computes. Leave it out to keep the saved level.
  */
 export function recordRound(
   progress: ProgressDocument,
   activityId: string,
   outcome: { mistakes: number; hintsUsed: number },
   finishedAt: Date,
+  difficulty?: number,
 ): ProgressDocument {
   const current = progress.activities[activityId] ?? emptyActivityProgress();
-  const next = activityProgressSchema.parse({
+  return withActivity(progress, activityId, {
     ...current,
+    ...(difficulty === undefined ? {} : { difficulty }),
     recentRounds: [...current.recentRounds, { ...outcome, at: finishedAt.getTime() }],
     daysPracticed: [...current.daysPracticed, localDateKey(finishedAt)],
   });
-  return { ...progress, activities: { ...progress.activities, [activityId]: next } };
+}
+
+/**
+ * Records that the child reached a step of a sequence activity and marks the day practiced.
+ * The furthest step never moves back, so replaying an early step keeps the later ones open.
+ */
+export function recordStep(
+  progress: ProgressDocument,
+  activityId: string,
+  reachedStep: number,
+  finishedAt: Date,
+): ProgressDocument {
+  const current = progress.activities[activityId] ?? emptyActivityProgress();
+  return withActivity(progress, activityId, {
+    ...current,
+    furthestStep: Math.max(current.furthestStep ?? reachedStep, reachedStep),
+    daysPracticed: [...current.daysPracticed, localDateKey(finishedAt)],
+  });
+}
+
+/** Validates one activity's new progress, which also trims its lists, and puts it in a new document. */
+function withActivity(progress: ProgressDocument, activityId: string, next: unknown): ProgressDocument {
+  return { ...progress, activities: { ...progress.activities, [activityId]: activityProgressSchema.parse(next) } };
 }
