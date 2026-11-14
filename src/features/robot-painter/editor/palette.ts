@@ -87,7 +87,7 @@ export function paletteFor(toolbox: readonly ToolboxItem[], program: Program): P
 }
 
 /** The number a block carries that the child can change, or null for a block without one. */
-export function blockValue(block: Block): number | null {
+export function blockValue(block: BlockDraft): number | null {
   if (block.kind === 'repeat') return block.count;
   if (block.kind === 'forward') return block.distance;
   if (block.kind === 'turn') return block.angle;
@@ -95,7 +95,7 @@ export function blockValue(block: Block): number | null {
 }
 
 /** The values the child can step a block through, smallest first, or null for a fixed block. */
-export function valueChoices(block: Block, toolbox: readonly ToolboxItem[]): readonly number[] | null {
+export function valueChoices(block: BlockDraft, toolbox: readonly ToolboxItem[]): readonly number[] | null {
   if (block.kind === 'repeat') {
     return Array.from({ length: MAX_REPEAT - MIN_REPEAT_COUNT + 1 }, (_, index) => MIN_REPEAT_COUNT + index);
   }

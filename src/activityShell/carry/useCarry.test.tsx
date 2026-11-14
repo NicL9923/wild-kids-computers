@@ -93,17 +93,17 @@ function Toolbox({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: Log & { c
   );
 }
 
-describe('useCarry with a click that acts', () => {
-  function renderToolbox() {
-    const kit = fakeKit();
-    const log = { drops: [] as string[], clicks: [] as string[] };
-    render(<Toolbox kit={kit} log={log} />);
-    placeAt(screen.getByText('apple'), 0, 0, 100, 100);
-    placeAt(screen.getByText('pear'), 0, 200, 100, 100);
-    placeAt(screen.getByText('basket'), 400, 0, 200, 200);
-    return { log, apple: screen.getByText('apple'), pear: screen.getByText('pear') };
-  }
+function renderToolbox() {
+  const kit = fakeKit();
+  const log = { drops: [] as string[], clicks: [] as string[] };
+  render(<Toolbox kit={kit} log={log} />);
+  placeAt(screen.getByText('apple'), 0, 0, 100, 100);
+  placeAt(screen.getByText('pear'), 0, 200, 100, 100);
+  placeAt(screen.getByText('basket'), 400, 0, 200, 200);
+  return { log, apple: screen.getByText('apple'), pear: screen.getByText('pear') };
+}
 
+describe('useCarry with a click that acts', () => {
   it('runs the click instead of picking the item up, by pointer and by keyboard', () => {
     const { log, pear } = renderToolbox();
     down(pear, { x: 50, y: 250 });

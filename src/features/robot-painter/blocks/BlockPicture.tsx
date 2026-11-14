@@ -65,7 +65,7 @@ export function ColorPicture({ color }: { color: PenColor }) {
   );
 }
 
-export function RepeatPicture() {
+function RepeatPicture() {
   return (
     <Svg>
       <path d='M38 24a14 14 0 1 1-5-10.7' fill='none' stroke='currentColor' strokeWidth='5' strokeLinecap='round' />
@@ -75,20 +75,37 @@ export function RepeatPicture() {
 }
 
 function PenPicture({ down }: { down: boolean }) {
-  // A pencil above a line: touching it with the pen down, lifted with a gap with the pen up.
-  const lift = down ? 0 : -9;
+  // Pen down: an upright pencil whose tip touches a solid line. Pen up: the pencil lifted high
+  // with an arrow pointing up, over a dashed line it does not draw.
   return (
     <Svg>
-      <path d='M4 42h40' stroke='currentColor' strokeWidth='3' strokeLinecap='round' opacity={down ? 1 : 0.45} />
-      <g transform={`translate(0 ${String(lift)}) rotate(35 24 38)`}>
-        <rect x='19' y='6' width='10' height='24' rx='2' fill='currentColor' />
-        <path d='M19 30h10l-5 9z' fill='currentColor' />
-      </g>
+      {down ? (
+        <>
+          <path d='M4 43h40' stroke='currentColor' strokeWidth='4' strokeLinecap='round' />
+          <rect x='19' y='4' width='10' height='22' rx='2' fill='currentColor' />
+          <path d='M19 26h10l-5 12z' fill='currentColor' />
+          <path d='M14 33l-6 4M34 33l6 4' stroke='currentColor' strokeWidth='3' strokeLinecap='round' />
+        </>
+      ) : (
+        <>
+          <path d='M4 43h40' stroke='currentColor' strokeWidth='3' strokeLinecap='round' strokeDasharray='4 5' />
+          <rect x='25' y='2' width='10' height='20' rx='2' fill='currentColor' />
+          <path d='M25 22h10l-5 10z' fill='currentColor' />
+          <path
+            d='M12 30V10M6 16l6-7 6 7'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth='4'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+          />
+        </>
+      )}
     </Svg>
   );
 }
 
-export function ForwardPicture() {
+function ForwardPicture() {
   return (
     <Svg>
       <circle cx='24' cy='40' r='5' fill='currentColor' />
@@ -98,7 +115,7 @@ export function ForwardPicture() {
   );
 }
 
-export function TurnPicture({ direction }: { direction: 'left' | 'right' }) {
+function TurnPicture({ direction }: { direction: 'left' | 'right' }) {
   return (
     <Svg>
       <g transform={direction === 'left' ? 'translate(48 0) scale(-1 1)' : undefined}>

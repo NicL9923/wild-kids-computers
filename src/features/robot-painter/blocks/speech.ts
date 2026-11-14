@@ -54,7 +54,7 @@ export const COLOR_SHAPES: Readonly<
   black: 'cross',
 };
 
-export function colorSpeech(color: PenColor): SpokenHandle {
+function colorSpeech(color: PenColor): SpokenHandle {
   return colors[color];
 }
 

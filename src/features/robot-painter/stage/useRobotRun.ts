@@ -33,7 +33,7 @@ export interface RunView {
  * - `paused`: part way, moved by "one step".
  * - `ended`: the run reached its end; the robot stays where it stopped.
  */
-export type RunStatus = 'idle' | 'running' | 'paused' | 'ended';
+type RunStatus = 'idle' | 'running' | 'paused' | 'ended';
 
 export interface RobotRun {
   readonly view: RunView;

@@ -71,7 +71,7 @@ export function ArrowPad({
   disabled?: boolean;
 }) {
   return (
-    <div className='rp-pad' role='group' aria-label={t(strings.arrows)}>
+    <fieldset className='rp-pad' aria-label={t(strings.arrows)}>
       {directions.map((direction) => (
         <ControlButton
           key={direction}
@@ -86,7 +86,7 @@ export function ArrowPad({
         />
       ))}
       {center !== undefined && <div className='rp-pad-center'>{center}</div>}
-    </div>
+    </fieldset>
   );
 }
 
@@ -105,7 +105,7 @@ export function ColorChoices({
   disabled?: boolean;
 }) {
   return (
-    <div className='rp-colors' role='group' aria-label={t(strings.pens)}>
+    <fieldset className='rp-colors' aria-label={t(strings.pens)}>
       {colors.map((color) => {
         const draft: BlockDraft = { kind: 'color', color };
         return (
@@ -123,7 +123,7 @@ export function ColorChoices({
           />
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 

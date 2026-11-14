@@ -372,7 +372,6 @@ function ProgramBlock({ block, context }: { block: Block; context: ListContext }
           {...carry.item(`block:${block.id}`)}
         >
           <BlockPicture block={block} />
-          <BlockValue block={block} />
         </button>
         {choices !== null && value !== null && (
           <span className='rp-stepper'>
@@ -386,6 +385,9 @@ function ProgramBlock({ block, context }: { block: Block; context: ListContext }
             >
               <MinusPicture />
             </SpokenButton>
+            <span className='rp-stepper-value' data-value={value} aria-hidden='true'>
+              {value}
+            </span>
             <SpokenButton
               kit={kit}
               speech={[strings.more]}

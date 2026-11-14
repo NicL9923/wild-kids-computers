@@ -1,10 +1,13 @@
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
+import type { KitClock } from '../../../core/activityKit/scheduler.ts';
+import type { Scope } from '../../../core/activityKit/scope.ts';
 import robotArt from '../../../../assets/art/activities/robot-painter/robot.svg';
 import { emojiUrl } from '../../../registry/emoji.ts';
 import { ColorShape, penColorCss } from '../blocks/BlockPicture.tsx';
 import type { Canvas, Point, Segment } from '../engine/geometry.ts';
 import type { RobotState } from '../engine/interpreter.ts';
 import type { Hint } from '../engine/puzzle.ts';
+import { useGlide } from './useGlide.ts';
 
 /**
  * The robot's paper: a dot for every whole step, the target picture faint underneath, the lines
@@ -35,7 +38,9 @@ export interface RobotStageProps {
   readonly hints: readonly Hint[] | null;
   readonly bump: StageBump | null;
   readonly tweenMs: number;
-  readonly label: string;
+  /** The kit's frames and clock, which the robot glides by. */
+  readonly scope: Pick<Scope, 'requestFrame'>;
+  readonly clock: KitClock;
 }
 
 /** How far the robot's pen sits from the top of its picture, as a share of its height. */
@@ -43,7 +48,7 @@ const PEN_FROM_TOP = 0.58;
 
 /** Sizes in canvas units, so a small paper gets a robot that fits a step, a big one a visible robot. */
 function sizes(canvas: Canvas) {
-  const robot = Math.max(0.84, canvas.width / 13);
+  const robot = Math.max(0.84, canvas.width / 9);
   const line = Math.max(0.1, canvas.width / 110);
   return { robot, line, margin: robot * 0.62, flower: Math.max(0.8, canvas.width / 12) };
 }
@@ -65,6 +70,26 @@ function midpoint(segment: Segment): Point {
   return { x: (segment.from.x + segment.to.x) / 2, y: (segment.from.y + segment.to.y) / 2 };
 }
 
+/** The point a share of the way along a line, eased like the robot's glide. */
+function along(segment: Segment, progress: number): Point {
+  const t = 1 - (1 - progress) * (1 - progress);
+  return {
+    x: segment.from.x + (segment.to.x - segment.from.x) * t,
+    y: segment.from.y + (segment.to.y - segment.from.y) * t,
+  };
+}
+
+/** One line per color, the longest, for a single shape mark each: enough to tell colors apart. */
+function longestPerColor(segments: readonly Segment[]): Segment[] {
+  const longest = new Map<string, { segment: Segment; length: number }>();
+  for (const segment of segments) {
+    const length = Math.hypot(segment.to.x - segment.from.x, segment.to.y - segment.from.y);
+    const known = longest.get(segment.color);
+    if (known === undefined || length > known.length) longest.set(segment.color, { segment, length });
+  }
+  return [...longest.values()].map((entry) => entry.segment);
+}
+
 function clampTo(point: Point, canvas: Canvas): Point {
   return {
     x: Math.min(canvas.width, Math.max(0, point.x)),
@@ -77,11 +102,14 @@ function Line({
   width,
   className,
   color,
+  dash,
 }: {
   segment: Segment;
   width: number;
   className?: string;
   color?: string;
+  /** Dashes in canvas units, so they look the same on a short line and a long one. */
+  dash?: readonly [number, number];
 }) {
   return (
     <line
@@ -90,8 +118,11 @@ function Line({
       y1={segment.from.y}
       x2={segment.to.x}
       y2={segment.to.y}
-      pathLength={1}
-      style={{ stroke: color ?? penColorCss(segment.color), strokeWidth: width }}
+      style={{
+        stroke: color ?? penColorCss(segment.color),
+        strokeWidth: width,
+        strokeDasharray: dash === undefined ? undefined : `${String(dash[0])} ${String(dash[1])}`,
+      }}
     />
   );
 }
@@ -126,6 +157,7 @@ function HintMarks({ hints, line, canvas }: { hints: readonly Hint[]; line: numb
                 width={line * 1.6}
                 className='rp-hint-missing'
                 color='var(--wk-color-focus)'
+                dash={[line * 0.6, line * 2.6]}
               />
             ));
           case 'extra-line':
@@ -137,6 +169,7 @@ function HintMarks({ hints, line, canvas }: { hints: readonly Hint[]; line: numb
                     segment={segment}
                     width={line * 1.2}
                     className='rp-hint-extra'
+                    dash={[line * 0.6, line * 2.6]}
                     color='var(--wk-color-text-muted)'
                   />
                   <path
@@ -154,6 +187,7 @@ function HintMarks({ hints, line, canvas }: { hints: readonly Hint[]; line: numb
                   segment={stretch.segment}
                   width={line * 1.6}
                   className='rp-hint-recolor'
+                  dash={[line * 2, line * 1.4]}
                   color={penColorCss(stretch.expected)}
                 />
                 <ShapeMark segment={{ ...stretch.segment, color: stretch.expected }} size={line * 7} />
@@ -181,15 +215,17 @@ function HintMarks({ hints, line, canvas }: { hints: readonly Hint[]; line: numb
   );
 }
 
-export function RobotStage({ canvas, robot, drawing, target, finish, hints, bump, tweenMs, label }: RobotStageProps) {
+export function RobotStage(props: RobotStageProps) {
+  const { canvas, robot, drawing, target, finish, hints, bump, tweenMs } = props;
   const size = sizes(canvas);
   const angle = useContinuousHeading(robot.heading);
+  const { pose, progress } = useGlide(props.scope, props.clock, { x: robot.x, y: robot.y, angle }, tweenMs);
+  const newest = drawing.at(-1);
   const { margin } = size;
   const viewBox = `${String(-margin)} ${String(-margin)} ${String(canvas.width + margin * 2)} ${String(canvas.height + margin * 2)}`;
   const dots: Point[] = [];
   for (let x = 0; x <= canvas.width; x++) for (let y = 0; y <= canvas.height; y++) dots.push({ x, y });
   const targetColors = new Set(target?.map((segment) => segment.color));
-  const style = { '--rp-tween': `${String(tweenMs)}ms` } as CSSProperties;
   const bumpAt =
     bump === null ? null : clampTo(midpoint({ from: bump.at, to: bump.blocked, color: robot.color }), canvas);
 
@@ -198,9 +234,7 @@ export function RobotStage({ canvas, robot, drawing, target, finish, hints, bump
       className='rp-paper'
       viewBox={viewBox}
       preserveAspectRatio='xMidYMid meet'
-      role='img'
-      aria-label={label}
-      style={style}
+      aria-hidden='true'
       data-robot-x={robot.x.toFixed(3)}
       data-robot-y={robot.y.toFixed(3)}
       data-robot-heading={robot.heading}
@@ -219,7 +253,9 @@ export function RobotStage({ canvas, robot, drawing, target, finish, hints, bump
             <Line key={index} segment={segment} width={size.line * 2.4} />
           ))}
           {targetColors.size > 1 &&
-            target.map((segment, index) => <ShapeMark key={index} segment={segment} size={size.line * 6} />)}
+            longestPerColor(target).map((segment) => (
+              <ShapeMark key={segment.color} segment={segment} size={size.line * 6} />
+            ))}
         </g>
       )}
       {finish !== null && (
@@ -233,15 +269,19 @@ export function RobotStage({ canvas, robot, drawing, target, finish, hints, bump
         />
       )}
       <g className='rp-drawing'>
-        {drawing.map((segment, index) => (
-          <Line
-            // The newest line draws itself; earlier ones are already down.
-            key={index}
-            segment={segment}
-            width={size.line}
-            className={index === drawing.length - 1 ? 'rp-line rp-line-new' : 'rp-line'}
-          />
-        ))}
+        {drawing.map((segment, index) =>
+          // The newest line draws itself behind the robot as it glides.
+          segment === newest && progress < 1 ? (
+            <Line
+              key={index}
+              segment={{ ...segment, to: along(segment, progress) }}
+              width={size.line}
+              className='rp-line'
+            />
+          ) : (
+            <Line key={index} segment={segment} width={size.line} className='rp-line' />
+          ),
+        )}
       </g>
       {hints !== null && <HintMarks hints={hints} line={size.line} canvas={canvas} />}
       {bump !== null && bumpAt !== null && (
@@ -254,38 +294,25 @@ export function RobotStage({ canvas, robot, drawing, target, finish, hints, bump
           style={{ strokeWidth: size.line }}
         />
       )}
-      <g className='rp-robot' style={{ transform: `translate(${String(robot.x)}px, ${String(robot.y)}px)` }}>
-        <g
-          key={bump?.key ?? 'still'}
-          className={bump === null ? undefined : 'rp-robot-bump'}
-          style={
-            bump === null
-              ? undefined
-              : ({
-                  '--rp-bump-x': `${String((bump.blocked.x - bump.at.x) * 0.12)}px`,
-                  '--rp-bump-y': `${String((bump.blocked.y - bump.at.y) * 0.12)}px`,
-                } as CSSProperties)
-          }
-        >
-          <g className='rp-robot-turn' style={{ transform: `rotate(${String(angle)}deg)` }}>
-            <image
-              href={robotArt}
-              x={-size.robot / 2}
-              y={-size.robot * PEN_FROM_TOP}
-              width={size.robot}
-              height={size.robot}
-            />
-          </g>
-          <circle
-            className='rp-pen'
-            r={size.robot * 0.075}
-            style={
-              robot.penDown
-                ? { fill: penColorCss(robot.color), stroke: penColorCss(robot.color) }
-                : { stroke: penColorCss(robot.color), strokeWidth: size.robot * 0.03 }
-            }
+      <g className='rp-robot' transform={`translate(${String(pose.x)} ${String(pose.y)})`}>
+        <g transform={`rotate(${String(pose.angle)})`}>
+          <image
+            href={robotArt}
+            x={-size.robot / 2}
+            y={-size.robot * PEN_FROM_TOP}
+            width={size.robot}
+            height={size.robot}
           />
         </g>
+        <circle
+          className='rp-pen'
+          r={size.robot * 0.075}
+          style={
+            robot.penDown
+              ? { fill: penColorCss(robot.color), stroke: 'none' }
+              : { stroke: penColorCss(robot.color), strokeWidth: size.robot * 0.03 }
+          }
+        />
       </g>
     </svg>
   );

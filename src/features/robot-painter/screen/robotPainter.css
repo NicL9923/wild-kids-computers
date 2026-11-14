@@ -45,9 +45,10 @@
 }
 
 .rp-paper {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  min-height: 0;
 }
 
 /* ---- the paper ---- */
@@ -82,35 +83,6 @@
   stroke: none;
 }
 
-.rp-line-new {
-  stroke-dasharray: 1 1;
-  animation: rp-draw calc(var(--rp-tween) * var(--wk-motion-scale)) linear both;
-}
-
-@keyframes rp-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.rp-robot,
-.rp-robot-turn {
-  transition: transform calc(var(--rp-tween) * var(--wk-motion-scale)) var(--wk-ease-in-out);
-}
-
-.rp-robot-bump {
-  animation: rp-bump calc(var(--wk-duration-calm) * var(--wk-motion-scale)) var(--wk-ease-out);
-}
-
-@keyframes rp-bump {
-  40% {
-    transform: translate(var(--rp-bump-x), var(--rp-bump-y));
-  }
-}
-
 .rp-bump {
   fill: none;
   stroke: var(--wk-color-text-muted);
@@ -121,19 +93,10 @@
   fill: var(--wk-color-surface);
 }
 
-.rp-hint-missing,
-.rp-hint-extra {
-  stroke-dasharray: 0.06 0.05;
-}
-
 .rp-hint-cross {
   fill: none;
   stroke: var(--wk-color-text-muted);
   stroke-linecap: round;
-}
-
-.rp-hint-recolor {
-  stroke-dasharray: 0.1 0.04;
 }
 
 .rp-hint-goal {
@@ -196,10 +159,6 @@
   grid-template-columns: repeat(3, var(--rp-pad-cell));
   grid-template-rows: repeat(3, var(--rp-pad-cell));
   gap: var(--wk-space-item);
-}
-
-.rp-screen[data-layout='direct'] .rp-pad {
-  --rp-pad-cell: calc(var(--wk-target-min) * 2);
 }
 
 .rp-pad .rp-control {
@@ -474,7 +433,7 @@
 }
 
 .rp-block-button {
-  padding: 0 calc(var(--wk-space-unit) * 5) 0 calc(var(--wk-space-unit) * 1);
+  padding: 0 calc(var(--wk-space-unit) * 1);
 }
 
 [data-flagged='true'] > .rp-block-row > .rp-block-button {
@@ -484,7 +443,17 @@
 
 .rp-stepper {
   display: flex;
+  align-items: center;
   gap: calc(var(--wk-space-unit) * 1);
+}
+
+/* The number a block carries, big enough to read at a glance between minus and plus. */
+.rp-stepper-value {
+  min-width: calc(var(--wk-target-min) * 0.75);
+  font-size: var(--wk-text-title);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  text-align: center;
 }
 
 .rp-small-button {
@@ -556,4 +525,25 @@
 
 .rp-choice .rp-control-label {
   font-size: var(--wk-text-body);
+}
+
+/* Groups of controls are fieldsets for their names; they draw no frame of their own. */
+.rp-controls,
+.rp-pad,
+.rp-colors {
+  min-inline-size: 0;
+  margin: 0;
+  border: 0;
+  padding-inline: 0;
+  padding-block-start: 0;
+}
+
+.rp-stage-area {
+  margin: 0;
+}
+
+.rp-choice .rp-picture,
+.rp-choice .wk-icon {
+  width: calc(var(--wk-icon-size) * 1.3);
+  height: calc(var(--wk-icon-size) * 1.3);
 }

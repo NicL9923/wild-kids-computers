@@ -48,7 +48,7 @@ describe('paletteFor', () => {
 
 describe('stepping a value', () => {
   const [forward, turn, repeat] = buildProgram([d.forward(2), d.turnRight(90), d.repeat(2, [])]).blocks;
-  if (forward === undefined || turn === undefined || repeat === undefined) throw new Error('fixture');
+  if (forward?.kind !== 'forward' || turn?.kind !== 'turn' || repeat?.kind !== 'repeat') throw new Error('fixture');
 
   it('steps through the offered values and stops at either end', () => {
     expect(stepValue(forward, FULL, 1)).toMatchObject({ distance: 4 });

@@ -44,7 +44,7 @@ import './robotPainter.css';
  * - `editor`: a toolbox, a program with repeats and defined blocks, and the run controls.
  */
 
-export type RobotMode =
+type RobotMode =
   | { readonly kind: 'puzzle'; readonly puzzle: Puzzle }
   | { readonly kind: 'free'; readonly free: FreeMode };
 
@@ -66,10 +66,16 @@ function instructionOf(mode: RobotMode, layout: Layout): SpokenHandle {
   return strings.doBuild;
 }
 
+/** Validates the program the screen holds. Edits keep it valid, so this only guards. */
+function checked(program: Program) {
+  const result = validateProgram(program);
+  return result.ok ? result.program : null;
+}
+
 export interface RobotPainterProps {
   readonly mode: RobotMode;
   readonly band: Band;
-  readonly kit: ActivityKit<never>;
+  readonly kit: ActivityKit;
 }
 
 export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
@@ -87,7 +93,7 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
   const [visualHints, setVisualHints] = useState<readonly Hint[] | null>(null);
   const failures = useRef(0);
   const cancelResult = useRef<(() => void) | null>(null);
-  const paper = useRef<HTMLDivElement | null>(null);
+  const paper = useRef<HTMLElement | null>(null);
   const choices = useRef<HTMLDivElement | null>(null);
 
   // Each puzzle kind has its own instruction. The shell speaks the main one when the step
@@ -141,12 +147,6 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
       cancelResult.current = null;
       runner.reset();
     }, RESULT_PAUSE_MS);
-  };
-
-  /** Validates the program the screen holds. Edits keep it valid, so this only guards. */
-  const checked = (program: Program) => {
-    const result = validateProgram(program);
-    return result.ok ? result.program : null;
   };
 
   const go = () => {
@@ -252,8 +252,8 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
   );
 
   return (
-    <div className='rp-screen' data-layout={layout} data-solved={solved}>
-      <div className='rp-stage-area' ref={paper}>
+    <div className='rp-screen' data-layout={layout} data-solved={solved} data-puzzle={puzzle?.id}>
+      <figure className='rp-stage-area' ref={paper} aria-label={t(strings.drawing)}>
         <RobotStage
           canvas={world.canvas}
           robot={runner.view.robot}
@@ -263,7 +263,8 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
           hints={visualHints}
           bump={runner.view.bump}
           tweenMs={kit.reducedMotion ? 0 : Math.round(runner.pause * 0.85)}
-          label={t(strings.drawing)}
+          scope={kit.scope}
+          clock={kit.clock}
         />
         {solved && (
           <div className='rp-choices' ref={choices} tabIndex={-1} data-choices=''>
@@ -285,7 +286,7 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
             />
           </div>
         )}
-      </div>
+      </figure>
 
       {layout === 'editor' && (
         <ProgramEditor
@@ -312,7 +313,7 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
         />
       )}
 
-      <div className='rp-controls' role='group' aria-label={t(strings.controls)}>
+      <fieldset className='rp-controls' aria-label={t(strings.controls)}>
         {layout === 'editor' ? (
           <>
             {goButton}
@@ -382,7 +383,7 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
             )}
           </>
         )}
-      </div>
+      </fieldset>
     </div>
   );
 }
@@ -392,7 +393,7 @@ function PaintItButton({
   onClick,
   showLabel = true,
 }: {
-  kit: ActivityKit<never>;
+  kit: ActivityKit;
   onClick: () => void;
   showLabel?: boolean;
 }) {

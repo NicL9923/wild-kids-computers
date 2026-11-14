@@ -71,12 +71,15 @@ function enter(puzzle: Puzzle, start: Program, list: ListKey, blocks: readonly B
     const added = listBlocks(program, list)?.at(-1);
     if (added === undefined) throw new Error('The block was not added');
     const goal = targetValue(wanted);
-    for (let placed = added; goal !== null && blockValue(placed) !== goal;) {
-      const value = blockValue(placed) ?? 0;
-      const next = stepValue(placed, puzzle.toolbox, value < goal ? 1 : -1);
-      if (next === null) throw new Error(`${puzzle.id}: cannot step ${keyOf(wanted)} to ${String(goal)}`);
-      program = ok(updateBlock(program, placed.id, () => next));
-      placed = next;
+    if (goal !== null) {
+      let placed = added;
+      while (blockValue(placed) !== goal) {
+        const value = blockValue(placed) ?? 0;
+        const next = stepValue(placed, puzzle.toolbox, value < goal ? 1 : -1);
+        if (next === null) throw new Error(`${puzzle.id}: cannot step ${keyOf(wanted)} to ${String(goal)}`);
+        program = ok(updateBlock(program, placed.id, () => next));
+        placed = next;
+      }
     }
     if (wanted.kind === 'repeat') program = enter(puzzle, program, added.id, wanted.body);
   }
