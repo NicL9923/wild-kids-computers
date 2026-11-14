@@ -1,0 +1,111 @@
+/*
+ * Animals in a row on top and the homes in a row below, each home a picture card. Cards and
+ * animals grow with the window, never below the band's large target.
+ */
+
+.ah-stage {
+  --ah-animal: max(var(--wk-target-large), min(18vh, 11vw));
+  --ah-home: max(calc(var(--wk-target-large) * 1.2), min(30vh, 17vw));
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: center;
+  justify-items: center;
+  padding-bottom: var(--wk-space-container);
+}
+
+.ah-animals,
+.ah-homes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  max-width: 100%;
+}
+
+.ah-homes {
+  gap: calc(var(--wk-space-container) * 1.25);
+}
+
+.ah-animal-spot {
+  width: var(--ah-animal);
+  height: var(--ah-animal);
+  box-sizing: border-box;
+  border: var(--wk-border-width) dashed var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+}
+
+.ah-animal {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 10%;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+}
+
+.ah-animal:hover {
+  background: var(--wk-color-selected);
+}
+
+.ah-animal img,
+.ah-resident img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ah-home {
+  position: relative;
+  width: var(--ah-home);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 1.5) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-card);
+}
+
+.ah-home-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* An animal at home sits in the middle of the picture, on a soft disc so it reads on any scene. */
+.ah-resident {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 52%;
+  aspect-ratio: 1;
+  padding: 5%;
+  box-sizing: border-box;
+  border-radius: var(--wk-radius-round);
+  background: rgb(255 255 255 / 0.8);
+  translate: -50% -50%;
+}
+
+.ah-home[data-filled='true'] {
+  border-color: var(--wk-color-success);
+  border-width: calc(var(--wk-border-width) * 2);
+}
+
+/* After two misses, the animal and its home stand out with a thick edge and a slow, small grow. */
+.ah-animal[data-hint='true'],
+.ah-home[data-hint='true'] {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+  outline-offset: var(--wk-focus-offset);
+  animation: ah-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes ah-hint {
+  to {
+    scale: calc(1 + 0.05 * var(--wk-motion-scale));
+  }
+}
