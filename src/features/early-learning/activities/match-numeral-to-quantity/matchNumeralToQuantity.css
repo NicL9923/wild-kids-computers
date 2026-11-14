@@ -1,0 +1,21 @@
+/* The numeral card on top, and the groups below it. */
+
+.match-stage {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.match-numeral {
+  min-width: var(--wk-target-large);
+  min-height: var(--wk-target-large);
+  padding: 0 var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: var(--wk-shadow-raised);
+  font: inherit;
+  font-size: calc(var(--wk-target-large) * 0.62);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
