@@ -114,6 +114,15 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **401 emoji in 12 categories.** People use the upstream "Default" tone, which is not a human skin color. Flags, alcohol, weapons, tobacco, religious symbols, scary pictures, reward symbols, and timers are left out.
 - **SVGO's default preset optimizes each file only when a 256 px render matches the original.** That saved 28 percent. The worst file changed 0.4 percent of pixel values, all on anti-aliased edges.
 
+### Session
+
+- **At startup the session makes the last active profile active again** when it still exists, so a returning child lands on the meadow without choosing. The profile choice still shows when several profiles exist; see "App shell".
+- **No profiles means "needs first launch"**, even when `app.json` says setup is done. A household whose last profile was deleted starts again from a profile, not from an empty meadow.
+- **Routes are not registered with TanStack Router for path types.** The router tree is found by file convention at run time, which the router's type registration cannot see. Each path has one owner file instead, and a source rule fails on a route literal anywhere else.
+- **`recordStep` never moves the furthest step back.** Replaying an early step keeps later ones open, and a step solved but not left still opens the next one.
+- **`setKioskLock` saves the lock and applies it to the window in one call.** A screen cannot save the choice and forget to apply it, or the reverse. A failed apply becomes the session's save problem.
+- **A profile being deleted cannot be made active.** Its files are on their way out, so loading its settings would bring some of them back.
+
 ### App shell
 
 - **First launch saves the profile after the age band step**, then checks sound and offers kiosk lock. A parent who closes the app after that comes back to the sound check with the profile kept. When profiles exist but setup is not done, first launch asks only about sound and kiosk lock.
