@@ -29,7 +29,7 @@ Inline styles are allowed because Radix adds `<style>` tags for scroll locking. 
 ### Keyboard and clipboard ownership
 
 - The main process sets an application menu with only the edit roles, which macOS needs for text fields. It blocks reload, close, quit, zoom, and developer tools shortcuts in `before-input-event` unless the app runs unpackaged in dev. It fixes the zoom factor at 1.
-- The app never reads or writes the system clipboard. `src/app/` handles `copy`, `cut`, and `paste` events at the document root and routes them to an in-app toy clipboard. An adult's copied password cannot land in a toy app, and a child's text cannot leave the app.
+- The app never reads or writes the system clipboard. `src/app/` handles `copy`, `cut`, and `paste` events at the document root and routes them to an in-app toy clipboard. An adult's copied password cannot land in a toy app, and a child's text cannot leave the app. Text inside an element marked `data-no-copy`, such as the pretend password in Secrets stay secret, is never copied or cut, even by a Select all that reaches over it.
 - The app root cancels every `dragstart`, so images do not produce ghost drags.
 - Spellcheck is off.
 
