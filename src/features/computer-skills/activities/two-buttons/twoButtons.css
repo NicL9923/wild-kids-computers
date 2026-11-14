@@ -1,0 +1,200 @@
+/*
+ * The board keeps its 5:3 shape and fits the stage: the left box, the thing to sort, and the
+ * right box, side by side. Each box sits under a big mouse that lights its button.
+ */
+
+.buttons-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.buttons-board {
+  position: relative;
+  box-sizing: border-box;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1fr;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-container);
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+}
+
+.buttons-side,
+.buttons-middle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-item);
+  min-width: 0;
+}
+
+/* Left box, the thing in the middle, right box, whatever the order in the markup. */
+.buttons-side[data-side='left'] {
+  order: 1;
+}
+
+.buttons-middle {
+  order: 2;
+}
+
+.buttons-side[data-side='right'] {
+  order: 3;
+}
+
+.buttons-mouse-big {
+  width: 10cqw;
+  border-radius: var(--wk-radius-card);
+}
+
+.buttons-side[data-hint='true'] .buttons-mouse-big {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-focus);
+  outline-offset: var(--wk-focus-offset);
+}
+
+.buttons-side-name {
+  margin: 0;
+  font-size: var(--wk-text-title);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.buttons-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-end;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 20cqw;
+  padding: var(--wk-space-item);
+  border: calc(var(--wk-border-width) * 2) solid var(--wk-color-border);
+  border-top-style: dashed;
+  border-radius: 0 0 var(--wk-radius-card) var(--wk-radius-card);
+  background: var(--wk-color-surface);
+}
+
+.buttons-boxed {
+  width: 5cqw;
+  height: 5cqw;
+}
+
+.buttons-mouse-body {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-text);
+  stroke-width: 4;
+}
+
+.buttons-mouse-key {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-text);
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+.buttons-mouse-key[data-lit='true'] {
+  fill: var(--wk-color-accent);
+}
+
+.buttons-mouse-wheel {
+  fill: var(--wk-color-text-muted);
+}
+
+.buttons-mouse-finger {
+  fill: var(--wk-color-text);
+}
+
+/* The thing to sort: a big card with its own small mouse and an arrow to its box. */
+.buttons-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24cqw;
+  min-width: var(--wk-target-large);
+  aspect-ratio: 1;
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+  animation: buttons-arrive var(--wk-duration-base) var(--wk-ease-out);
+}
+
+.buttons-card:hover {
+  background: var(--wk-color-selected);
+}
+
+.buttons-picture {
+  width: 58%;
+  height: 58%;
+  margin-bottom: 18%;
+}
+
+.buttons-badge {
+  position: absolute;
+  bottom: 5%;
+  display: flex;
+  align-items: center;
+  gap: 2%;
+  width: 52%;
+}
+
+.buttons-badge[data-side='left'] {
+  left: 5%;
+  flex-direction: row-reverse;
+}
+
+.buttons-badge[data-side='right'] {
+  right: 5%;
+}
+
+.buttons-mouse-small {
+  width: 36%;
+}
+
+.buttons-arrow {
+  width: 56%;
+  fill: none;
+  stroke: var(--wk-color-text);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.buttons-badge[data-side='left'] .buttons-arrow {
+  scale: -1 1;
+}
+
+.buttons-tip {
+  display: flex;
+  align-items: center;
+  gap: var(--wk-space-item);
+  margin: 0;
+  max-width: 100%;
+  font-size: var(--wk-text-small);
+  color: var(--wk-color-text-muted);
+}
+
+.buttons-trackpad-art {
+  flex: none;
+  width: calc(var(--wk-target-min) * 1.1);
+}
+
+@keyframes buttons-arrive {
+  from {
+    opacity: 0;
+    scale: calc(1 - 0.15 * var(--wk-motion-scale));
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
