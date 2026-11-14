@@ -164,17 +164,28 @@ export function useCarry<I extends string, T extends string = never>(
   mode: CarryMode<I, T>,
 ): Carry<I, T> {
   const { scope, play, holdCheckpoint } = kit;
-  const [active, setActive] = useState<Active<I> | null>(null);
-  const [over, setOver] = useState<T | null>(null);
+  const [active, setActiveState] = useState<Active<I> | null>(null);
+  const [over, setOverState] = useState<T | null>(null);
   const targets = useRef(new Map<T, HTMLElement>());
   // The press that picked the item up. The window hears it too, and must not take it for a new one.
   const pickUpPress = useRef<Event | null>(null);
   const items = useRef(new Map<I, HTMLElement>());
-  // The newest values for window listeners, which outlive a render.
+  // The newest values for window listeners, which outlive a render, and for the next input when
+  // inputs come faster than the screen draws. Only the two setters below change the carried item
+  // and the chosen target, and they write here first, so a second Enter or a release that lands
+  // before React draws sees the pick-up or the move before it.
   const live = useRef({ active, over, mode });
   useLayoutEffect(() => {
-    live.current = { active, over, mode };
+    live.current = { ...live.current, mode };
   });
+  const setActive = useCallback((next: Active<I> | null) => {
+    live.current = { ...live.current, active: next };
+    setActiveState(next);
+  }, []);
+  const setOver = useCallback((next: T | null) => {
+    live.current = { ...live.current, over: next };
+    setOverState(next);
+  }, []);
 
   const targetAt = useCallback((item: I, point: Point): T | null => {
     for (const [id, element] of targets.current) {
@@ -227,7 +238,6 @@ export function useCarry<I extends string, T extends string = never>(
       const { active: now, over: chosen, mode: modeNow } = live.current;
       if (now === null) return;
       // Over at once, so a second listener that hears the same event finds nothing carried.
-      live.current = { ...live.current, active: null, over: null };
       setActive(null);
       setOver(null);
       // An item that left the screen is never placed.
@@ -259,7 +269,7 @@ export function useCarry<I extends string, T extends string = never>(
       play('put-down');
       modeNow.onDrop?.(now.item, value);
     },
-    [axisValue, freePoint, play, stillTakes, targetAt],
+    [axisValue, freePoint, play, setActive, setOver, stillTakes, targetAt],
   );
 
   /** Follows the pointer: the offset for targets and free moves, the value for an axis move. */
@@ -274,7 +284,7 @@ export function useCarry<I extends string, T extends string = never>(
       if (modeNow.kind === 'targets') setOver(targetAt(now.item, point));
       setActive({ ...now, pending: false, offset });
     },
-    [axisValue, targetAt],
+    [axisValue, setActive, setOver, targetAt],
   );
 
   // Window listeners while anything is carried. They live in the activity's scope, so leaving the
@@ -360,7 +370,7 @@ export function useCarry<I extends string, T extends string = never>(
     return () => {
       for (const stop of stops) stop();
     };
-  }, [byPointer, finish, follow, scope]);
+  }, [byPointer, finish, follow, scope, setActive, setOver]);
 
   const item = useCallback(
     (id: I): CarryItemProps => {
@@ -463,7 +473,7 @@ export function useCarry<I extends string, T extends string = never>(
         mode.onChange(now.item, value);
       }
     },
-    [active, finish, mode, play],
+    [active, finish, mode, play, setActive, setOver],
   );
 
   const target = useCallback(
