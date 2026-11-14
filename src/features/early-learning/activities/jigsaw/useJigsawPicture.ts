@@ -78,13 +78,18 @@ export function useJigsawPicture(
     const fallback = () => {
       if (current) setPicture({ status: 'ready', source: { kind: 'scene', scene: level.scene }, from: 'scene' });
     };
-    const painting = withDeadline(
-      galleryPainting(pictures, pick, level),
-      JIGSAW_PICTURE_DEADLINE_MS,
-      timers,
-      'The jigsaw picture',
-    );
-    void painting.then((bytes) => {
+    const show = async (): Promise<void> => {
+      let bytes: Uint8Array | null;
+      try {
+        bytes = await withDeadline(
+          galleryPainting(pictures, pick, level),
+          JIGSAW_PICTURE_DEADLINE_MS,
+          timers,
+          'The jigsaw picture',
+        );
+      } catch {
+        bytes = null;
+      }
       if (!current) return;
       if (bytes === null) {
         fallback();
@@ -92,7 +97,8 @@ export function useJigsawPicture(
       }
       url = URL.createObjectURL(new Blob([bytes.slice()], { type: 'image/png' }));
       setPicture({ status: 'ready', source: { kind: 'image', url, ...PICTURE }, from: 'gallery' });
-    }, fallback);
+    };
+    void show();
     return () => {
       current = false;
       if (url !== null) URL.revokeObjectURL(url);

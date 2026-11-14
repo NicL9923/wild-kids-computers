@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { BridgeResult } from '../../../../app/session/sessionStore.ts';
 import { createRandom } from '../../../../core/activityKit/random.ts';
 import { createManualScheduler } from '../../../../core/activityKit/scheduler.ts';
@@ -17,6 +17,9 @@ function noise(): Uint8ClampedArray {
     i % 4 === 3 ? 255 : Math.floor(random.next() * 256),
   );
 }
+
+/** The object URLs the hook made, which only a painting it shows needs. */
+let madeUrls: MockInstance<typeof URL.createObjectURL>;
 
 // Decoding is the browser's native edge, which jsdom lacks: a stand-in decodes any bytes to noise.
 beforeEach(() => {
@@ -35,7 +38,7 @@ beforeEach(() => {
       }
     },
   );
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:painting');
+  madeUrls = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:painting');
   vi.spyOn(URL, 'revokeObjectURL').mockReturnValue(undefined);
 });
 
@@ -51,7 +54,7 @@ const bytes: BridgeResult<Uint8Array> = { ok: true, value: new Uint8Array([1, 2,
 
 /** A gallery whose list answers only when the test says. Reads answer at once. */
 function slowGallery() {
-  let answer: (result: BridgeResult<PictureSummary[]>) => void = () => undefined;
+  let answer: ((result: BridgeResult<PictureSummary[]>) => void) | null = null;
   const pictures = {
     list: () =>
       new Promise<BridgeResult<PictureSummary[]>>((resolve) => {
@@ -59,10 +62,14 @@ function slowGallery() {
       }),
     read: () => Promise.resolve(bytes),
   };
-  return { pictures, answer: (result: BridgeResult<PictureSummary[]>) => answer(result) };
+  return { pictures, answer: (result: BridgeResult<PictureSummary[]>) => answer?.(result) };
 }
 
-const flush = () => act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+/** Lets every pending promise run: the reads and the stand-in decode settle in microtasks. */
+const flush = () =>
+  act(async () => {
+    for (let turn = 0; turn < 20; turn += 1) await Promise.resolve();
+  });
 
 describe('the jigsaw picture', () => {
   it('uses a fit painting from the gallery when the gallery answers in time', async () => {
@@ -89,6 +96,6 @@ describe('the jigsaw picture', () => {
     gallery.answer(listed);
     await flush();
     expect(result.current).toMatchObject({ status: 'ready', from: 'scene' });
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(madeUrls).not.toHaveBeenCalled();
   });
 });
