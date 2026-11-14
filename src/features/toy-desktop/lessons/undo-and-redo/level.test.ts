@@ -219,8 +219,8 @@ describe('undo and redo layout', () => {
   });
 
   it('describes the change of each app in the round, and only those', () => {
-    for (let difficulty = 1; difficulty <= 6; difficulty += 1) {
-      const level = generateLevel(3, difficulty, 'band-9-12');
+    for (const [seed, difficulty] of SEEDS.slice(0, 40).map((seed, index) => [seed, (index % 6) + 1] as const)) {
+      const level = generateLevel(seed, difficulty, 'band-9-12');
       expect(level.sentence !== undefined).toBe(level.apps.includes('notepad'));
       expect(level.dot !== undefined).toBe(level.apps.includes('music-box'));
       // The word comes after the start of a sentence, so taking it back leaves words behind.
