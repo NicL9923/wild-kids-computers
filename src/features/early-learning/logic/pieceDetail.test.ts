@@ -12,9 +12,46 @@ const WHITE = [255, 255, 255, 255];
 const gray = (value: number) => [value, value, value, 255];
 const BLACK = [0, 0, 0, 255];
 
+type Drawing = (x: number, y: number) => readonly number[];
+
+/** Square pieces this many pixels across: two pixels each way in every cell the pieces are compared by. */
+const PIECE = 16;
+
+/** An image of `columns` by `rows` pieces, each PIECE pixels square and painted by its own drawing, row by row. */
+function tiles(columns: number, rows: number, drawings: readonly Drawing[]): Uint8ClampedArray {
+  return image(columns * PIECE, rows * PIECE, (x, y) => {
+    const draw = drawings[Math.floor(y / PIECE) * columns + Math.floor(x / PIECE)] ?? blank;
+    return draw(x % PIECE, y % PIECE);
+  });
+}
+
+const blank: Drawing = () => WHITE;
+/** A black square filling one quarter of the piece. */
+const quarter =
+  (left: boolean, top: boolean): Drawing =>
+  (x, y) =>
+    x < PIECE / 2 === left && y < PIECE / 2 === top ? BLACK : WHITE;
+
+/** Light and dark columns, `lighter` grays lighter than the plain ones. */
+const grayStripes =
+  (lighter: number): Drawing =>
+  (x) =>
+    gray((x % 2 === 0 ? 40 : 200) + lighter);
+
 /** Two pieces side by side with the same light and dark columns, the right one `shift` grays lighter. */
 function shifted(shift: number): Uint8ClampedArray {
-  return image(4, 2, (x) => gray((x % 2 === 0 ? 40 : 200) + (x < 2 ? 0 : shift)));
+  return tiles(2, 1, [grayStripes(0), grayStripes(shift)]);
+}
+
+/** The pairs piecesAlike finds in two pieces side by side, each one color all over. */
+function pair(left: readonly number[], right: readonly number[]): [number, number][] {
+  return piecesAlike(
+    image(2 * PIECE, PIECE, (x) => (x < PIECE ? left : right)),
+    2 * PIECE,
+    PIECE,
+    2,
+    1,
+  );
 }
 
 describe('pieceDetail', () => {
@@ -50,8 +87,11 @@ describe('pieceDetail', () => {
     expect(pieceDetail(pixels, 2, 1, 4, 1)).toEqual([0, 0, 0, 0]);
   });
 
-  it('refuses pixels that do not match the size', () => {
-    expect(() => pieceDetail(new Uint8ClampedArray(12), 2, 2, 1, 1)).toThrow(/has 16 values, not 12/);
+  it.each([
+    ['pieceDetail', pieceDetail],
+    ['piecesAlike', piecesAlike],
+  ])('%s refuses pixels that do not match the size', (_, measure) => {
+    expect(() => measure(new Uint8ClampedArray(12), 2, 2, 1, 1)).toThrow(/has 16 values, not 12/);
   });
 });
 
@@ -96,8 +136,47 @@ describe('fitForPieces', () => {
   });
 
   it('calls pieces alike below the least difference, and different at it', () => {
-    expect(piecesAlike(shifted(MIN_DIFFERENCE), 4, 2, 2, 1)).toEqual([]);
-    expect(piecesAlike(shifted(MIN_DIFFERENCE - 1), 4, 2, 2, 1)).toEqual([[0, 1]]);
+    expect(piecesAlike(shifted(MIN_DIFFERENCE), 2 * PIECE, PIECE, 2, 1)).toEqual([]);
+    expect(piecesAlike(shifted(MIN_DIFFERENCE - 1), 2 * PIECE, PIECE, 2, 1)).toEqual([[0, 1]]);
+  });
+
+  it('finds look-alike pieces in different rows', () => {
+    // Pieces 0 and 3 show the same black quarter; pieces 1 and 2 each show another quarter.
+    const drawings = [quarter(true, true), quarter(false, true), quarter(true, false), quarter(true, true)];
+    expect(piecesAlike(tiles(2, 2, drawings), 2 * PIECE, 2 * PIECE, 2, 2)).toEqual([[0, 3]]);
+  });
+
+  it.each<[string, Drawing]>([
+    ['matches along the top and left edges and is black everywhere else', (x, y) => (x < 2 || y < 2 ? WHITE : BLACK)],
+    ['has a black bar along the top edge only', (_, y) => (y < 2 ? BLACK : WHITE)],
+  ])('tells a blank piece from one that %s', (_, drawing) => {
+    expect(piecesAlike(tiles(2, 1, [blank, drawing]), 2 * PIECE, PIECE, 2, 1)).toEqual([]);
+  });
+
+  it('sees transparent paint as the white paper under it', () => {
+    expect(pair([200, 0, 0, 0], WHITE)).toEqual([[0, 1]]);
+    // Black at half strength shows as the gray halfway to white.
+    expect(pair([0, 0, 0, 128], gray(127))).toEqual([[0, 1]]);
+    expect(pair([0, 0, 0, 128], WHITE)).toEqual([]);
+  });
+
+  it('compares pieces of uneven sizes, as when a small picture does not divide evenly', () => {
+    // Ten pixels across cut into four columns gives pieces 2, 3, 2, and 3 wide, all blank.
+    const pixels = image(10, 1, () => WHITE);
+    expect(piecesAlike(pixels, 10, 1, 4, 1)).toEqual([
+      [0, 1],
+      [0, 2],
+      [0, 3],
+      [1, 2],
+      [1, 3],
+      [2, 3],
+    ]);
+  });
+
+  it('fails a picture with one blank piece even when no two pieces look alike', () => {
+    const pixels = tiles(3, 1, [quarter(true, true), blank, quarter(false, false)]);
+    expect(piecesAlike(pixels, 3 * PIECE, PIECE, 3, 1)).toEqual([]);
+    expect(fitForPieces(pixels, 3 * PIECE, PIECE, 3, 1)).toBe(false);
   });
 
   it('needs at least the least detail, not more', () => {

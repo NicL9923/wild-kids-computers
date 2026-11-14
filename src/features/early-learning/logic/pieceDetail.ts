@@ -83,21 +83,20 @@ export function piecesAlike(
   const cells = Array.from({ length: columns * rows }, (_, index) =>
     cellColors(pixels, width, pieceBounds(width, height, columns, rows, index)),
   );
-  const alike: [number, number][] = [];
-  for (let a = 0; a < cells.length; a += 1) {
-    for (let b = a + 1; b < cells.length; b += 1) {
+  return cells.flatMap((firstCells, a) =>
+    cells.slice(a + 1).flatMap((secondCells, offset): [number, number][] => {
       let total = 0;
       let compared = 0;
-      cells[a]?.forEach((first, cell) => {
-        const second = cells[b]?.[cell];
-        if (first === null || second === null || second === undefined) return;
+      firstCells.forEach((first, cell) => {
+        const second = secondCells[cell] ?? null;
+        if (first === null || second === null) return;
         total += (Math.abs(first[0] - second[0]) + Math.abs(first[1] - second[1]) + Math.abs(first[2] - second[2])) / 3;
         compared += 1;
       });
-      if (compared > 0 && total / compared < MIN_DIFFERENCE) alike.push([a, b]);
-    }
-  }
-  return alike;
+      // The average difference is below the least. Pieces with no cell to compare are never alike.
+      return total < MIN_DIFFERENCE * compared ? [[a, a + 1 + offset]] : [];
+    }),
+  );
 }
 
 /**
@@ -112,36 +111,26 @@ export function pieceDetail(
   rows: number,
 ): number[] {
   checkSize(pixels, width, height);
-  const details: number[] = [];
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const left = Math.floor((column * width) / columns);
-      const right = Math.floor(((column + 1) * width) / columns);
-      const top = Math.floor((row * height) / rows);
-      const bottom = Math.floor(((row + 1) * height) / rows);
-      let sum = 0;
-      let squares = 0;
-      let count = 0;
-      for (let y = top; y < bottom; y += 1) {
-        for (let x = left; x < right; x += 1) {
-          const at = (y * width + x) * 4;
-          const alpha = (pixels[at + 3] ?? 0) / 255;
-          const light = 0.299 * (pixels[at] ?? 0) + 0.587 * (pixels[at + 1] ?? 0) + 0.114 * (pixels[at + 2] ?? 0);
-          const shown = light * alpha + 255 * (1 - alpha);
-          sum += shown;
-          squares += shown * shown;
-          count += 1;
-        }
+  return Array.from({ length: columns * rows }, (_, index) => {
+    const { left, right, top, bottom } = pieceBounds(width, height, columns, rows, index);
+    let sum = 0;
+    let squares = 0;
+    let count = 0;
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        const at = (y * width + x) * 4;
+        const alpha = (pixels[at + 3] ?? 0) / 255;
+        const light = 0.299 * (pixels[at] ?? 0) + 0.587 * (pixels[at + 1] ?? 0) + 0.114 * (pixels[at + 2] ?? 0);
+        const shown = light * alpha + 255 * (1 - alpha);
+        sum += shown;
+        squares += shown * shown;
+        count += 1;
       }
-      if (count === 0) {
-        details.push(0);
-        continue;
-      }
-      const mean = sum / count;
-      details.push(Math.sqrt(Math.max(0, squares / count - mean * mean)));
     }
-  }
-  return details;
+    if (count === 0) return 0;
+    const mean = sum / count;
+    return Math.sqrt(Math.max(0, squares / count - mean * mean));
+  });
 }
 
 /** True when every piece of the picture shows enough to tell it from a blank one, and from every other piece. */
