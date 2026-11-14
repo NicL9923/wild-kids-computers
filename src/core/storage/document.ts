@@ -99,7 +99,10 @@ type LoadStatus =
   | 'missing'
   /** The saved document was bad. It was set aside and defaults came back. */
   | 'reset'
-  /** The platform could not read the document. Defaults came back and nothing was moved. */
+  /**
+   * The platform could not read the document, or could not set a bad one aside. Defaults came
+   * back, but they must not be saved: the file is still there.
+   */
   | 'unreadable';
 
 export interface LoadResult<T> {
@@ -112,7 +115,8 @@ export interface LoadResult<T> {
 /**
  * Reads a document and returns its value or defaults. It never throws on bad saved data: a
  * document that fails any check is set aside under a `.corrupt-<timestamp>` name, so the next
- * save starts clean and an adult can still recover the old file.
+ * save starts clean and an adult can still recover the old file. When it cannot be set aside, the
+ * load is `unreadable`, so no save replaces the file before an adult could recover it.
  */
 export async function loadDocument<T>(
   store: Pick<DocumentStore, 'read' | 'setAside'>,
@@ -145,8 +149,9 @@ async function reset<T>(
 ): Promise<LoadResult<T>> {
   try {
     await store.setAside(name);
-  } catch {
-    // The defaults still come back. The next save replaces the bad file.
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { value: spec.defaults(), status: 'unreadable', problem: `${problem}; not set aside: ${reason}` };
   }
   return { value: spec.defaults(), status: 'reset', problem };
 }

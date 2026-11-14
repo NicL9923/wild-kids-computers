@@ -773,8 +773,8 @@ async function hasSettled(promise: Promise<unknown>): Promise<boolean> {
 }
 
 describe('bridge calls that never answer', () => {
-  it('ends a document read at the deadline as unreadable for that attempt, without setting the file aside', async () => {
-    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+  it('ends a profile read at the deadline as unreadable, without setting the file aside or making the profile active', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id, { voiceVolume: 0.2 }) });
     const settingsName = documentNames.settings(FOX.id);
     const read = fake.bridge.documents.read.bind(fake.bridge.documents);
     const hung = hangCalls<string | null>();
@@ -786,17 +786,17 @@ describe('bridge calls that never answer', () => {
     expect(await hasSettled(started)).toBe(false);
     timers.advance(1);
     await started;
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', settings: { muted: false } });
-    expect(store.getSnapshot().loadProblems).toEqual([
-      { document: settingsName, status: 'unreadable', problem: expect.stringMatching(/did not finish within/) },
-    ]);
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null, loadProblems: [] });
     expect(fake.calls).not.toContain(`documents.setAside ${settingsName}`);
 
-    // The late answer is dropped: it never replaces what the child changed since.
-    store.updateSettings({ voiceVolume: 0.5 });
-    hung.answerAll(json({ ...settingsDocument.defaults(), muted: true, voiceVolume: 0.2 }));
-    await store.flush();
-    expect(store.getSnapshot().settings).toMatchObject({ muted: false, voiceVolume: 0.5 });
+    // The late answer is dropped: only trying again reads the file, and then the profile opens.
+    hung.answerAll(json({ ...settingsDocument.defaults(), muted: true }));
+    await settle();
+    expect(store.getSnapshot().status).toBe('unavailable');
+    fake.bridge.documents.read = read;
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX, settings: { voiceVolume: 0.2 } });
+    expect(fake.calls.filter((call) => call.startsWith('documents.write profile/'))).toEqual([]);
   });
 
   it('turns a write that passes its deadline into a save problem, and holds the next write of that document until it ends', async () => {
@@ -960,5 +960,184 @@ describe('saved things that cannot be opened at start', () => {
     await store.retryStart();
     await store.flush();
     expect(saved(fake, 'app', appDocument)).toMatchObject({ firstLaunchDone: true, lastActiveProfileId: FOX.id });
+  });
+});
+
+describe('documents that could not be read', () => {
+  const lessonState = activityStateDocument({
+    schema: z.object({ furthestLesson: z.int().min(0) }),
+    defaults: () => ({ furthestLesson: 0 }),
+  });
+
+  it('shows activity state that could not be read as not opened, drops updates to it, and reads it again on reopen', async () => {
+    const documents = savedApp([FOX], FOX.id);
+    const name = documentNames.activity(FOX.id, 'typing-course');
+    documents[name] = json({ version: 1, state: { furthestLesson: 3 } });
+    const { fake, store } = storeWithDeadlines({ documents });
+    await store.start();
+    fake.failNext('read', name, new BridgeError('io', 'disk busy'));
+
+    store.openActivityState('typing-course', lessonState);
+    // Made while the read runs, so it waits for it, and is dropped when the read fails.
+    store.updateActivityState('typing-course', lessonState, (state) => ({ furthestLesson: state.furthestLesson + 1 }));
+    await until(store, () => store.getSnapshot().activityStates['typing-course']?.unreadable === true);
+    store.updateActivityState('typing-course', lessonState, () => ({ furthestLesson: 0 }));
+    await store.flush();
+    expect(store.getSnapshot().activityStates['typing-course']).toMatchObject({ loaded: false, unreadable: true });
+    expect(fake.calls).not.toContain(`documents.write ${name}`);
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+
+    store.openActivityState('typing-course', lessonState);
+    await until(store, () => store.getSnapshot().activityStates['typing-course']?.loaded === true);
+    expect(store.getSnapshot().activityStates['typing-course']).toMatchObject({
+      unreadable: false,
+      state: { furthestLesson: 3 },
+    });
+  });
+
+  it.each([
+    ['settings', (id: string) => documentNames.settings(id)],
+    ['progress', (id: string) => documentNames.progress(id)],
+  ] as const)('does not make a profile active when its %s cannot be read', async (_label, nameOf) => {
+    const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], OWL.id) });
+    await store.start();
+    fake.failNext('read', nameOf(FOX.id), new BridgeError('io', 'disk busy'));
+    store.chooseProfile(FOX.id);
+    store.updateSettings({ muted: true });
+    await until(store, () => store.getSnapshot().status !== 'loading');
+    await store.flush();
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null });
+    expect(fake.calls).not.toContain(`documents.write ${nameOf(FOX.id)}`);
+
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+  });
+
+  it('leaves the try-again state when the profile that could not be opened is deleted', async () => {
+    const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], FOX.id) });
+    fake.failNext('read', documentNames.settings(FOX.id), new BridgeError('io', 'disk busy'));
+    await store.start();
+    expect(store.getSnapshot().status).toBe('unavailable');
+    expect(await store.deleteProfile(FOX.id)).toEqual({ ok: true, value: undefined });
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profiles: [OWL] });
+  });
+
+  it('never writes a document without a successful read of it, through random reads that fail, pass their deadline, or answer late', async () => {
+    const profiles = [FOX, OWL];
+    for (let seed = 1; seed <= 30; seed++) {
+      const random = createRandom(seed);
+      const documents = savedApp(profiles, FOX.id, { sessionLengthMinutes: 15 });
+      for (const profile of profiles) {
+        documents[documentNames.progress(profile.id)] = json({
+          version: 1,
+          activities: { old: { recentRounds: [], daysPracticed: [], furthestStep: 7 } },
+        });
+        documents[documentNames.activity(profile.id, 'typing-course')] = json({
+          version: 1,
+          state: { furthestLesson: 3 },
+        });
+      }
+      const { fake, timers, store } = storeWithDeadlines({ documents });
+      const read = fake.bridge.documents.read.bind(fake.bridge.documents);
+      const write = fake.bridge.documents.write.bind(fake.bridge.documents);
+      /** How the store last saw a read of each document end: answered in time, or not. */
+      const lastRead = new Map<string, 'ok' | 'failed'>();
+      const unread: string[] = [];
+      const held: Array<{ name: DocumentName; expired: boolean; answer: () => void }> = [];
+      let chaos = true;
+
+      fake.bridge.documents.read = (name) => {
+        const roll = chaos ? random.next() : 1;
+        if (roll < 0.15) {
+          lastRead.set(name, 'failed');
+          return Promise.reject(new BridgeError('io', 'disk busy'));
+        }
+        const answered = (text: string | null) => {
+          lastRead.set(name, 'ok');
+          return text;
+        };
+        if (roll < 0.4) {
+          return new Promise((resolve) => {
+            const entry = {
+              name,
+              expired: false,
+              // An answer after the deadline is dropped, so it never counts as a read.
+              answer: () => void read(name).then((text) => resolve(entry.expired ? text : answered(text))),
+            };
+            held.push(entry);
+          });
+        }
+        return read(name).then(answered);
+      };
+      fake.bridge.documents.write = (name, text) => {
+        if (lastRead.get(name) !== 'ok') unread.push(name);
+        return write(name, text);
+      };
+      const expire = () => {
+        for (const entry of held) {
+          if (entry.expired) continue;
+          entry.expired = true;
+          lastRead.set(entry.name, 'failed');
+        }
+        timers.advance(SESSION_CALL_DEADLINE_MS);
+      };
+
+      void store.start();
+      for (let step = 0; step < 80; step++) {
+        const roll = random.next();
+        const hasProfile = store.getSnapshot().activeProfile !== null;
+        if (roll < 0.15 && store.getSnapshot().profiles.length > 0) {
+          store.chooseProfile(random.pick(profiles).id);
+        } else if (roll < 0.35 && hasProfile) {
+          store.updateSettings({ voiceVolume: random.int(0, 10) / 10 });
+        } else if (roll < 0.45 && hasProfile) {
+          store.recordStep('new', random.int(1, 5));
+        } else if (roll < 0.55 && hasProfile) {
+          store.openActivityState('typing-course', lessonState);
+          store.updateActivityState('typing-course', lessonState, (s) => ({ furthestLesson: s.furthestLesson + 1 }));
+        } else if (roll < 0.7) {
+          expire();
+        } else if (roll < 0.85) {
+          held.splice(random.int(0, Math.max(held.length - 1, 0)), 1)[0]?.answer();
+        } else if (store.getSnapshot().status === 'unavailable') {
+          void store.retryStart();
+        }
+        if (random.next() < 0.5) await settle();
+      }
+
+      // Everything answers now, and every profile opens.
+      chaos = false;
+      expire();
+      for (const entry of held.splice(0)) entry.answer();
+      await settle();
+      for (const profile of profiles) {
+        for (
+          let tries = 0;
+          store.getSnapshot().status !== 'ready' || store.getSnapshot().activeProfile?.id !== profile.id;
+          tries++
+        ) {
+          if (tries > 20) throw new Error(`seed ${seed}: ${profile.id} is still ${store.getSnapshot().status}`);
+          if (store.getSnapshot().status === 'unavailable') await store.retryStart();
+          else if (store.getSnapshot().profiles.length > 0 && store.getSnapshot().activeProfile?.id !== profile.id) {
+            store.chooseProfile(profile.id);
+          }
+          await settle();
+        }
+      }
+      await store.flush();
+
+      expect(unread, `seed ${seed}: writes without a read`).toEqual([]);
+      for (const profile of profiles) {
+        const settings = saved(fake, documentNames.settings(profile.id), settingsDocument);
+        expect(settings.sessionLengthMinutes, `seed ${seed}, ${profile.id} settings`).toBe(15);
+        const progress = saved(fake, documentNames.progress(profile.id), progressDocument);
+        expect(progress.activities.old?.furthestStep, `seed ${seed}, ${profile.id} progress`).toBe(7);
+        const lesson = savedJson(fake, documentNames.activity(profile.id, 'typing-course'));
+        expect(lesson, `seed ${seed}, ${profile.id} activity`).toMatchObject({
+          state: { furthestLesson: expect.any(Number) },
+        });
+        expect(lessonState.schema.parse(lesson).state.furthestLesson).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 });

@@ -202,15 +202,17 @@ describe('loadDocument', () => {
     expect(setAside).toEqual([]);
   });
 
-  it('still returns defaults when setting the file aside fails', async () => {
-    const { store } = memoryStore({ app: '{' });
+  it('counts a bad document it could not set aside as unreadable, so no save replaces it', async () => {
+    const { store, files } = memoryStore({ app: '{' });
     store.setAside = async () => {
       throw new BridgeError('io', 'read-only disk');
     };
     expect(await loadDocument(store, NAME, appDocument)).toMatchObject({
       value: appDocument.defaults(),
-      status: 'reset',
+      status: 'unreadable',
+      problem: expect.stringMatching(/^invalid-json: .*; not set aside: read-only disk$/),
     });
+    expect(files.get(NAME)).toBe('{');
   });
 });
 

@@ -163,8 +163,8 @@ describe('a document write that passes its deadline', () => {
             ...update,
           });
         } else if (roll < 0.7) {
-          // Only writes pass their deadline here. A read that passes it loads defaults for that
-          // attempt by design ("Session" in docs/decisions.md), which is not what this test is about.
+          // Only writes pass their deadline here. A read that passes it leaves the profile
+          // unopened, which "a profile document that could not be read" covers.
           while (readsRunning()) await turn();
           timers.advance(SESSION_CALL_DEADLINE_MS);
         } else if (roll < 0.9) {
@@ -197,5 +197,68 @@ describe('a document write that passes its deadline', () => {
       // Every write landed, so nothing is left to report.
       expect(store.getSnapshot().saveProblem, `seed ${seed}`).toBeNull();
     }
+  });
+});
+
+describe('a profile document that could not be read', () => {
+  it('writes nothing over settings and progress whose reads passed the deadline, and opens them on try again', async () => {
+    const files = createFileStore(root);
+    const app = { ...appDocument.defaults(), firstLaunchDone: true, lastActiveProfileId: KID.id };
+    await files.documents.write('app', JSON.stringify(app));
+    await files.documents.write('profiles', JSON.stringify({ version: 1, profiles: [KID, PAL] }));
+    const settings = { ...settingsDocument.defaults(), voiceVolume: 0.2, sessionLengthMinutes: 15 };
+    await files.documents.write(documentNames.settings(KID.id), JSON.stringify(settings));
+    const progress = { version: 1, activities: { old: { recentRounds: [], daysPracticed: [], furthestStep: 7 } } };
+    await files.documents.write(documentNames.progress(KID.id), JSON.stringify(progress));
+    const before = await Promise.all([
+      files.documents.read(documentNames.settings(KID.id)),
+      files.documents.read(documentNames.progress(KID.id)),
+    ]);
+
+    // The reads of the child's documents answer only after their deadline.
+    const gate = Promise.withResolvers<void>();
+    const bothHeld = Promise.withResolvers<void>();
+    let held = 0;
+    const documents = {
+      ...files.documents,
+      async read(name: DocumentName) {
+        const text = await files.documents.read(name);
+        if (name.startsWith(`profile/${KID.id}/`)) {
+          held += 1;
+          if (held === 2) bothHeld.resolve();
+          await gate.promise;
+        }
+        return text;
+      },
+    };
+    const timers = createManualScheduler({ wall: 0 });
+    const store = createSessionStore({
+      bridge: { ...createFakeBridge().bridge, documents, pictures: files.pictures },
+      timers,
+    });
+    const started = store.start();
+    await bothHeld.promise;
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await started;
+
+    // What the reviewer's probe did next: a mute change and a recorded step. No profile is active.
+    expect(() => store.updateSettings({ muted: true })).toThrow(/needs an active profile/);
+    expect(() => store.recordStep('new', 1)).toThrow(/needs an active profile/);
+    gate.resolve();
+    await store.flush();
+    expect(
+      await Promise.all([
+        files.documents.read(documentNames.settings(KID.id)),
+        files.documents.read(documentNames.progress(KID.id)),
+      ]),
+    ).toEqual(before);
+    // The child is not shown defaults in place of their own settings: the app says it could not
+    // open the saved things, and trying again opens them.
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', activeProfile: null });
+
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: KID });
+    expect(store.getSnapshot().settings).toMatchObject({ voiceVolume: 0.2, sessionLengthMinutes: 15 });
+    expect(store.progressOf('old')).toMatchObject({ furthestStep: 7 });
   });
 });

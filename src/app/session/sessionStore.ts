@@ -52,7 +52,8 @@ export type SessionStatus =
   /** The app or profiles document, or the active profile's settings or progress, is loading. */
   | 'loading'
   /**
-   * The app or profiles document could not be read, so the app cannot know which children it has.
+   * The app or profiles document could not be read, so the app cannot know which children it has,
+   * or the chosen profile's settings or progress could not be read, so that profile is not active.
    * Nothing is replaced with defaults and nothing is written until `retryStart()` reads them.
    */
   | 'unavailable'
@@ -72,16 +73,20 @@ export interface SaveProblem {
   readonly message: string;
 }
 
-/** A saved document that came back as defaults, so the parent corner can say so. */
+/** A saved document whose bad data was set aside and replaced with defaults, so the parent corner can say so. */
 export interface LoadProblem {
   readonly document: DocumentName;
-  /** `reset`: bad data was set aside. `unreadable`: the platform could not read it. */
-  readonly status: 'reset' | 'unreadable';
+  readonly status: 'reset';
   readonly problem: string;
 }
 
 export interface ActivityStateEntry<S = unknown> {
   readonly loaded: boolean;
+  /**
+   * The saved state could not be read. Nothing is written and updates are dropped until
+   * `openActivityState` reads it again.
+   */
+  readonly unreadable: boolean;
   /** The activity's own state, unwrapped from its versioned document. */
   readonly state: S;
   /** The spec the state was opened with. Only that spec can read it. */
@@ -158,7 +163,8 @@ export interface SessionStore {
   readonly start: () => Promise<void>;
   /**
    * With status `unavailable`, reads the app and profiles documents that could not be read, and
-   * goes on as `start` does once both are open. A retry already running is reused.
+   * goes on as `start` does once both are open, or reads the chosen profile's settings and
+   * progress again and makes it active once both are open. A retry already running is reused.
    */
   readonly retryStart: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
@@ -178,7 +184,10 @@ export interface SessionStore {
    * afterwards. On failure the profile stays in the list and `saveProblem` says why.
    */
   readonly deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
-  /** Makes a profile active and loads its documents, or makes none active with null. Throws for a profile being deleted. */
+  /**
+   * Makes a profile active and loads its documents, or makes none active with null. When its
+   * settings or progress cannot be read, it does not stay active and the status is `unavailable`.
+   */
   readonly chooseProfile: (profileId: string | null) => void;
 
   /** Throws when no profile is active, because there are no settings to save. */
@@ -194,7 +203,10 @@ export interface SessionStore {
   /** Records that the child reached a step of a sequence activity. */
   readonly recordStep: (activityId: string, reachedStep: number) => void;
 
-  /** Starts loading an activity's state for the active profile. Repeat calls reuse the first load. */
+  /**
+   * Starts loading an activity's state for the active profile. Repeat calls reuse the first load,
+   * except after a read that failed, which they try again.
+   */
   readonly openActivityState: <S>(activityId: string, spec: DocumentSpec<ActivityStateDocument<S>>) => void;
   readonly updateActivityState: <S>(
     activityId: string,
@@ -313,8 +325,9 @@ class Cell<T> {
   /** Reads and writes of this cell queued or running, including a write past its deadline. */
   tasks = 0;
   /**
-   * Set for a document the app cannot start without, when its read failed. The cell then stays
-   * unloaded with its value untouched, so nothing writes defaults over the saved file.
+   * Set when the read failed or passed its deadline. The cell then stays unloaded with its value
+   * untouched, so nothing writes defaults over the saved file. A required cell is read again in
+   * place by `retryStart`; any other cell is never written and a fresh cell reads the file again.
    */
   unreadable = false;
   /** Updates made before the load finished, oldest first. They apply in one queued task. */
@@ -339,6 +352,12 @@ class Cell<T> {
 
   finishLoad(): void {
     this.loaded = true;
+    this.markReady();
+  }
+
+  /** Ends the load of a cell that is not required without a value, so updates waiting for it are dropped. */
+  giveUp(): void {
+    this.unreadable = true;
     this.markReady();
   }
 }
@@ -392,6 +411,11 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   /** Profiles whose files are being removed. Their pictures take no more changes. */
   const removed = new Set<string>();
   /**
+   * The profile that was chosen but whose settings or progress could not be read. It is not
+   * active, the status is `unavailable`, and `retryStart` chooses it again.
+   */
+  let unopened: string | null = null;
+  /**
    * Documents with a read or write still queued or running, by name. Choosing a profile again, or
    * opening an activity's state again, takes the cell from here instead of reading the file, which
    * may not have the newest value yet. A cell leaves once its queue is empty.
@@ -411,7 +435,12 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     const band: Band = activeProfile?.band ?? DEFAULT_BAND;
     const activityStates: Record<string, ActivityStateEntry> = {};
     for (const [activityId, cell] of active?.activityStates ?? []) {
-      activityStates[activityId] = { loaded: cell.loaded, state: cell.value.state, spec: cell.spec };
+      activityStates[activityId] = {
+        loaded: cell.loaded,
+        unreadable: cell.unreadable,
+        state: cell.value.state,
+        spec: cell.spec,
+      };
     }
     return {
       status: statusOf(),
@@ -434,7 +463,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function statusOf(): SessionStatus {
-    if (app.unreadable || profiles.unreadable) return 'unavailable';
+    if (app.unreadable || profiles.unreadable || unopened !== null) return 'unavailable';
     if (!app.loaded || !profiles.loaded) return 'loading';
     if (!app.value.firstLaunchDone || profiles.value.profiles.length === 0) return 'needs-first-launch';
     if (active === null) return 'needs-profile';
@@ -492,18 +521,34 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       // loadDocument never throws on bad data. This covers a bridge that broke its contract.
       result = { value: cell.spec.defaults(), status: 'unreadable', problem: toBridgeError(error).message };
     }
-    cell.unreadable = cell.required && result.status === 'unreadable';
+    // Defaults never stand in for a document that could not be read: the next write would put
+    // them over the saved file. Only a read that answered "nothing saved" or "set aside" gives them.
+    cell.unreadable = result.status === 'unreadable';
     if (cell.unreadable) {
+      if (!cell.required) {
+        cell.giveUp();
+        leaveUnopened(cell);
+      }
       emit();
       return;
     }
-    if (result.status === 'reset' || result.status === 'unreadable') {
+    if (result.status === 'reset') {
       loadProblems = [...loadProblems, { document: cell.name, status: result.status, problem: result.problem ?? '' }];
     }
     cell.value = result.value;
     cell.finishLoad();
     if (result.status === 'migrated') queueWrite(cell);
     emit();
+  }
+
+  /**
+   * A profile whose settings or progress could not be read does not stay active, so nothing
+   * reads, shows, or writes defaults in their place. The status says `unavailable` until a retry.
+   */
+  function leaveUnopened(cell: Cell<unknown>): void {
+    if (active === null || (active.settings !== cell && active.progress !== cell)) return;
+    unopened = active.profileId;
+    active = null;
   }
 
   /** Runs a read or write of the cell in its document's queue, and keeps the cell findable meanwhile. */
@@ -583,6 +628,13 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     if (cell.early.length > 1) return;
     void runFor(cell, async () => {
       await cell.ready;
+      if (!cell.loaded) {
+        // The read failed, so there is no saved value to apply these updates to. They are dropped,
+        // as is any later update until a fresh cell reads the file, and the screen says it did
+        // not open.
+        cell.early.length = 0;
+        return;
+      }
       for (const early of cell.early.splice(0)) {
         try {
           cell.value = cell.spec.schema.parse(early.apply(cell.value));
@@ -612,6 +664,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   // ---- profiles ---------------------------------------------------------------------------
 
   function activate(profileId: string | null): void {
+    unopened = null;
     if (profileId === null) {
       active = null;
       return;
@@ -627,7 +680,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function chooseProfile(profileId: string | null): void {
-    if ((active?.profileId ?? null) === profileId) return;
+    if (unopened === null && (active?.profileId ?? null) === profileId) return;
     if (profileId !== null && !profiles.value.profiles.some((p) => p.id === profileId)) {
       throw new Error(`No profile with id ${profileId}.`);
     }
@@ -647,7 +700,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   async function deleteProfile(profileId: string): Promise<BridgeResult<void>> {
-    if (active?.profileId === profileId) chooseProfile(null);
+    if (active?.profileId === profileId || unopened === profileId) chooseProfile(null);
     removed.add(profileId);
     try {
       // Writes already queued for this profile finish first, so none lands after the removal. A
@@ -677,14 +730,15 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
   // ---- activity state ---------------------------------------------------------------------
 
-  function activityCell<S>(activityId: string, spec: DocumentSpec<ActivityStateDocument<S>>) {
+  /** `reopen` reads a state whose last read failed again, for the activity's "try again". */
+  function activityCell<S>(activityId: string, spec: DocumentSpec<ActivityStateDocument<S>>, reopen = false) {
     const profile = requireActive('Activity state');
     const existing = profile.activityStates.get(activityId);
     if (existing !== undefined) {
       if (!isCellOf(existing, spec)) {
         throw new Error(`Activity ${activityId} opened its state with two different specs. Define the spec once.`);
       }
-      return existing;
+      if (!(reopen && existing.unreadable)) return existing;
     }
     const cell = openCell(documentNames.activity(profile.profileId, activityId), spec);
     profile.activityStates.set(activityId, cell);
@@ -757,6 +811,12 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     await Promise.all([active?.settings.ready, active?.progress.ready]);
   }
 
+  /** Chooses again the profile whose documents could not be read, and waits for them. */
+  async function reopenProfile(profileId: string): Promise<void> {
+    chooseProfile(profileId);
+    await Promise.all([active?.settings.ready, active?.progress.ready]);
+  }
+
   audio?.onVolumeChange(onEngineVolume);
   let started = false;
   let retrying: Promise<void> | null = null;
@@ -784,7 +844,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     retryStart() {
       if (!started) throw new Error('The session has not started.');
       if (statusOf() !== 'unavailable') return Promise.resolve();
-      retrying ??= open(false).finally(() => {
+      retrying ??= (unopened === null ? open(false) : reopenProfile(unopened)).finally(() => {
         retrying = null;
       });
       return retrying;
@@ -835,9 +895,8 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     },
 
     openActivityState(activityId, spec) {
-      const before = active?.activityStates.size;
-      activityCell(activityId, spec);
-      if (active?.activityStates.size !== before) emit();
+      const before = active?.activityStates.get(activityId);
+      if (activityCell(activityId, spec, true) !== before) emit();
     },
 
     updateActivityState(activityId, spec, update) {

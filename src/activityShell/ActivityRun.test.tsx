@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { SessionProvider } from '../app/session/SessionProvider.tsx';
 import { createSessionStore, type SessionStore } from '../app/session/sessionStore.ts';
-import { createFakeBridge } from '../app/session/testing/fakeBridge.ts';
+import { createFakeBridge, type FakeBridge } from '../app/session/testing/fakeBridge.ts';
 import { createAudioEngine, type AudioEngine } from '../audio/audioEngine.ts';
 import { AudioProvider } from '../audio/AudioProvider.tsx';
 import { CONTINUOUS } from '../audio/sfx/continuous.ts';
@@ -23,6 +23,7 @@ import type { Band } from '../core/bands.ts';
 import { defineActivity, type ActivityDefinition } from '../core/activityKit/defineActivity.ts';
 import { nextDifficulty } from '../core/activityKit/difficulty.ts';
 import { roundSeed } from '../core/activityKit/random.ts';
+import { BridgeError } from '../core/platform/bridge.ts';
 import { documentNames } from '../core/platform/names.ts';
 import { appDocument, progressDocument, settingsDocument } from '../core/storage/schemas.ts';
 import { defineStrings } from '../core/strings/defineStrings.ts';
@@ -201,7 +202,14 @@ interface Harness {
 
 async function run(
   definition: ActivityDefinition,
-  options: { furthestStep?: number; sessionMinutes?: number; band?: Band; voice?: FakeAudioContext } = {},
+  options: {
+    furthestStep?: number;
+    sessionMinutes?: number;
+    band?: Band;
+    voice?: FakeAudioContext;
+    /** Seeds or breaks the platform before the session starts. */
+    prepare?: (fake: FakeBridge) => void;
+  } = {},
 ): Promise<Harness> {
   const clock = { mono: 0 };
   const progress = progressDocument.defaults();
@@ -220,6 +228,7 @@ async function run(
     },
     test: { seed: SEED, difficulty: 3 },
   });
+  options.prepare?.(fake);
   const audio = createAudioEngine({
     // With a voice, every string has a clip that plays until the test ends it.
     environment: options.voice
@@ -652,6 +661,22 @@ describe('an activity with saved state', () => {
     fireEvent.click(button);
     await screen.findByRole('button', { name: 'taps 1' });
     expect(h.store.getSnapshot().activityStates[withState.id]?.state).toEqual({ taps: 1 });
+  });
+
+  it('does not start on defaults when its state cannot be read, and starts with the saved state on try again', async () => {
+    const name = documentNames.activity(PROFILE.id, withState.id);
+    const h = await run(withState, {
+      prepare: (fake) => {
+        fake.documents.set(name, JSON.stringify({ version: 1, state: { taps: 4 } }));
+        fake.failNext('read', name, new BridgeError('io', 'disk busy'));
+      },
+    });
+    await screen.findByRole('heading', { name: shellStrings.notOpened.text });
+    expect(h.spoken()).toContain(shellStrings.notOpened.id);
+    expect(screen.queryByRole('button', { name: /^taps/ })).toBeNull();
+
+    click(appShellStrings.tryAgain.text);
+    await screen.findByRole('button', { name: 'taps 4' });
   });
 });
 
