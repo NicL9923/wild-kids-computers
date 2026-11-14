@@ -114,7 +114,7 @@ export function ancestry(fs: FileSystem, id: string): FsNode[] {
 }
 
 /** True when the item is the folder or anywhere inside it. */
-export function isInside(fs: FileSystem, id: string, folderId: string): boolean {
+function isInside(fs: FileSystem, id: string, folderId: string): boolean {
   return ancestry(fs, id).some((node) => node.id === folderId);
 }
 
@@ -146,7 +146,7 @@ export function nodeAtPath(fs: FileSystem, path: string): FsNode | undefined {
 }
 
 /** Every item inside a folder, at any depth, not counting the folder. */
-export function descendants(fs: FileSystem, folderId: string): FsNode[] {
+function descendants(fs: FileSystem, folderId: string): FsNode[] {
   return listFolder(fs, folderId).flatMap((child) => [child, ...descendants(fs, child.id)]);
 }
 

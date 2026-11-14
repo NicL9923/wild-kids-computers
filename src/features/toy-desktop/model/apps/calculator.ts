@@ -7,6 +7,7 @@
 export const CALCULATOR_MAX_DIGITS = 10;
 
 export const OPERATORS = ['add', 'subtract', 'multiply', 'divide'] as const;
+/** @public */
 export type Operator = (typeof OPERATORS)[number];
 
 export type CalculatorKey =

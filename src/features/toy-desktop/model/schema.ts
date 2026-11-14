@@ -214,6 +214,7 @@ function repairLoaded(state: DesktopState): DesktopState {
   return repairWindows({ ...placed, focusedWindowId });
 }
 
+/** @public */
 export const desktopStateSchema = z
   .object({
     size: z.object({ width: dimension, height: dimension }),

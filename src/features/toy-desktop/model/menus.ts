@@ -27,8 +27,10 @@ import {
 } from './state.ts';
 import { canRedo, canUndo, hasSelection, type TextClipboard } from './textEditor.ts';
 
+/** @public */
 export type MenuId = 'file' | 'edit' | 'view' | 'go' | 'play';
 
+/** @public */
 export interface MenuItem {
   command: CommandId;
   enabled: boolean;
@@ -43,7 +45,7 @@ export interface Menu {
 const TEXT_EDIT: readonly CommandId[] = ['undo', 'redo', 'cut', 'copy', 'paste', 'select-all'];
 
 /** The menus of each app, left to right, and the commands in each, top to bottom. */
-export const APP_MENUS: Readonly<Record<AppKind, readonly { id: MenuId; commands: readonly CommandId[] }[]>> = {
+const APP_MENUS: Readonly<Record<AppKind, readonly { id: MenuId; commands: readonly CommandId[] }[]>> = {
   notepad: [
     { id: 'file', commands: ['new', 'open', 'save', 'save-as', 'close'] },
     { id: 'edit', commands: TEXT_EDIT },

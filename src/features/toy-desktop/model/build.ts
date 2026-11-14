@@ -45,6 +45,7 @@ interface WindowPlacement {
   maximized?: boolean;
 }
 
+/** @public */
 export type WindowSpec = WindowPlacement &
   (
     | { app: 'notepad'; /** Unsaved text in a new note. */ text?: string }

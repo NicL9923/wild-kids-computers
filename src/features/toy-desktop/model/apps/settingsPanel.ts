@@ -7,10 +7,12 @@ import { createEditor, type TextEditorState } from '../textEditor.ts';
 
 /** Radio group: the desktop's background picture. */
 export const WALLPAPERS = ['meadow', 'pond', 'hills', 'night-sky'] as const;
+/** @public */
 export type Wallpaper = (typeof WALLPAPERS)[number];
 
 /** Dropdown: how big desktop icons are. */
 export const ICON_SIZES = ['small', 'medium', 'large'] as const;
+/** @public */
 export type IconSize = (typeof ICON_SIZES)[number];
 
 /** Scrollable list: the sound the toy computer makes for an alert. More than fit at once. */
@@ -28,6 +30,7 @@ export const ALERT_SOUNDS = [
   'chime',
   'wood-block',
 ] as const;
+/** @public */
 export type AlertSound = (typeof ALERT_SOUNDS)[number];
 
 /** Rows of the alert sound list that show at once. The rest are reached by scrolling. */

@@ -83,6 +83,7 @@ export type ExplorerAction =
   | { type: 'cancel-rename' }
   | { type: 'clear-search' };
 
+/** @public */
 export type DialogAction =
   /** Single click on a folder, or a place such as Home in the dialog's side list. */
   | { type: 'open-folder'; folderId: string }
@@ -92,6 +93,7 @@ export type DialogAction =
   | { type: 'confirm' }
   | { type: 'cancel' };
 
+/** @public */
 export type MusicBoxAction = { type: 'toggle'; step: number; note: number } | { type: 'tick' };
 
 export type DesktopAction =
@@ -128,7 +130,7 @@ export type DesktopAction =
 export const NEW_FOLDER_NAME = 'New folder';
 
 /** The size each app's window opens at. */
-export const DEFAULT_WINDOW_SIZES: Readonly<Record<AppKind, Size>> = {
+const DEFAULT_WINDOW_SIZES: Readonly<Record<AppKind, Size>> = {
   notepad: { width: 560, height: 400 },
   'picture-viewer': { width: 640, height: 480 },
   'file-explorer': { width: 640, height: 440 },
@@ -148,7 +150,7 @@ function then(first: Transition, next: (state: DesktopState) => Step): Step {
 }
 
 /** A fresh app of a kind, with nothing open. */
-export function createApp(kind: AppKind, state: DesktopState): AppState {
+function createApp(kind: AppKind, state: DesktopState): AppState {
   switch (kind) {
     case 'notepad':
       return {

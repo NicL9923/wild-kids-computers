@@ -57,7 +57,10 @@ export type TextEditOp =
   /** A pointer selection or caret placement. Out-of-range offsets clamp. */
   | { type: 'select'; anchor: number; caret: number };
 
-/** The standard edit commands, which every app runs the same way. */
+/**
+ * The standard edit commands, which every app runs the same way.
+ * @public
+ */
 export type TextCommandOp =
   | { type: 'select-all' }
   | { type: 'cut' }
@@ -141,7 +144,10 @@ export function setEditorText(editor: TextEditorState, text: string): TextEditor
   return createEditor({ text, multiline: editor.multiline, maxLength: editor.maxLength });
 }
 
-/** The selection as `[start, end]`, start first. */
+/**
+ * The selection as `[start, end]`, start first.
+ * @public
+ */
 export function selectionRange(editor: TextSnapshot): [number, number] {
   return [Math.min(editor.anchor, editor.caret), Math.max(editor.anchor, editor.caret)];
 }

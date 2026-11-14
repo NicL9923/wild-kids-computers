@@ -10,7 +10,7 @@ export const MAX_NAME_LENGTH = 32;
  * Characters a name cannot use. These are the ones real computers refuse, so the habit carries
  * over. The slash also keeps paths such as "Pictures/Cat" unambiguous.
  */
-export const DISALLOWED_NAME_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'] as const;
+const DISALLOWED_NAME_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'] as const;
 
 export type NameProblem =
   /** Nothing but spaces, or nothing at all. */

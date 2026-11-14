@@ -5,7 +5,7 @@
  */
 
 /** Commands every app runs the same way, when the app has them. */
-export const STANDARD_COMMANDS = [
+const STANDARD_COMMANDS = [
   'new',
   'open',
   'save',
@@ -20,7 +20,7 @@ export const STANDARD_COMMANDS = [
 ] as const;
 
 /** Commands only some apps have. */
-export const APP_COMMANDS = [
+const APP_COMMANDS = [
   'new-folder',
   'rename',
   'delete',

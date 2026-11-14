@@ -2,7 +2,7 @@
 import type { AppState } from './state.ts';
 import type { TextEditorState } from './textEditor.ts';
 
-export const TEXT_FIELDS = ['document', 'file-name', 'search', 'rename', 'computer-name'] as const;
+const TEXT_FIELDS = ['document', 'file-name', 'search', 'rename', 'computer-name'] as const;
 export type TextFieldId = (typeof TEXT_FIELDS)[number];
 
 /** The editor behind a field, or undefined when the app has no such field right now. */

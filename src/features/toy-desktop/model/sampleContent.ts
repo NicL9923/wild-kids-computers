@@ -7,7 +7,7 @@ import type { DesktopState } from './state.ts';
 
 export const SAMPLE_PICTURE_IDS = ['sunflower', 'fox', 'sailboat', 'rainbow', 'butterfly', 'tractor'] as const;
 
-export const SAMPLE_FILES: TreeSpec = {
+const SAMPLE_FILES: TreeSpec = {
   Notes: {
     'Shopping list': note('apples\nbread\nmilk'),
     'Animal names': note('fox\nowl\nfrog'),

@@ -40,6 +40,7 @@ export interface NotepadState {
   dialog: FileDialog | null;
 }
 
+/** @public */
 export interface PictureViewerState {
   kind: 'picture-viewer';
   fileId: string | null;
@@ -56,6 +57,7 @@ export interface FileExplorerState {
   rename: { nodeId: string; field: TextEditorState } | null;
 }
 
+/** @public */
 export interface MusicBoxState extends MusicBoxGrid {
   kind: 'music-box';
   fileId: string | null;
@@ -113,6 +115,7 @@ export function topVisibleWindow(state: DesktopState, exceptId?: string): Window
   return state.windows.findLast((window) => !window.minimized && window.id !== exceptId);
 }
 
+/** @public */
 export function focusedWindow(state: DesktopState): WindowState | undefined {
   return state.focusedWindowId === null ? undefined : findWindow(state, state.focusedWindowId);
 }
