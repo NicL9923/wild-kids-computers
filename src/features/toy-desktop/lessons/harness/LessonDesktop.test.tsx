@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Band } from '../../../../core/bands.ts';
 import { createManualScheduler, type ManualScheduler } from '../../../../core/activityKit/scheduler.ts';
 import { createScope } from '../../../../core/activityKit/scope.ts';
 import type { SpokenHandle } from '../../../../core/strings/defineStrings.ts';
@@ -81,9 +82,9 @@ describe('the lesson harness, running open and close', () => {
     vi.unstubAllGlobals();
   });
 
-  async function start() {
+  async function start(round = level, band: Band = 'band-6-8') {
     const fake = fakeKit(scheduler);
-    const view = render(<LessonDesktop level={level} band='band-6-8' kit={fake.kit} steps={openCloseSteps(level)} />);
+    const view = render(<LessonDesktop level={round} band={band} kit={fake.kit} steps={openCloseSteps(round)} />);
     // The first step's instruction waits for the shell's own instruction to be set.
     await act(() => Promise.resolve());
     return { ...fake, container: view.container };
@@ -118,6 +119,16 @@ describe('the lesson harness, running open and close', () => {
     // The pointer goes away when the step is done.
     fireEvent.click(icon(container, level.app));
     expect(icon(container, level.app).getAttribute('data-highlight')).toBe('false');
+  });
+
+  it('counts no try for the youngest band, whose windows open filling the screen', async () => {
+    const young = generateLevel(31, 1, 'band-3-5');
+    const { calls, container } = await start(young, 'band-3-5');
+    fireEvent.click(icon(container, young.app));
+    expect(container.querySelector(`[data-app="${young.app}"]`)?.getAttribute('data-maximized')).toBe('true');
+    fireEvent.click(closeOf(container, young.app));
+    expect(calls.filter((entry) => entry.call === 'wrong' || entry.call === 'hint')).toEqual([]);
+    expect(calls.at(-1)).toEqual({ call: 'correct', say: feedback.youDidIt.id });
   });
 
   it('ends the round after the last step, once the child has seen it land', async () => {

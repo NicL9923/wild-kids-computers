@@ -223,16 +223,20 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const open = useCallback(
     (action: OpenAction) => {
       const now = desktop.current();
-      const app = action.type === 'open-app' ? action.app : appForNode(getNode(now.fs, action.fileId));
+      const app =
+        action.type === 'open-app'
+          ? action.app
+          : action.type === 'open-folder'
+            ? 'file-explorer'
+            : appForNode(getNode(now.fs, action.fileId));
       const targetPx = Number.parseFloat(
         screen.current === null ? '' : getComputedStyle(screen.current).getPropertyValue('--wk-target-min'),
       );
       const size =
         app === null || !(targetPx > 0) ? undefined : comfortableSize(app, targetPx, fitDesktop(spaceRef.current));
-      const opened = dispatch({ ...action, size });
-      const windowId = opened.events.find((event) => event.type === 'window-opened')?.windowId;
-      if (parts.openMaximized && windowId !== undefined) dispatch({ type: 'maximize-window', windowId });
-      return opened;
+      // One dispatch: a window that opens maximized is one action for a lesson, never an open
+      // followed by a maximize the child did not ask for.
+      return dispatch({ ...action, size, maximized: parts.openMaximized });
     },
     [desktop, dispatch, parts.openMaximized],
   );

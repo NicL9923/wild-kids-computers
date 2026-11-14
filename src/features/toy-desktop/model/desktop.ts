@@ -121,11 +121,14 @@ export type MusicBoxAction = { type: 'toggle'; step: number; note: number } | { 
 export type DesktopAction =
   /**
    * Opens an app in a new window. `size` replaces the app's usual size, such as a size that suits
-   * the screen; it is clamped to the desktop.
+   * the screen; it is clamped to the desktop. With `maximized`, the new window opens filling the
+   * desktop, in the same transition, so a lesson sees one action and not an open and a maximize.
    */
-  | { type: 'open-app'; app: AppKind; size?: Size }
-  /** Opens a file in its app, or brings forward the window that already shows it. `size` as for open-app. */
-  | { type: 'open-file'; fileId: string; size?: Size }
+  | { type: 'open-app'; app: AppKind; size?: Size; maximized?: boolean }
+  /** Opens a file in its app, or brings forward the window that already shows it. `size` and `maximized` as for open-app. */
+  | { type: 'open-file'; fileId: string; size?: Size; maximized?: boolean }
+  /** Opens a folder or the trash in a new file explorer. `size` and `maximized` as for open-app. */
+  | { type: 'open-folder'; folderId: string; size?: Size; maximized?: boolean }
   | { type: 'close-window'; windowId: string }
   /** A click on a window that is not minimized. */
   | { type: 'focus-window'; windowId: string }
@@ -181,6 +184,10 @@ const nameEditor = (text = '') => createEditor({ text, maxLength: MAX_NAME_LENGT
 /** A name field with the whole name selected, so typing replaces it. */
 const selectedName = (text: string): TextEditorState => ({ ...nameEditor(text), anchor: 0 });
 
+function createExplorer(): FileExplorerState {
+  return { kind: 'file-explorer', folderId: HOME_ID, selectedId: null, search: nameEditor(), rename: null };
+}
+
 /** A fresh app of a kind, with nothing open. */
 function createApp(kind: AppKind, state: DesktopState): AppState {
   switch (kind) {
@@ -189,7 +196,7 @@ function createApp(kind: AppKind, state: DesktopState): AppState {
     case 'picture-viewer':
       return { kind, fileId: null, dialog: null };
     case 'file-explorer':
-      return { kind, folderId: HOME_ID, selectedId: null, search: nameEditor(), rename: null };
+      return createExplorer();
     case 'music-box':
       return { ...createGrid(), kind, fileId: null, savedTune: emptyTune(), dialog: null };
     case 'calculator':
@@ -255,7 +262,7 @@ function refocus(state: DesktopState): Transition {
   return front === undefined ? done({ ...state, focusedWindowId: null }) : bringToFront(state, front);
 }
 
-function openWindow(state: DesktopState, app: AppState, size?: Size): Step {
+function openWindow(state: DesktopState, app: AppState, size?: Size, maximized = false): Step {
   if (size !== undefined && !(Number.isFinite(size.width) && Number.isFinite(size.height))) return 'not-an-option';
   if (state.windows.length >= MAX_WINDOWS) return 'too-many-windows';
   const windowId = `w${state.nextWindowId}`;
@@ -264,7 +271,7 @@ function openWindow(state: DesktopState, app: AppState, size?: Size): Step {
     state.size,
     state.windows.map((window) => window.rect),
   );
-  const window: WindowState = { id: windowId, rect, minimized: false, maximized: false, app };
+  const window: WindowState = { id: windowId, rect, minimized: false, maximized, app };
   const next = {
     ...state,
     nextWindowId: state.nextWindowId + 1,
@@ -286,16 +293,30 @@ function openedEvents(windowId: string, file: FileNode): DesktopEvent[] {
   return file.kind === 'picture' ? [opened, { type: 'picture-shown', windowId, nodeId: file.id }] : [opened];
 }
 
-function openFile(state: DesktopState, fileId: string, size?: Size): Step {
+function openFile(state: DesktopState, fileId: string, size?: Size, maximized = false): Step {
   const file = getNode(state.fs, fileId);
   if (file === undefined) return 'not-found';
   if (!isFile(file)) return 'not-a-file';
   if (isTrashed(state.fs, fileId)) return 'in-trash';
   const showing = state.windows.find((window) => 'fileId' in window.app && window.app.fileId === fileId);
   if (showing !== undefined) return activate(state, showing);
-  const opened = openWindow(state, appForFile(file), size);
+  const opened = openWindow(state, appForFile(file), size, maximized);
   if (typeof opened === 'string') return opened;
   return { ...opened, events: [...opened.events, ...openedEvents(`w${state.nextWindowId}`, file)] };
+}
+
+function openFolder(state: DesktopState, folderId: string, size?: Size, maximized = false): Step {
+  const folder = getNode(state.fs, folderId);
+  if (folder === undefined) return 'not-found';
+  if (!isFolder(folder)) return 'not-a-folder';
+  if (isTrashed(state.fs, folderId)) return 'in-trash';
+  const explorer: FileExplorerState = { ...createExplorer(), folderId };
+  const opened = openWindow(state, explorer, size, maximized);
+  if (typeof opened === 'string') return opened;
+  const windowId = `w${state.nextWindowId}`;
+  return folderId === HOME_ID
+    ? opened
+    : { ...opened, events: [...opened.events, { type: 'folder-opened', windowId, folderId }] };
 }
 
 function closeWindow(state: DesktopState, window: WindowState): Transition {
@@ -955,9 +976,11 @@ export function repairWindows(state: DesktopState): DesktopState {
 function handle(state: DesktopState, action: DesktopAction, env: DesktopEnv): Step {
   switch (action.type) {
     case 'open-app':
-      return openWindow(state, createApp(action.app, state), action.size);
+      return openWindow(state, createApp(action.app, state), action.size, action.maximized);
     case 'open-file':
-      return openFile(state, action.fileId, action.size);
+      return openFile(state, action.fileId, action.size, action.maximized);
+    case 'open-folder':
+      return openFolder(state, action.folderId, action.size, action.maximized);
     case 'focus-next-window': {
       const back = state.windows[0];
       return back === undefined ? done(state) : activate(state, back);
