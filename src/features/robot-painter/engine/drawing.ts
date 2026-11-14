@@ -65,7 +65,7 @@ function sameLine(a: Line, b: Line): boolean {
   );
 }
 
-/** Adds an interval to a sorted list of disjoint intervals, merging pieces that touch. */
+/** Adds an interval to a list of disjoint intervals, merging pieces that overlap or touch. */
 function addInterval(list: readonly Interval[], added: Interval): Interval[] {
   let [start, end] = added;
   const out: Interval[] = [];
@@ -78,21 +78,23 @@ function addInterval(list: readonly Interval[], added: Interval): Interval[] {
     }
   }
   out.push([start, end]);
-  return out.toSorted((a, b) => a[0] - b[0]);
+  return out;
 }
 
 /** What is left of a list after taking away every interval in `removed`. Slivers vanish. */
 function subtract(list: readonly Interval[], removed: readonly Interval[]): Interval[] {
-  let out: Interval[] = [...list];
+  let out: readonly Interval[] = list;
   for (const [cutStart, cutEnd] of removed) {
-    const next: Interval[] = [];
-    for (const [start, end] of out) {
-      if (cutStart - start > TOLERANCE) next.push([start, Math.min(end, cutStart)]);
-      if (end - cutEnd > TOLERANCE) next.push([Math.max(start, cutEnd), end]);
-    }
-    out = next.filter(([start, end]) => end - start > TOLERANCE);
+    // Keep what lies before the cut and what lies after it. A side the cut covers comes out
+    // empty or backwards, and the filter drops it with the slivers.
+    out = out
+      .flatMap(([start, end]): Interval[] => [
+        [start, Math.min(end, cutStart)],
+        [Math.max(start, cutEnd), end],
+      ])
+      .filter(([start, end]) => end - start > TOLERANCE);
   }
-  return out;
+  return [...out];
 }
 
 /** The parts of a list that some interval in `kept` also covers. */
@@ -110,9 +112,9 @@ interface Group {
   readonly theirs: Pieces;
 }
 
-/** Paints a later piece over earlier pieces of other colors, then merges it into its own color. */
+/** Paints a later piece over whatever lies under it, then merges it into its own color. */
 function paint(pieces: Pieces, color: PenColor, interval: Interval) {
-  for (const [other, list] of pieces) if (other !== color) pieces.set(other, subtract(list, [interval]));
+  for (const [other, list] of pieces) pieces.set(other, subtract(list, [interval]));
   pieces.set(color, addInterval(pieces.get(color) ?? [], interval));
 }
 

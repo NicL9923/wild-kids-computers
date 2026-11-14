@@ -73,12 +73,32 @@ describe('repeat', () => {
     expect(result.steps).toBe(1 + moves);
   });
 
+  it('runs a repeat that follows a repeat with nothing to do', () => {
+    const result = run([d.repeat(2, []), d.repeat(2, [d.turnRight(90)])]);
+    expect(result.robot.heading).toBe(180);
+  });
+
   it('marks the repeat around the running block, outermost first', () => {
     const { steps: all } = steps([d.repeat(2, [d.repeat(1, [d.turnRight(90)])])]);
     expect(all.map((step) => [step.blockId, step.within])).toEqual([
       ['b0.0.0', ['b0', 'b0.0']],
       ['b0.0.0', ['b0', 'b0.0']],
     ]);
+  });
+
+  it('skips calls to a definition that never takes a step, however deep the chain of calls', () => {
+    // Each definition calls the next 24 times, and the last repeats a move zero times. Running
+    // every call, or checking every path through the chain, would take 24^7 calls and hang.
+    const names = ['box', 'house', 'petal', 'flower', 'tree', 'leaf', 'sun', 'moon'] as const;
+    const definitions = names.map((name, index) => {
+      const next = names[index + 1];
+      return d.define(
+        name,
+        next === undefined ? [d.repeat(0, [d.right()])] : Array.from({ length: 24 }, () => d.call(next)),
+      );
+    });
+    const result = run([d.repeat(MAX_REPEAT, [d.call('box')]), d.right()], definitions);
+    expect(result).toMatchObject({ outcome: 'finished', steps: 1, robot: { x: 2 } });
   });
 
   it('finishes at once when deep repeats hold nothing to do', () => {
@@ -93,16 +113,17 @@ describe('defined blocks', () => {
   it('runs a block defined once and called twice, marking the call and the definition', () => {
     const { steps: all, result } = steps(
       [d.call('box'), d.penUp(), d.right(), d.penDown(), d.call('box')],
-      [d.define('box', [d.down(), d.up()])],
+      // The empty repeat and the unused definition must not stop the box from running.
+      [d.define('sun', [d.left()]), d.define('box', [d.down(), d.repeat(0, [d.left()]), d.up()])],
     );
     expect(all.map((step) => [step.blockId, step.within])).toEqual([
-      ['d0.0', ['b0', 'd0']],
-      ['d0.1', ['b0', 'd0']],
+      ['d1.0', ['b0', 'd1']],
+      ['d1.2', ['b0', 'd1']],
       ['b1', []],
       ['b2', []],
       ['b3', []],
-      ['d0.0', ['b4', 'd0']],
-      ['d0.1', ['b4', 'd0']],
+      ['d1.0', ['b4', 'd1']],
+      ['d1.2', ['b4', 'd1']],
     ]);
     expect(canonicalDrawing(result.segments)).toEqual([
       { from: { x: 1, y: 1 }, to: { x: 1, y: 2 }, color: 'blue' },
@@ -134,6 +155,20 @@ describe('the step cap', () => {
     for (; !next.done; next = generator.next()) count++;
     expect(count).toBe(MAX_STEPS);
     expect(next.value.outcome).toBe('step-limit');
+  });
+});
+
+describe('step events', () => {
+  it('names what each kind of block did', () => {
+    const { steps: all } = steps([d.penUp(), d.right(), d.penDown(), d.color('red'), d.turnLeft(90), d.down()]);
+    expect(all.map((step) => step.event)).toEqual([
+      { kind: 'pen-up' },
+      { kind: 'moved', segment: null },
+      { kind: 'pen-down' },
+      { kind: 'color' },
+      { kind: 'turned' },
+      { kind: 'moved', segment: { from: { x: 2, y: 1 }, to: { x: 2, y: 2 }, color: 'red' } },
+    ]);
   });
 });
 

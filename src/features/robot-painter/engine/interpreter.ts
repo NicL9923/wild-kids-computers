@@ -79,6 +79,9 @@ export interface RunResult {
   readonly steps: number;
 }
 
+/** The path above the program's own blocks. One array, so both entry points start the same. */
+const TOP: readonly string[] = [];
+
 interface StepRecord {
   readonly blockId: string;
   readonly within: readonly string[];
@@ -93,7 +96,7 @@ class Machine {
   steps = 0;
   halted = false;
   private readonly definitions: readonly Definition[];
-  private readonly hasSteps = new Map<string, boolean>();
+  private readonly known = new Map<Block, boolean>();
   private readonly canvas: Canvas;
   private readonly limit: number;
 
@@ -105,29 +108,30 @@ class Machine {
   }
 
   /**
-   * Whether running these blocks takes at least one primitive step. A repeat with an empty
-   * body is skipped, so every loop pass takes a step and the step cap bounds all the work.
+   * Whether running a block takes at least one primitive step. A repeat or a call that takes
+   * none is skipped, so every loop pass and every call reaches a step, and the step cap bounds
+   * all the work. The answer is kept per block, so a deep chain of definitions is checked once,
+   * not once per path through it.
    */
-  private takesSteps(blocks: readonly Block[]): boolean {
-    return blocks.some((block) => {
-      if (block.kind === 'repeat') return block.count > 0 && this.takesSteps(block.body);
-      if (block.kind !== 'call') return true;
-      let known = this.hasSteps.get(block.name);
-      if (known === undefined) {
-        known = this.definitions.some(
-          (definition) => definition.name === block.name && this.takesSteps(definition.body),
-        );
-        this.hasSteps.set(block.name, known);
-      }
-      return known;
-    });
+  private takesSteps(block: Block): boolean {
+    if (block.kind !== 'repeat' && block.kind !== 'call') return true;
+    let known = this.known.get(block);
+    if (known === undefined) {
+      known =
+        block.kind === 'repeat'
+          ? block.count > 0 && block.body.some((inner) => this.takesSteps(inner))
+          : this.definitions.some(
+              (definition) => definition.name === block.name && definition.body.some((inner) => this.takesSteps(inner)),
+            );
+      this.known.set(block, known);
+    }
+    return known;
   }
 
   *run(blocks: readonly Block[], within: readonly string[]): Generator<StepRecord, void> {
     for (const block of blocks) {
-      if (this.halted) return;
+      if (!this.takesSteps(block)) continue;
       if (block.kind === 'repeat') {
-        if (!this.takesSteps(block.body)) continue;
         const inner = [...within, block.id];
         for (let pass = 0; pass < block.count && !this.halted; pass++) yield* this.run(block.body, inner);
       } else if (block.kind === 'call') {
@@ -209,7 +213,7 @@ class Machine {
  */
 export function* stepProgram(program: ValidProgram, world: World, limit = MAX_STEPS): Generator<RunStep, RunResult> {
   const machine = new Machine(program, world, limit);
-  for (const record of machine.run(program.blocks, [])) {
+  for (const record of machine.run(program.blocks, TOP)) {
     yield { ...record, index: machine.steps - 1, robot: machine.robot, drawing: [...machine.segments] };
   }
   return machine.result();
@@ -218,7 +222,7 @@ export function* stepProgram(program: ValidProgram, world: World, limit = MAX_ST
 /** Runs a program to the end, or to the step cap, without building a picture for each step. */
 export function runProgram(program: ValidProgram, world: World, limit = MAX_STEPS): RunResult {
   const machine = new Machine(program, world, limit);
-  for (const _ of machine.run(program.blocks, [])) {
+  for (const _ of machine.run(program.blocks, TOP)) {
     // Each pass applies one step. Only the end matters here.
   }
   return machine.result();

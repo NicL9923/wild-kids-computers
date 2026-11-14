@@ -6,6 +6,14 @@ const move = (id: string, direction = 'up') => ({ id, kind: 'move', direction })
 const program = (blocks: unknown[], definitions: unknown[] = []) => ({ blocks, definitions });
 const moves = (count: number) => Array.from({ length: count }, (_, index) => move(`m${index}`));
 
+/** A definition whose body is one call. */
+const calls = (id: string, name: string, callee: string) => ({
+  id,
+  kind: 'define',
+  name,
+  body: [{ id: `${id}.0`, kind: 'call', name: callee }],
+});
+
 function issuesOf(input: unknown): readonly ProgramIssue[] {
   const result = validateProgram(input);
   return result.ok ? [] : result.issues;
@@ -147,6 +155,50 @@ describe('validateProgram', () => {
     ],
   ])('rejects %s', (_, input, expected) => {
     expect(issuesOf(input)).toEqual([expected]);
+  });
+
+  it.each([
+    [
+      'a bad block inside a definition',
+      program([], [{ id: 'a', kind: 'define', name: 'box', body: [{ id: 'b', kind: 'color', color: 'pink' }] }]),
+      { reason: 'bad-value', path: 'definitions[0].body[0]', blockId: 'b', field: 'color' },
+    ],
+    [
+      'a call to an undefined block inside a definition',
+      program(
+        [],
+        [{ id: 'a', kind: 'define', name: 'box', body: [move('b'), { id: 'c', kind: 'call', name: 'sun' }] }],
+      ),
+      { reason: 'undefined-block', path: 'definitions[0].body[1]', blockId: 'c', name: 'sun' },
+    ],
+    [
+      'a block with no id, reporting only the id',
+      program([{ kind: 'move', direction: 'sideways' }]),
+      { reason: 'malformed', path: 'blocks[0]', detail: 'id' },
+    ],
+    [
+      'a definition with no id, reporting only the id',
+      program([], [{ kind: 'define', name: 'dragon', body: [] }]),
+      { reason: 'malformed', path: 'definitions[0]', detail: 'id' },
+    ],
+  ])('points at the place of %s', (_, input, expected) => {
+    expect(issuesOf(input)).toEqual([expected]);
+  });
+
+  it('reports each separate loop once', () => {
+    const input = program(
+      [],
+      [calls('a', 'box', 'sun'), calls('b', 'sun', 'box'), calls('c', 'moon', 'tree'), calls('d', 'tree', 'moon')],
+    );
+    expect(issuesOf(input)).toEqual([
+      { reason: 'recursion', cycle: ['box', 'sun', 'box'] },
+      { reason: 'recursion', cycle: ['moon', 'tree', 'moon'] },
+    ]);
+  });
+
+  it('reports a definition that calls itself once, even when another definition calls it', () => {
+    const input = program([], [calls('a', 'box', 'sun'), calls('b', 'sun', 'sun')]);
+    expect(issuesOf(input)).toEqual([{ reason: 'recursion', cycle: ['sun', 'sun'] }]);
   });
 
   it('names the loop when definitions call each other in a circle', () => {

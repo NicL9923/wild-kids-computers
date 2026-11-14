@@ -10,7 +10,7 @@ function block(draftBlock: BlockDraft): Block {
 
 describe('offers', () => {
   const toolbox: ToolboxItem[] = [
-    ...arrows('up'),
+    ...arrows('up', 'left'),
     { kind: 'forward', distances: [2, 3] },
     { kind: 'turn', direction: 'right', angles: [90] },
     ...colors('red'),
@@ -30,13 +30,14 @@ describe('offers', () => {
     ['a repeat', d.repeat(2, []), true],
     ['pen up when the pen is not offered', d.penUp(), false],
     ['a call when define is not offered', d.call('box'), false],
+    ['a turn left when only the left arrow is offered', d.turnLeft(90), false],
   ])('%s: %s', (_, draftBlock, expected) => {
     expect(offers(toolbox, block(draftBlock))).toBe(expected);
   });
 
-  it('offers define and call together', () => {
-    const program = assignIds([d.call('box')], [d.define('box', [])]);
-    expect(checkFit(program, [{ kind: 'define' }], 10)).toEqual([]);
+  it('offers define and call together, and nothing else', () => {
+    const program = assignIds([d.call('box'), d.up()], [d.define('box', [])]);
+    expect(checkFit(program, [{ kind: 'define' }], 10)).toEqual([{ reason: 'not-in-toolbox', blockId: 'b1' }]);
   });
 });
 

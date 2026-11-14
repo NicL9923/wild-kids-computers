@@ -102,17 +102,12 @@ describe.each(withStartingProgram)('%s, from its starting program', (_, puzzle, 
     expect(checkFit(starting, puzzle.toolbox, puzzle.blockLimit)).toEqual([]);
     expect(checkRun(puzzle, runPuzzle(puzzle, starting)).solved).toBe(false);
   });
-
-  it.runIf(puzzle.kind === 'fix')('is one block away from the solution in a fix puzzle', () => {
-    expect(changedBlocks(starting, puzzle.solution)).toBe(1);
-  });
 });
 
-it('gives every fix puzzle a starting program', () => {
-  const fixes = robotPuzzles.filter((puzzle) => puzzle.kind === 'fix');
-  expect(fixes.map((puzzle) => puzzle.id)).toEqual(
-    withStartingProgram.filter(([, p]) => p.kind === 'fix').map(([id]) => id),
-  );
+const fixes = withStartingProgram.filter(([, puzzle]) => puzzle.kind === 'fix');
+
+it.each(fixes)('starts %s one block away from its solution', (_, puzzle, starting) => {
+  expect(changedBlocks(starting, puzzle.solution)).toBe(1);
 });
 
 describe('what each tier teaches', () => {

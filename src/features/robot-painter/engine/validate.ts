@@ -62,8 +62,7 @@ export class ValidProgram implements Program {
   /** Use validateProgram. This is the one place a ValidProgram is made. */
   static check(input: unknown, maxBlocks: number): ValidationResult {
     const read = readProgram(input, maxBlocks);
-    if (read.issues.length > 0) return { ok: false, issues: read.issues };
-    return { ok: true, program: new ValidProgram(read.blocks, read.definitions) };
+    return read.ok ? { ok: true, program: new ValidProgram(read.blocks, read.definitions) } : read;
   }
 }
 
@@ -83,8 +82,6 @@ function isName(value: unknown): value is DefinitionName {
   return isOneOf(DEFINITION_NAMES, value);
 }
 
-class TooManyBlocks extends Error {}
-
 /**
  * Checks a program from any source: a screen, saved data, or an authored puzzle. On success
  * the result holds a fresh copy with only the known fields, so later changes to the input do
@@ -97,10 +94,14 @@ export function validateProgram(input: unknown, maxBlocks = MAX_PROGRAM_BLOCKS):
   return ValidProgram.check(input, maxBlocks);
 }
 
-interface ReadProgram {
-  readonly blocks: readonly Block[];
-  readonly definitions: readonly Definition[];
-  readonly issues: readonly ProgramIssue[];
+type ReadProgram =
+  | { readonly ok: true; readonly blocks: readonly Block[]; readonly definitions: readonly Definition[] }
+  | { readonly ok: false; readonly issues: readonly ProgramIssue[] };
+
+/** Whether a value is a whole number from low to high, both included. */
+function isWholeIn(value: unknown, low: number, high: number): value is number {
+  // Number.isInteger is true only for numbers, so Number() hands the same number back.
+  return Number.isInteger(value) && Number(value) >= low && Number(value) <= high;
 }
 
 function readProgram(input: unknown, maxBlocks: number): ReadProgram {
@@ -114,7 +115,8 @@ function readProgram(input: unknown, maxBlocks: number): ReadProgram {
 
   const readId = (value: Record<string, unknown>, path: string): string | undefined => {
     count++;
-    if (count > maxBlocks) throw new TooManyBlocks();
+    // Past the limit, nothing more is read, so deeply nested saved data cannot exhaust the stack.
+    if (count > maxBlocks) return undefined;
     const id = value.id;
     if (typeof id !== 'string' || id.length === 0) {
       issue({ reason: 'malformed', path, detail: 'id' });
@@ -144,9 +146,10 @@ function readProgram(input: unknown, maxBlocks: number): ReadProgram {
       return undefined;
     }
     const id = readId(value, path);
+    if (id === undefined) return undefined;
     const kind = value.kind;
     const bad = (field: string) => {
-      if (id !== undefined) issue({ reason: 'bad-value', path, blockId: id, field });
+      issue({ reason: 'bad-value', path, blockId: id, field });
       return undefined;
     };
     let block: LeafDraft;
@@ -157,9 +160,7 @@ function readProgram(input: unknown, maxBlocks: number): ReadProgram {
         break;
       case 'forward': {
         const distance = value.distance;
-        if (typeof distance !== 'number' || !Number.isInteger(distance) || distance < 1 || distance > MAX_DISTANCE) {
-          return bad('distance');
-        }
+        if (!isWholeIn(distance, 1, MAX_DISTANCE)) return bad('distance');
         block = { kind, distance };
         break;
       }
@@ -183,23 +184,17 @@ function readProgram(input: unknown, maxBlocks: number): ReadProgram {
       case 'repeat': {
         const repeatCount = value.count;
         const body = readList(value.body, `${path}.body`);
-        if (
-          typeof repeatCount !== 'number' ||
-          !Number.isInteger(repeatCount) ||
-          repeatCount < 0 ||
-          repeatCount > MAX_REPEAT
-        ) {
-          if (id !== undefined) issue({ reason: 'repeat-count-out-of-range', path, blockId: id, count: repeatCount });
+        if (!isWholeIn(repeatCount, 0, MAX_REPEAT)) {
+          issue({ reason: 'repeat-count-out-of-range', path, blockId: id, count: repeatCount });
           return undefined;
         }
-        if (id === undefined) return undefined;
         return Object.freeze({ id, kind, count: repeatCount, body: Object.freeze(body) });
       }
       default:
         issue({ reason: 'unknown-block', path, kind });
         return undefined;
     }
-    return id === undefined ? undefined : Object.freeze({ ...block, id });
+    return Object.freeze({ ...block, id });
   };
 
   const readDefinitions = (value: unknown): Definition[] => {
@@ -215,85 +210,74 @@ function readProgram(input: unknown, maxBlocks: number): ReadProgram {
         return;
       }
       const id = readId(item, path);
+      if (id === undefined) return;
       const body = readList(item.body, `${path}.body`);
       if (!isName(item.name)) {
-        if (id !== undefined) issue({ reason: 'bad-value', path, blockId: id, field: 'name' });
+        issue({ reason: 'bad-value', path, blockId: id, field: 'name' });
         return;
       }
       if (definitions.some((other) => other.name === item.name)) {
         issue({ reason: 'duplicate-definition', path, name: item.name });
       }
-      if (id !== undefined)
-        definitions.push(Object.freeze({ id, kind: 'define', name: item.name, body: Object.freeze(body) }));
+      definitions.push(Object.freeze({ id, kind: 'define', name: item.name, body: Object.freeze(body) }));
     });
     return definitions;
   };
 
-  let blocks: Block[];
-  let definitions: Definition[];
-  try {
-    if (!isRecord(input))
-      return { blocks: [], definitions: [], issues: [{ reason: 'malformed', path: '', detail: 'program' }] };
-    blocks = readList(input.blocks, 'blocks');
-    definitions = readDefinitions(input.definitions);
-  } catch (error) {
-    if (error instanceof TooManyBlocks) {
-      return { blocks: [], definitions: [], issues: [{ reason: 'too-many-blocks', limit: maxBlocks }] };
-    }
-    throw error;
-  }
+  if (!isRecord(input)) return { ok: false, issues: [{ reason: 'malformed', path: '', detail: 'program' }] };
+  const blocks = readList(input.blocks, 'blocks');
+  const definitions = readDefinitions(input.definitions);
+  if (count > maxBlocks) return { ok: false, issues: [{ reason: 'too-many-blocks', limit: maxBlocks }] };
 
   checkCalls(blocks, definitions, issue);
-  return { blocks: Object.freeze(blocks), definitions: Object.freeze(definitions), issues };
+  if (issues.length > 0) return { ok: false, issues };
+  return { ok: true, blocks: Object.freeze(blocks), definitions: Object.freeze(definitions) };
 }
 
-/** Reports calls to a missing definition, then any loop of definitions that call each other. */
+interface CallNode {
+  readonly name: DefinitionName;
+  readonly body: readonly Block[];
+  readonly callees: CallNode[];
+}
+
+/** Reports each call to a missing definition, then each loop of definitions that call each other. */
 function checkCalls(
   blocks: readonly Block[],
   definitions: readonly Definition[],
   issue: (found: ProgramIssue) => void,
 ) {
-  const byName = new Map(definitions.map((definition) => [definition.name, definition]));
+  const nodes = definitions.map((definition): CallNode => ({
+    name: definition.name,
+    body: definition.body,
+    callees: [],
+  }));
 
-  const callsIn = (list: readonly Block[], path: string, out: DefinitionName[]) => {
-    list.forEach((block, index) => {
+  const callsIn = (list: readonly Block[], path: string): CallNode[] =>
+    list.flatMap((block, index): CallNode[] => {
       const here = `${path}[${index}]`;
-      if (block.kind === 'repeat') callsIn(block.body, `${here}.body`, out);
-      if (block.kind !== 'call') return;
-      if (byName.has(block.name)) out.push(block.name);
-      else issue({ reason: 'undefined-block', path: here, blockId: block.id, name: block.name });
+      if (block.kind === 'repeat') return callsIn(block.body, `${here}.body`);
+      if (block.kind !== 'call') return [];
+      const callee = nodes.find((node) => node.name === block.name);
+      if (callee !== undefined) return [callee];
+      issue({ reason: 'undefined-block', path: here, blockId: block.id, name: block.name });
+      return [];
     });
-    return out;
-  };
 
-  callsIn(blocks, 'blocks', []);
-  const calls = new Map(
-    definitions.map((definition, index) => [
-      definition.name,
-      callsIn(definition.body, `definitions[${index}].body`, []),
-    ]),
-  );
+  callsIn(blocks, 'blocks');
+  nodes.forEach((node, index) => node.callees.push(...callsIn(node.body, `definitions[${index}].body`)));
 
-  // Depth-first search. A name met again while it is still on the path closes a loop.
-  const done = new Set<DefinitionName>();
-  const path: DefinitionName[] = [];
-  const visit = (name: DefinitionName): boolean => {
-    const at = path.indexOf(name);
-    if (at >= 0) {
-      issue({ reason: 'recursion', cycle: [...path.slice(at), name] });
-      return true;
+  // Depth-first search. Each definition is visited once, so each loop is reported once: when a
+  // call leads back to a definition still on the path.
+  const done = new Set<CallNode>();
+  const visit = (node: CallNode, path: readonly CallNode[]) => {
+    for (const callee of node.callees) {
+      const at = path.indexOf(callee);
+      if (at >= 0) issue({ reason: 'recursion', cycle: [...path.slice(at), callee].map((step) => step.name) });
+      else if (!done.has(callee)) visit(callee, [...path, callee]);
     }
-    if (done.has(name)) return false;
-    path.push(name);
-    for (const callee of calls.get(name) ?? []) if (visit(callee)) return true;
-    path.pop();
-    done.add(name);
-    return false;
+    done.add(node);
   };
-  for (const definition of definitions) {
-    path.length = 0;
-    if (visit(definition.name)) return;
-  }
+  for (const node of nodes) if (!done.has(node)) visit(node, [node]);
 }
 
 /**

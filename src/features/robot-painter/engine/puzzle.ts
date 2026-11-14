@@ -85,7 +85,7 @@ export function definePuzzle(spec: PuzzleSpec): Puzzle {
   if (!PUZZLE_ID.test(id)) fail(id, 'the id must be camelCase');
   if (!Number.isInteger(spec.order) || spec.order < 1) fail(id, 'the order must be a whole number from 1');
   if (!Number.isInteger(canvas.width) || !Number.isInteger(canvas.height) || canvas.width < 1 || canvas.height < 1) {
-    fail(id, 'the canvas must be whole units');
+    fail(id, 'the canvas must be at least one whole unit each way');
   }
   const heading = spec.start.heading ?? 0;
   if (!Number.isInteger(heading)) fail(id, 'the start heading must be whole degrees');

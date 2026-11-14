@@ -49,8 +49,10 @@ describe('definePuzzle', () => {
     ['an id that is not camelCase', { id: 'test-box' }, /camelCase/],
     ['an order of zero', { order: 0 }, /order/],
     ['an order that is not whole', { order: 1.5 }, /order/],
-    ['a canvas that is not whole units', { canvas: { width: 4.5, height: 3 } }, /canvas/],
-    ['an empty canvas', { canvas: { width: 4, height: 0 } }, /canvas/],
+    ['a canvas that is not whole units', { canvas: { width: 4.5, height: 3 } }, /canvas must be/],
+    ['a canvas height that is not whole units', { canvas: { width: 4, height: 3.5 } }, /canvas must be/],
+    ['a canvas with no height', { canvas: { width: 4, height: 0 } }, /canvas must be/],
+    ['a canvas with no width', { canvas: { width: 0, height: 3 } }, /canvas must be/],
     ['a heading that is not whole degrees', { start: { x: 1, y: 1, heading: 45.5 } }, /heading/],
     ['a start off the canvas', { start: { x: 5, y: 1 } }, /start on the canvas/],
     [
@@ -77,6 +79,16 @@ describe('definePuzzle', () => {
     ['a solution that reaches the step cap', { solution: buildProgram(long) }, /step cap/],
   ])('rejects %s', (_, change, reason) => {
     expect(() => definePuzzle({ ...base, ...change })).toThrow(reason);
+  });
+
+  it('accepts the smallest canvas, one unit on each side', () => {
+    const tiny = definePuzzle({
+      ...base,
+      canvas: { width: 1, height: 1 },
+      start: { x: 0, y: 0 },
+      solution: buildProgram([d.right()]),
+    });
+    expect(tiny.target).toHaveLength(1);
   });
 
   it('maps each tier to its band', () => {
@@ -144,6 +156,12 @@ describe('checkRun on a picture puzzle', () => {
       hints: [{ kind: 'wrong-end', at: { x: 2, y: 1 }, goal: { x: 1, y: 1 } }],
     });
     expect(checkRun(box, run)).toEqual({ solved: true });
+  });
+
+  it('talks about the picture, not the end, while the picture is still wrong', () => {
+    const puzzle = definePuzzle({ ...base, mustEndAtFinish: true });
+    const run = tryRun(puzzle, [d.right(), d.down(), d.left()]);
+    expect(checkRun(puzzle, run)).toMatchObject({ solved: false, hints: [{ kind: 'missing-line' }] });
   });
 
   it('does not count a run stopped at the step cap, even with the picture right', () => {

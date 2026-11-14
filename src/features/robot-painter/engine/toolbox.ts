@@ -49,24 +49,43 @@ export function turns(angles: readonly TurnAngle[]): ToolboxItem[] {
   ];
 }
 
+/** A key naming a block by its kind and the values a toolbox item fixes. */
+function blockKey(block: Block | Definition): string {
+  switch (block.kind) {
+    case 'move':
+      return `move ${block.direction}`;
+    case 'forward':
+      return `forward ${block.distance}`;
+    case 'turn':
+      return `turn ${block.direction} ${block.angle}`;
+    case 'color':
+      return `color ${block.color}`;
+    case 'call':
+      return 'define';
+    default:
+      return block.kind;
+  }
+}
+
+/** The keys of every block a toolbox item lets the child place. */
+function itemKeys(item: ToolboxItem): string[] {
+  switch (item.kind) {
+    case 'move':
+      return [`move ${item.direction}`];
+    case 'forward':
+      return item.distances.map((distance) => `forward ${distance}`);
+    case 'turn':
+      return item.angles.map((angle) => `turn ${item.direction} ${angle}`);
+    case 'color':
+      return [`color ${item.color}`];
+    default:
+      return [item.kind];
+  }
+}
+
 /** Whether the toolbox offers this block with these values. */
 export function offers(toolbox: readonly ToolboxItem[], block: Block | Definition): boolean {
-  return toolbox.some((item) => {
-    switch (item.kind) {
-      case 'move':
-        return block.kind === 'move' && block.direction === item.direction;
-      case 'forward':
-        return block.kind === 'forward' && item.distances.includes(block.distance);
-      case 'turn':
-        return block.kind === 'turn' && block.direction === item.direction && item.angles.includes(block.angle);
-      case 'color':
-        return block.kind === 'color' && block.color === item.color;
-      case 'define':
-        return block.kind === 'define' || block.kind === 'call';
-      default:
-        return block.kind === item.kind;
-    }
-  });
+  return toolbox.some((item) => itemKeys(item).includes(blockKey(block)));
 }
 
 export type FitIssue =

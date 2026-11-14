@@ -35,6 +35,11 @@ describe('unitStep', () => {
 });
 
 describe('samePoint and insideCanvas', () => {
+  it('counts points exactly the tolerance apart as the same', () => {
+    expect(samePoint({ x: 0, y: 0 }, { x: TOLERANCE, y: 0 })).toBe(true);
+    expect(samePoint({ x: 0, y: 0 }, { x: 0, y: TOLERANCE })).toBe(true);
+  });
+
   it.each([
     [TOLERANCE / 2, true],
     [TOLERANCE * 2, false],
@@ -47,6 +52,8 @@ describe('samePoint and insideCanvas', () => {
     [{ x: 0, y: 0 }, true],
     [{ x: 4, y: 3 }, true],
     [{ x: -TOLERANCE / 2, y: 3 + TOLERANCE / 2 }, true],
+    [{ x: -TOLERANCE, y: -TOLERANCE }, true],
+    [{ x: 4 + TOLERANCE, y: 3 + TOLERANCE }, true],
     [{ x: -TOLERANCE * 2, y: 1 }, false],
     [{ x: 1, y: -TOLERANCE * 2 }, false],
     [{ x: 4 + TOLERANCE * 2, y: 1 }, false],

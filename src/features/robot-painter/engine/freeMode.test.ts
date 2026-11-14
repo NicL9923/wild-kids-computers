@@ -3,7 +3,9 @@ import { BANDS } from '../../../core/bands.ts';
 import { puzzlesForTier } from '../../../registry/robotPuzzles.ts';
 import { FREE_MODES } from './freeMode.ts';
 import { insideCanvas } from './geometry.ts';
-import type { Block, Definition } from './program.ts';
+import { runProgram } from './interpreter.ts';
+import { draft, type Block, type Definition } from './program.ts';
+import { buildProgram } from './validate.ts';
 import { TIER_BANDS, TIERS } from './puzzle.ts';
 import { offers, type ToolboxItem } from './toolbox.ts';
 
@@ -37,6 +39,16 @@ describe('free mode', () => {
     const free = FREE_MODES[TIER_BANDS[tier]].toolbox;
     const taught = puzzlesForTier(tier).flatMap((puzzle) => puzzle.toolbox.flatMap(blocksOf));
     expect(taught.filter((block) => !offers(free, block))).toEqual([]);
+  });
+
+  it.each(BANDS)('draws a line with the first move in %s, so the pen starts down', (band) => {
+    const { world } = FREE_MODES[band];
+    const first = world.start.y > 0 ? draft.up() : draft.down();
+    expect(runProgram(buildProgram([first]), world).segments).toHaveLength(1);
+  });
+
+  it('has only the youngest band press arrows that run at once', () => {
+    expect(BANDS.map((band) => FREE_MODES[band].style)).toEqual(['direct', 'build', 'build']);
   });
 
   it('lets the youngest band press arrows that run at once', () => {
