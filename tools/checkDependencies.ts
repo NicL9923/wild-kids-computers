@@ -129,21 +129,71 @@ export interface LicenseViolation {
   where: string;
 }
 
+type LicenseNode = { kind: 'license'; id: string } | { kind: 'and' | 'or'; left: LicenseNode; right: LicenseNode };
+
+const LICENSE_ID = /^(?:DocumentRef-[A-Za-z0-9.-]+:)?[A-Za-z0-9.-]+\+?$/;
+
+/**
+ * Parses an SPDX license expression with its precedence: `WITH` binds tightest, then `AND`,
+ * then `OR`, and parentheses group. Returns null for anything outside that grammar, including
+ * lowercase operators and a `WITH` after a parenthesized group, so a check that cannot read an
+ * expression rejects it instead of guessing.
+ */
+function parseLicenseExpression(expression: string): LicenseNode | null {
+  const tokens = expression.match(/\(|\)|[^\s()]+/g) ?? [];
+  let position = 0;
+  const peek = () => tokens[position];
+
+  function primary(): LicenseNode | null {
+    const token = tokens[position++];
+    if (token === '(') {
+      const inner = disjunction();
+      return inner !== null && tokens[position++] === ')' ? inner : null;
+    }
+    if (token === undefined || token === ')' || token === 'AND' || token === 'OR' || token === 'WITH') return null;
+    if (!LICENSE_ID.test(token)) return null;
+    if (peek() === 'WITH') {
+      position += 1;
+      const exception = tokens[position++];
+      // An exception narrows its license and never widens it, so the base license decides.
+      if (exception === undefined || !LICENSE_ID.test(exception) || exception.endsWith('+')) return null;
+      if (exception === 'AND' || exception === 'OR' || exception === 'WITH') return null;
+    }
+    return { kind: 'license', id: token };
+  }
+
+  function binary(kind: 'and' | 'or', operator: string, operand: () => LicenseNode | null): LicenseNode | null {
+    let left = operand();
+    while (left !== null && peek() === operator) {
+      position += 1;
+      const right = operand();
+      left = right === null ? null : { kind, left, right };
+    }
+    return left;
+  }
+
+  const conjunction = () => binary('and', 'AND', primary);
+  const disjunction = () => binary('or', 'OR', conjunction);
+
+  const tree = disjunction();
+  return tree !== null && position === tokens.length ? tree : null;
+}
+
+function licenseTreeAllowed(node: LicenseNode): boolean {
+  if (node.kind === 'license') return ALLOWED_PACKAGE_LICENSES.has(node.id);
+  if (node.kind === 'and') return licenseTreeAllowed(node.left) && licenseTreeAllowed(node.right);
+  return licenseTreeAllowed(node.left) || licenseTreeAllowed(node.right);
+}
+
 /**
  * Whether an SPDX expression is acceptable. `A OR B` needs one allowed side, `A AND B` needs
- * both. A `WITH` exception is judged by its base license. Parentheses are ignored, which is
- * enough for the expressions npm packages use.
+ * both, and a `WITH` exception is judged by its base license. An expression the parser cannot
+ * read is rejected.
  */
 export function isAllowedLicense(expression: string | undefined): boolean {
-  if (expression === undefined || expression.trim() === '') return false;
-  const flat = expression.replaceAll(/[()]/g, ' ').trim();
-  return flat
-    .split(/\s+OR\s+/)
-    .some((alternative) =>
-      alternative
-        .split(/\s+AND\s+/)
-        .every((term) => ALLOWED_PACKAGE_LICENSES.has(term.split(/\s+WITH\s+/)[0]?.trim() ?? '')),
-    );
+  if (expression === undefined) return false;
+  const tree = parseLicenseExpression(expression);
+  return tree !== null && licenseTreeAllowed(tree);
 }
 
 export function denyCategoryFor(name: string): DenyCategory | undefined {

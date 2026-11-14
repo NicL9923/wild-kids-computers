@@ -104,12 +104,16 @@ describe('findDeniedPackages', () => {
 
 describe('isAllowedLicense', () => {
   it.each([
-    'MIT',
-    '(MIT OR GPL-3.0-only)',
-    'MIT AND ISC',
-    '(MIT AND Zlib) OR GPL-2.0',
-    'Apache-2.0 WITH LLVM-exception',
-  ])('allows %s', (expression) => {
+    ['one license', 'MIT'],
+    ['a choice with one allowed side', '(MIT OR GPL-3.0-only)'],
+    ['AND of allowed licenses', 'MIT AND ISC'],
+    ['a group before OR', '(MIT AND Zlib) OR GPL-2.0'],
+    ['an exception on an allowed license', 'Apache-2.0 WITH LLVM-exception'],
+    ['nested groups', '((MIT))'],
+    ['AND over two choices', '(MIT OR GPL-3.0-only) AND (ISC OR GPL-2.0-only)'],
+    ['an allowed choice before a copyleft AND', 'MIT OR (GPL-3.0-only AND ISC)'],
+    ['AND binding tighter than OR', 'GPL-3.0-only AND ISC OR MIT'],
+  ])('allows %s', (_label, expression) => {
     expect(isAllowedLicense(expression)).toBe(true);
   });
 
@@ -118,6 +122,17 @@ describe('isAllowedLicense', () => {
     ['a ShareAlike license', 'CC-BY-SA-4.0'],
     ['a NonCommercial license', 'CC-BY-NC-4.0'],
     ['AND with a copyleft term', 'MIT AND GPL-3.0-only'],
+    // Dropping the parentheses turned this into (GPL AND MIT) OR ISC, which passed.
+    ['a copyleft term AND a group of choices', 'GPL-3.0-only AND (MIT OR ISC)'],
+    ['an exception on a copyleft license', 'GPL-2.0-only WITH Classpath-exception-2.0'],
+    ['WITH after a group', '(MIT OR ISC) WITH LLVM-exception'],
+    ['WITH and no exception', 'MIT WITH'],
+    ['an unclosed group', '(MIT OR ISC'],
+    ['a stray closing parenthesis', 'MIT) OR (ISC'],
+    ['two licenses with no operator', 'MIT ISC'],
+    ['a lowercase operator', 'GPL-3.0-only and MIT'],
+    ['a trailing operator', 'MIT AND'],
+    ['an empty group', '()'],
     ['a custom license file', 'SEE LICENSE IN LICENSE.txt'],
     ['an empty string', ''],
     ['no license', undefined],
