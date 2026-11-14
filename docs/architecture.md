@@ -320,7 +320,7 @@ A coloring page is an original SVG line drawing in `assets/coloring/src/<page-id
 
 Each page has an entry, `src/features/paint-studio/coloringPages/<pageId>.ts`, from `defineColoringPage`: id, order, spoken title, bands youngest first, the mask and thumbnail URLs, a background point, and one point inside each region a child would color. `npm run coloring:regions -- <page-id>` prints the regions of a rendered mask, ready to paste.
 
-`src/features/paint-studio/coloringPages.test.ts` is the proof that the fill respects the lines. For every page it fills from every point with the real fill tool and fails when the paint reaches the page edge, reaches another point, or covers more than its region. It also fails when a visible region has no point, when a source breaks the line rules for its youngest band, or when a page breaks its band's region count or smallest region size. Those rules are in `tools/coloringPages.ts`.
+`src/features/paint-studio/testing/coloringPageTests.ts` is the proof that the fill respects the lines, run by one `coloringPagesBand*.test.ts` file per band. For every page it fills from every point with the real fill tool and fails when the paint reaches the page edge, reaches another point, or covers more than its region. It also fails when a visible region has no point, when a source breaks the line rules for its youngest band, or when a page breaks its band's region count or smallest region size. Those rules are in `tools/coloringPages.ts`.
 
 ## Design tokens
 
