@@ -12,7 +12,6 @@ export const BRIDGE_METHODS = [
   'documents.write',
   'documents.setAside',
   'documents.removeProfile',
-  'documents.listProfiles',
   'pictures.save',
   'pictures.list',
   'pictures.read',

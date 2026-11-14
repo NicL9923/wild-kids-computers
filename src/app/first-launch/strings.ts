@@ -25,6 +25,7 @@ export const strings = defineStrings('first-launch', {
   pickAnimalFirst: { text: 'Pick an animal first.' },
   pickColorFirst: { text: 'Pick a color first.' },
   pickBandFirst: { text: 'Pick an age band first.' },
+  saveProblem: { text: 'The player could not be saved. Press Next to try again.', silent: 'parent' },
   back: { text: 'Back' },
   next: { text: 'Next' },
   finish: { text: 'Go to the meadow' },

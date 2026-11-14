@@ -340,6 +340,13 @@
     transform: translateY(calc(1px * var(--wk-motion-scale)));
   }
 
+  .wk-choose-problem {
+    max-width: 40ch;
+    margin: 0;
+    font-size: var(--wk-text-title);
+    text-align: center;
+  }
+
   .wk-choose-name {
     display: flex;
     align-items: center;

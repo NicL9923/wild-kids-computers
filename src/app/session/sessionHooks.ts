@@ -57,22 +57,26 @@ export function useAppDocument(): {
 /** Every profile, and the functions that add, change, remove, and choose them. */
 export function useProfiles(): {
   profiles: readonly Profile[];
-  createProfile: (profile: NewProfile) => Profile;
+  /** The profile last chosen whose saved settings or progress could not be read, or null. */
+  notOpened: string | null;
+  createProfile: (profile: NewProfile) => Promise<BridgeResult<Profile>>;
   updateProfile: (profileId: string, update: Update<NewProfile>) => void;
   deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
   chooseProfile: (profileId: string | null) => void;
 } {
   const store = useSessionStore();
   const profiles = useSnapshot((s) => s.profiles);
+  const notOpened = useSnapshot((s) => s.profileNotOpened);
   return useMemo(
     () => ({
       profiles,
+      notOpened,
       createProfile: store.createProfile,
       updateProfile: store.updateProfile,
       deleteProfile: store.deleteProfile,
       chooseProfile: store.chooseProfile,
     }),
-    [profiles, store],
+    [profiles, notOpened, store],
   );
 }
 

@@ -47,20 +47,25 @@ import { isSessionLimitReached, type SessionClock } from './sessionLength.ts';
  * start of the app. A deadline changes what the child and the adult are told, never the order of
  * operations: a document write past its deadline shows as a save problem, but its document's
  * queue waits until the write really ends, and the document in memory stays the truth until then.
+ * Creating and removing a profile have no deadline: each waits for the real outcome of its write
+ * of the profile list, because a reported outcome that the disk later contradicts loses a child's
+ * work.
  */
 
 export type SessionStatus =
   /** The app or profiles document, or the active profile's settings or progress, is loading. */
   | 'loading'
   /**
-   * The app or profiles document could not be read, so the app cannot know which children it has,
-   * or the chosen profile's settings or progress could not be read, so that profile is not active.
+   * The app or profiles document could not be read, so the app cannot know which children it has.
    * Nothing is replaced with defaults and nothing is written until `retryStart()` reads them.
    */
   | 'unavailable'
   /** First launch is not done, or no profile exists. */
   | 'needs-first-launch'
-  /** Profiles exist and none is active. */
+  /**
+   * Profiles exist and none is active, including when the chosen profile's settings or progress
+   * could not be read: `profileNotOpened` names it then.
+   */
   | 'needs-profile'
   /** A profile is active and its settings and progress are loaded. */
   | 'ready';
@@ -107,6 +112,11 @@ export interface SessionSnapshot {
   readonly app: AppDocument;
   readonly profiles: readonly Profile[];
   readonly activeProfile: Profile | null;
+  /**
+   * The profile last chosen whose settings or progress could not be read, so it is not active.
+   * Choosing it again reads them again. Null once any profile opens or it is removed.
+   */
+  readonly profileNotOpened: string | null;
   /** The active profile's settings, or the defaults when no profile is active. */
   readonly settings: Settings;
   /** The active profile's progress, or empty progress when no profile is active. */
@@ -164,8 +174,7 @@ export interface SessionStore {
   readonly start: () => Promise<void>;
   /**
    * With status `unavailable`, reads the app and profiles documents that could not be read, and
-   * goes on as `start` does once both are open, or reads the chosen profile's settings and
-   * progress again and makes it active once both are open. A retry already running is reused.
+   * goes on as `start` does once both are open. A retry already running is reused.
    */
   readonly retryStart: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
@@ -177,19 +186,26 @@ export interface SessionStore {
   /** Saves kiosk lock and turns it on or off for the window. */
   readonly setKioskLock: (on: boolean) => Promise<BridgeResult<void>>;
 
-  /** Adds a profile and returns it. It does not become active. Throws past MAX_PROFILES or on a bad field. */
-  readonly createProfile: (profile: NewProfile) => Profile;
+  /**
+   * Adds a profile once the profile list that names it is saved, however long that takes, and
+   * resolves to it. Until then it is not listed, so nothing can choose it or save its work. On
+   * failure it is not added and `saveProblem` says why. It does not become active. Throws at once
+   * past MAX_PROFILES, on a bad field, or while the profile list is not open.
+   */
+  readonly createProfile: (profile: NewProfile) => Promise<BridgeResult<Profile>>;
   readonly updateProfile: (profileId: string, update: Update<NewProfile>) => void;
   /**
-   * Removes a profile with its documents and pictures. When it is active, no profile is active
-   * afterwards. The removal happens when the profile list without it is saved: on success the
-   * profile is gone for good, and its files are deleted afterwards. On failure the profile stays
-   * in the list, usable, and `saveProblem` says why.
+   * Removes a profile with its documents and pictures, after an adult confirmed it. The removal
+   * happens at one write of the profile list without it, and this resolves only when that write
+   * really ends, however long it takes. Until then the profile stays as it was. On success it is
+   * gone, no longer active, and its files are deleted once, best effort. On failure it stays,
+   * exactly as before, and `saveProblem` says why.
    */
   readonly deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
   /**
    * Makes a profile active and loads its documents, or makes none active with null. When its
-   * settings or progress cannot be read, it does not stay active and the status is `unavailable`.
+   * settings or progress cannot be read, it does not stay active, the status is `needs-profile`,
+   * and `profileNotOpened` names it.
    */
   readonly chooseProfile: (profileId: string | null) => void;
 
@@ -296,7 +312,6 @@ function boundedBridge(bridge: PlatformBridge, timers: Pick<Scheduler, 'setTimeo
       write: held('documents.write', (name, text) => documents.write(name, text)),
       setAside: bound('documents.setAside', (name) => documents.setAside(name)),
       removeProfile: bound('documents.removeProfile', (profileId) => documents.removeProfile(profileId)),
-      listProfiles: bound('documents.listProfiles', () => documents.listProfiles()),
     },
     pictures: {
       save: bound('pictures.save', (profileId, input) => pictures.save(profileId, input)),
@@ -334,8 +349,6 @@ class Cell<T> {
    * place by `retryStart`; any other cell is never written and a fresh cell reads the file again.
    */
   unreadable = false;
-  /** The value came from a saved file, not from defaults for a file that was missing or set aside. */
-  fromFile = false;
   /** Updates made before the load finished, oldest first. They apply in one queued task. */
   readonly early: EarlyUpdate<T>[] = [];
   readonly ready: Promise<void>;
@@ -416,10 +429,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   const profiles = new Cell(documentNames.profiles, profilesDocument, true);
   /** Profiles removed from the list this session. Their pictures take no more changes. */
   const removed = new Set<string>();
-  /**
-   * The profile that was chosen but whose settings or progress could not be read. It is not
-   * active, the status is `unavailable`, and `retryStart` chooses it again.
-   */
+  /** The profile that was chosen but whose settings or progress could not be read. It is not active. */
   let unopened: string | null = null;
   /**
    * Documents with a read or write still queued or running, by name. Choosing a profile again, or
@@ -453,6 +463,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       app: app.value,
       profiles: profiles.value.profiles,
       activeProfile,
+      profileNotOpened: unopened,
       settings,
       progress: active?.progress.value ?? EMPTY_PROGRESS,
       theme: {
@@ -469,7 +480,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function statusOf(): SessionStatus {
-    if (app.unreadable || profiles.unreadable || unopened !== null) return 'unavailable';
+    if (app.unreadable || profiles.unreadable) return 'unavailable';
     if (!app.loaded || !profiles.loaded) return 'loading';
     if (!app.value.firstLaunchDone || profiles.value.profiles.length === 0) return 'needs-first-launch';
     if (active === null) return 'needs-profile';
@@ -542,7 +553,6 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       loadProblems = [...loadProblems, { document: cell.name, status: result.status, problem: result.problem ?? '' }];
     }
     cell.value = result.value;
-    cell.fromFile = result.status === 'loaded' || result.status === 'migrated';
     cell.finishLoad();
     if (result.status === 'migrated') queueWrite(cell);
     emit();
@@ -550,7 +560,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
   /**
    * A profile whose settings or progress could not be read does not stay active, so nothing
-   * reads, shows, or writes defaults in their place. The status says `unavailable` until a retry.
+   * reads, shows, or writes defaults in their place. The other profiles can still be chosen.
    */
   function leaveUnopened(cell: Cell<unknown>): void {
     if (active === null || (active.settings !== cell && active.progress !== cell)) return;
@@ -716,96 +726,88 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     change(requireActive('updateSettings').settings, update);
   }
 
-  async function deleteProfile(profileId: string): Promise<BridgeResult<void>> {
-    if (!profiles.loaded || !profiles.value.profiles.some((p) => p.id === profileId)) {
-      return { ok: false, error: new BridgeError('not-found', `No profile with id ${profileId}.`) };
-    }
-    if (active?.profileId === profileId || unopened === profileId) chooseProfile(null);
-    const committed = await commitRemoval(profileId);
-    if (!committed.ok)
-      return { ok: false, error: reportProblem(`profile/${profileId}`, 'remove-profile', committed.error) };
-    // The profile is gone for good. It stays usable until the list is saved, so it may be active again.
-    removed.add(profileId);
-    if (active?.profileId === profileId) chooseProfile(null);
-    if (app.value.lastActiveProfileId === profileId) change(app, { lastActiveProfileId: null });
-    emit();
-    void removeUnlisted([profileId]);
-    return { ok: true, value: undefined };
+  function isListed(profileId: string): boolean {
+    return profiles.value.profiles.some((p) => p.id === profileId);
   }
 
   /**
-   * Saves the profile list without the profile: the moment the removal happens. Until the write is
-   * answered the profile stays in memory, listed and usable. A write past its deadline is a failed
-   * removal, but it may still land: then memory, which still lists the profile, is saved again.
+   * Writes the profile list and waits for the write to really end, past any deadline. The caller
+   * runs in the list's queue, so no other write of the list can pass this one.
    */
-  function commitRemoval(profileId: string): Promise<BridgeResult<void>> {
+  async function writeProfileList(value: ProfilesDocument): Promise<BridgeResult<void>> {
+    try {
+      await sendWrite(profiles, value).landed;
+      clearProblem(profiles.name);
+      return { ok: true, value: undefined };
+    } catch (error) {
+      return { ok: false, error: toBridgeError(error) };
+    }
+  }
+
+  function createProfile(profile: NewProfile): Promise<BridgeResult<Profile>> {
+    if (!profiles.loaded) throw new Error('createProfile needs the profile list open.');
+    const id = newProfileId();
+    const withCreated = (current: ProfilesDocument): ProfilesDocument =>
+      profilesDocument.schema.parse({ ...current, profiles: [...current.profiles, { ...profile, id }] });
+    // A bad field or a full list throws here, before anything is written.
+    withCreated(profiles.value);
+    return runFor(profiles, async (): Promise<BridgeResult<Profile>> => {
+      let next: ProfilesDocument;
+      try {
+        // Checked again on the list as it is now: another creation may have filled it meanwhile.
+        next = withCreated(profiles.value);
+      } catch (error) {
+        return { ok: false, error: reportProblem(profiles.name, 'write', error) };
+      }
+      const written = await writeProfileList(next);
+      if (!written.ok) return { ok: false, error: reportProblem(profiles.name, 'write', written.error) };
+      // The saved entry, with the schema's trims. `next` always holds it; the fallback is for the types.
+      const created = next.profiles.find((p) => p.id === id) ?? { ...profile, id };
+      // Memory may have taken an update while the list was saved. A write queued for it runs next.
+      profiles.value = { ...profiles.value, profiles: [...profiles.value.profiles, created] };
+      emit();
+      return { ok: true, value: created };
+    });
+  }
+
+  async function deleteProfile(profileId: string): Promise<BridgeResult<void>> {
+    if (!profiles.loaded || !isListed(profileId)) {
+      return { ok: false, error: new BridgeError('not-found', `No profile with id ${profileId}.`) };
+    }
     const without = (current: ProfilesDocument) => ({
       ...current,
       profiles: current.profiles.filter((p) => p.id !== profileId),
     });
-    return new Promise((resolve) => {
-      // A list write past its deadline holds the list's queue. A removal that cannot start in time
-      // fails instead of waiting with it, and never starts later.
-      let started = false;
-      const stopWaiting = timers.setTimeout(() => {
-        if (started) return;
-        started = true;
-        resolve({ ok: false, error: new BridgeError('io', 'The profile list was still being saved.') });
-      }, SESSION_CALL_DEADLINE_MS);
-      void runFor(profiles, async () => {
-        if (started) return;
-        started = true;
-        stopWaiting();
-        // An earlier removal of the same profile already saved the list without it.
-        if (!profiles.value.profiles.some((p) => p.id === profileId)) {
-          resolve({ ok: true, value: undefined });
-          return;
-        }
-        const call = sendWrite(profiles, without(profiles.value));
-        try {
-          await call.answer;
-        } catch (error) {
-          resolve({ ok: false, error: toBridgeError(error) });
-          try {
-            await call.landed;
-          } catch {
-            return;
-          }
-          queueWrite(profiles);
-          return;
-        }
-        profiles.value = without(profiles.value);
-        clearProblem(profiles.name);
-        resolve({ ok: true, value: undefined });
-      });
+    const result = await runFor(profiles, async (): Promise<BridgeResult<void>> => {
+      // An earlier removal of the same profile already saved the list without it.
+      if (!isListed(profileId)) return { ok: true, value: undefined };
+      const written = await writeProfileList(without(profiles.value));
+      if (!written.ok) return written;
+      profiles.value = without(profiles.value);
+      removed.add(profileId);
+      if (active?.profileId === profileId) chooseProfile(null);
+      if (unopened === profileId) unopened = null;
+      if (app.value.lastActiveProfileId === profileId) change(app, { lastActiveProfileId: null });
+      emit();
+      deleteFiles(profileId);
+      return { ok: true, value: undefined };
     });
+    if (!result.ok) return { ok: false, error: reportProblem(`profile/${profileId}`, 'remove-profile', result.error) };
+    return result;
   }
 
   /**
-   * Deletes the documents and pictures of profiles the list does not name: the ones given, and,
-   * when the list came from a saved file, every one the platform has stored. Those are what a
-   * removal left behind when the deletion failed, timed out, or the app stopped first. A list that
-   * was missing or corrupt names no one, so it never sends the stored profiles' files away.
+   * Deletes a removed profile's documents and pictures, once, after any work already queued for
+   * them ends, so none brings a file back. A failure leaves the files on disk, unlisted and never
+   * read again: nothing but an adult's confirmed removal deletes stored data.
    */
-  function removeUnlisted(known: readonly string[]): Promise<void> {
-    return queues.run('unlisted', async () => {
-      let stored: string[] = [];
-      if (profiles.fromFile) {
-        try {
-          stored = await bridge.documents.listProfiles();
-        } catch {
-          // The next start or removal looks again.
-        }
-      }
-      for (const profileId of new Set([...known, ...stored])) {
-        if (profiles.value.profiles.some((p) => p.id === profileId)) continue;
-        // Work already queued for its documents or pictures ends first, so none brings a file back.
-        await Promise.all([queues.settled(`profile/${profileId}/`), queues.settled(`pictures/${profileId}`)]);
-        try {
-          await bridge.documents.removeProfile(profileId);
-        } catch {
-          // Left for the next start or removal.
-        }
+  function deleteFiles(profileId: string): void {
+    void queues.run(`removed/${profileId}`, async () => {
+      await Promise.all([queues.settled(`profile/${profileId}/`), queues.settled(`pictures/${profileId}`)]);
+      try {
+        await bridge.documents.removeProfile(profileId);
+      } catch {
+        // Left on disk. See the doc comment.
       }
     });
   }
@@ -897,17 +899,10 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       before,
     ]);
     if (!app.loaded || !profiles.loaded) return;
-    void removeUnlisted([]);
     const last = app.value.lastActiveProfileId;
     if (last !== null && profiles.value.profiles.some((p) => p.id === last)) activate(last);
     if (app.value.kioskLock) void setKioskLock(true);
     emit();
-    await Promise.all([active?.settings.ready, active?.progress.ready]);
-  }
-
-  /** Chooses again the profile whose documents could not be read, and waits for them. */
-  async function reopenProfile(profileId: string): Promise<void> {
-    chooseProfile(profileId);
     await Promise.all([active?.settings.ready, active?.progress.ready]);
   }
 
@@ -938,7 +933,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     retryStart() {
       if (!started) throw new Error('The session has not started.');
       if (statusOf() !== 'unavailable') return Promise.resolve();
-      retrying ??= (unopened === null ? open(false) : reopenProfile(unopened)).finally(() => {
+      retrying ??= open(false).finally(() => {
         retrying = null;
       });
       return retrying;
@@ -951,11 +946,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
     setKioskLock,
 
-    createProfile(profile) {
-      const created: Profile = { ...profile, id: newProfileId() };
-      change(profiles, (current) => ({ ...current, profiles: [...current.profiles, created] }));
-      return created;
-    },
+    createProfile,
 
     updateProfile(profileId, update) {
       change(profiles, (current) => {

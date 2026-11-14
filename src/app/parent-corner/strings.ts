@@ -34,6 +34,7 @@ export const strings = defineStrings('parent-corner', {
   deleteConfirm: { text: 'Delete profile', silent: 'parent' },
   deleteKeep: { text: 'Keep profile', silent: 'parent' },
   deleteProblem: { text: 'The profile could not be deleted. Try again.', silent: 'parent' },
+  addProblem: { text: 'The child could not be added. Try again.', silent: 'parent' },
 
   settings: { text: 'Settings for one child', silent: 'parent' },
   settingsChild: { text: 'Child', silent: 'parent' },

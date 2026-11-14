@@ -55,7 +55,6 @@ const HANDLERS: Record<BridgeMethod, Handler> = {
   'documents.removeProfile': handler('documents.removeProfile', z.tuple([safeId]), (bridge, [profileId]) =>
     bridge.documents.removeProfile(profileId),
   ),
-  'documents.listProfiles': handler('documents.listProfiles', z.tuple([]), (bridge) => bridge.documents.listProfiles()),
   'pictures.save': handler(
     'pictures.save',
     z.tuple([safeId, z.object({ id: safeId.optional(), png: bytes, thumbnail: bytes }).strict()]),

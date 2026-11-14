@@ -128,14 +128,28 @@ function ProfileEditor({ editing, onDone }: { editing: Editing; onDone: () => vo
   const [colorId, setColorId] = useState<string>(start.colorId ?? PROFILE_COLOR_IDS[0]);
   const [band, setBand] = useState<Band>(start.band);
   const [name, setName] = useState(start.name ?? '');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  const save = () => {
+  /** A new child is added only once the list that names them is saved, so the dialog waits for it. */
+  const save = async () => {
     const trimmed = name.trim();
     const profile: NewProfile =
       trimmed === '' ? { avatarId, colorId, band } : { avatarId, colorId, band, name: trimmed };
-    if (editing.kind === 'add') createProfile(profile);
-    // A function replaces the whole profile, so clearing the name removes it.
-    else updateProfile(editing.profile.id, () => profile);
+    if (editing.kind === 'edit') {
+      // A function replaces the whole profile, so clearing the name removes it.
+      updateProfile(editing.profile.id, () => profile);
+      onDone();
+      return;
+    }
+    setBusy(true);
+    setFailed(false);
+    const created = await createProfile(profile);
+    setBusy(false);
+    if (!created.ok) {
+      setFailed(true);
+      return;
+    }
     onDone();
   };
 
@@ -143,19 +157,24 @@ function ProfileEditor({ editing, onDone }: { editing: Editing; onDone: () => vo
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) onDone();
+        if (!open && !busy) onDone();
       }}
       title={t(editing.kind === 'add' ? strings.addTitle : strings.editTitle)}
       closeLabel={t(strings.close)}
       actions={
         <>
-          <Button onClick={onDone}>{t(strings.cancel)}</Button>
-          <Button variant='primary' onClick={save}>
+          <Button disabled={busy} onClick={onDone}>
+            {t(strings.cancel)}
+          </Button>
+          <Button variant='primary' disabled={busy} onClick={() => void save()}>
             {t(strings.save)}
           </Button>
         </>
       }
     >
+      <p role='alert' className='wk-parent-problem-text'>
+        {failed ? t(strings.addProblem) : ''}
+      </p>
       <div className='wk-parent-editor'>
         <ChoiceGroup
           legend={t(strings.avatarLabel)}
