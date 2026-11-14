@@ -100,6 +100,9 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'node',
       include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.ts', 'tools/**/*.test.ts'],
+      // Stryker instruments every mutant and records coverage per test, which makes heavy level
+      // tests several times slower. The mutation run sets WKC_MUTATION so they are not cut off.
+      testTimeout: process.env['WKC_MUTATION'] === '1' ? 60_000 : 5_000,
       setupFiles: ['tools/test/pinTimezone.ts'],
       restoreMocks: true,
       unstubEnvs: true,
