@@ -6,6 +6,7 @@ import { BANDS, type Band } from '../src/core/bands.ts';
 import { expectAccessible } from './support/accessibility.ts';
 import { launchApp, type LaunchedApp } from './support/launchApp.ts';
 import { SCREENS_DIR } from './support/screens.ts';
+import { DEV_GALLERY_PATH } from '../src/app/paths.ts';
 
 /** The smallest target per band, from src/styles/tokens.css. */
 const TARGET_MIN: Record<Band, number> = { 'band-3-5': 72, 'band-6-8': 56, 'band-9-12': 44 };
@@ -41,7 +42,7 @@ async function resizeWindow(size: { width: number; height: number }): Promise<vo
 async function openGallery(page: Page, band: Band, view: GalleryView): Promise<void> {
   await page.evaluate((hash) => {
     window.location.hash = hash;
-  }, `#/dev/gallery?band=${band}&view=${view}`);
+  }, `#${DEV_GALLERY_PATH}?band=${band}&view=${view}`);
   await expect(page.locator('html')).toHaveAttribute('data-band', band);
   // Fonts and pictures finish loading before anything is measured or photographed.
   await page.evaluate(async () => {

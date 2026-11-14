@@ -6,6 +6,7 @@ import type { SpokenHandle } from '../../src/core/strings/defineStrings.ts';
 import { readAudioLog } from './audioLog.ts';
 import { launchApp, type LaunchedApp } from './launchApp.ts';
 import { SCREENS_DIR } from './screens.ts';
+import { ACTIVITY_PATH } from '../../src/activityShell/paths.ts';
 
 /**
  * Helpers for activity end-to-end tests. See "End-to-end tests" in docs/architecture.md and
@@ -50,9 +51,12 @@ export async function openActivity(options: OpenActivityOptions): Promise<Launch
     // Always set the size: a virtual display's default screen is smaller than the app's window.
     await resizeWindow(launched, options.size ?? DEFAULT_SIZE);
     if (options.pinClockAt !== undefined) await kitTime(launched.page).pin(options.pinClockAt);
-    await launched.page.evaluate((hash) => {
-      window.location.hash = hash;
-    }, `#/activity/${options.activity}`);
+    await launched.page.evaluate(
+      (hash) => {
+        window.location.hash = hash;
+      },
+      `#${ACTIVITY_PATH(options.activity)}`,
+    );
     await expect(launched.page.locator(`[data-activity="${options.activity}"] .wk-activity-stage`)).toBeVisible();
     await expect(launched.page.locator('html')).toHaveAttribute('data-band', options.band);
     return launched;

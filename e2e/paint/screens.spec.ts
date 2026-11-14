@@ -12,6 +12,7 @@ import {
   screenPoint,
   WINDOW_SIZES,
 } from './studioSupport.ts';
+import { PAINT_GALLERY_PATH } from '../../src/features/paint-studio/paths.ts';
 
 /** The smallest target per band, from src/styles/tokens.css. */
 const TARGET_MIN: Record<Band, number> = { 'band-3-5': 72, 'band-6-8': 56, 'band-9-12': 44 };
@@ -119,7 +120,7 @@ for (const band of BANDS) {
 
       await tool(page, strings['tool-brush'].text);
       await expect.poll(() => galleryIds(page), { timeout: 10_000 }).not.toHaveLength(0);
-      await openRoute(page, '#/paint/gallery');
+      await openRoute(page, `#${PAINT_GALLERY_PATH}`);
       await check(page, band, 'gallery');
     }
   });

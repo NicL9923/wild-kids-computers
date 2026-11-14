@@ -21,6 +21,7 @@ import {
   saveScreen,
   screenPoint,
 } from './studioSupport.ts';
+import { PAINT_GALLERY_PATH } from '../../src/features/paint-studio/paths.ts';
 
 const RED = [220, 38, 38, 255];
 const WHITE = [255, 255, 255, 255];
@@ -223,7 +224,7 @@ test('the picture saves itself and is in the gallery after a restart', async () 
   launched = await restartApp(launched, { band });
   page = launched.page;
   await resizeWindow(launched, { width: 1920, height: 1080 });
-  await openRoute(page, '#/paint/gallery');
+  await openRoute(page, `#${PAINT_GALLERY_PATH}`);
   const cards = page.getByRole('list', { name: strings.galleryTitle.text }).getByRole('listitem');
   await expect(cards).toHaveCount(1);
   await expectAccessible(page);

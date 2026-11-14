@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import path from 'node:path';
 import type { Band } from '../../src/core/bands.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
+import { PAINT_STUDIO_PATH } from '../../src/features/paint-studio/paths.ts';
 
 /**
  * Helpers for the paint studio's end-to-end tests. Canvas checks read pixels back from the page's
@@ -40,7 +41,7 @@ export async function openRoute(page: Page, hash: string): Promise<void> {
   });
 }
 
-export const openStudio = (page: Page): Promise<void> => openRoute(page, '#/paint');
+export const openStudio = (page: Page): Promise<void> => openRoute(page, `#${PAINT_STUDIO_PATH}`);
 
 export async function saveScreen(page: Page, band: Band, name: string): Promise<void> {
   const size = await page.evaluate(() => `${window.innerWidth}x${window.innerHeight}`);

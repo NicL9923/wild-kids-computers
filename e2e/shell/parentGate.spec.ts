@@ -19,6 +19,7 @@ import {
   waitForHome,
   wordGateAnswer,
 } from './shellSupport.ts';
+import { PAINT_GALLERY_PATH } from '../../src/features/paint-studio/paths.ts';
 
 let launched: LaunchedApp;
 
@@ -117,9 +118,9 @@ test('saving a picture to the computer asks the parent gate by default', async (
     },
     { profileId: FIXTURE_PROFILE.id, png: solidPng(16, 10, [40, 120, 200, 255]) },
   );
-  await page.evaluate(() => {
-    window.location.hash = '#/paint/gallery';
-  });
+  await page.evaluate((hash) => {
+    window.location.hash = hash;
+  }, `#${PAINT_GALLERY_PATH}`);
   await page.getByRole('button', { name: paintStrings.exportPicture.text }).click({ timeout: 15_000 });
   const gate = gateDialog(page, 'export');
   await expect(gate).toBeVisible();

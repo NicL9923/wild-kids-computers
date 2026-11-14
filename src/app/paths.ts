@@ -1,21 +1,22 @@
+import { AREA_PATH } from '../activityShell/paths.ts';
 import type { HomePlaceId } from '../components/ui/homePlaces.ts';
+import { PAINT_STUDIO_PATH } from '../features/paint-studio/paths.ts';
 
-/** The app shell's own screens. */
+/**
+ * The app shell's own screens. Each route path has one owner: this file, src/activityShell/paths.ts,
+ * or src/features/paint-studio/paths.ts. Everything else imports the constant; a test in
+ * tools/sourceRules.test.ts fails on a route literal anywhere else.
+ */
 export const START_PATH = '/';
 export const HOME_PATH = '/home';
 export const PARENT_CORNER_PATH = '/parent';
 export const CLOSING_PATH = '/closing';
-
-// Screens other agents build, by the literal path from the shared path table. The coordinator
-// replaces these with the owners' constants after the merge.
-/** The paint studio, built by the paint studio. */
-const PAINT_STUDIO_PATH = '/paint';
-/** An area screen, built by the activity kit. */
-const areaPath = (areaId: Exclude<HomePlaceId, 'paint-studio'>): string => `/area/${areaId}`;
+/** The component gallery, open only in dev and in a test run. */
+export const DEV_GALLERY_PATH = '/dev/gallery';
 
 /** Where each place on the home map goes. */
 export function placePath(place: HomePlaceId): string {
-  return place === 'paint-studio' ? PAINT_STUDIO_PATH : areaPath(place);
+  return place === 'paint-studio' ? PAINT_STUDIO_PATH : AREA_PATH(place);
 }
 
 /**

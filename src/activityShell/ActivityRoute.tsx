@@ -3,7 +3,8 @@ import { useBand, useSessionStatus } from '../app/session/sessionHooks.ts';
 import { activityById } from '../registry/activities.ts';
 import { ActivityRun } from './ActivityRun.tsx';
 import './activityShell.css';
-import { AREA_PATH, START_PATH } from './paths.ts';
+import { START_PATH } from '../app/paths.ts';
+import { AREA_PATH } from './paths.ts';
 
 /**
  * `/activity/$activityId`: one activity for the active profile. Without a ready profile it goes

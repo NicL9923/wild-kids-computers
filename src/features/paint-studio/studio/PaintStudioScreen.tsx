@@ -21,7 +21,8 @@ import { coloringPageById } from '../../../registry/coloringPages.ts';
 import { emojiUrl } from '../../../registry/emoji.ts';
 import { brushTips, paintFonts, paintTools } from '../../../registry/paint.ts';
 import type { ColoringPage } from '../coloringPage.ts';
-import { HOME_PATH, PAINT_GALLERY_PATH, SESSION_CLOSING_PATH } from '../paths.ts';
+import { CLOSING_PATH, HOME_PATH } from '../../../app/paths.ts';
+import { PAINT_GALLERY_PATH } from '../paths.ts';
 import { clearStartingPicture, paintLines, peekStartingPicture, type StartingPicture } from '../startingPicture.ts';
 import { strings } from '../strings.ts';
 import { createStudioScope, type StudioScope } from '../studioScope.ts';
@@ -309,7 +310,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     if (runtime === null) return undefined;
     return runtime.scope.setInterval(() => {
       if (canvasRef.current?.penDown === true || busy || studioRef.current.stroking) return;
-      if (isLimitReached()) void leave(SESSION_CLOSING_PATH);
+      if (isLimitReached()) void leave(CLOSING_PATH);
     }, SESSION_CHECK_MS);
   }, [runtime, busy, isLimitReached, leave]);
 

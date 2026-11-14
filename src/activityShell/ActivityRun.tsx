@@ -35,7 +35,8 @@ import {
   type RoundCompleteHandler,
 } from './kit.ts';
 import { kitScheduler } from './kitTime.ts';
-import { AREA_PATH, SESSION_CLOSING_PATH } from './paths.ts';
+import { CLOSING_PATH } from '../app/paths.ts';
+import { AREA_PATH } from './paths.ts';
 import { ExitControl, InstructionControl, MuteControl } from './ShellControls.tsx';
 import { StepPicker } from './StepPicker.tsx';
 import { strings } from './strings.ts';
@@ -287,7 +288,7 @@ function useLimitOrContinue(): (next: () => void) => void {
   return useCallback(
     (next: () => void) => {
       // The session limit is checked only here, between rounds, never during one.
-      if (session.isLimitReached()) void navigate({ to: SESSION_CLOSING_PATH });
+      if (session.isLimitReached()) void navigate({ to: CLOSING_PATH });
       else next();
     },
     [session, navigate],

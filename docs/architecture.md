@@ -113,6 +113,8 @@ export const routes: FeatureRoutes = [
 ];
 ```
 
+Each route path has one owner: `src/app/paths.ts` for the shell's screens, `src/activityShell/paths.ts` for the area and activity screens, and `src/features/paint-studio/paths.ts` for the studio and its gallery. Everything else, end-to-end tests included, imports the constant. `tools/sourceRules.test.ts` fails on a route literal outside its owner.
+
 Load each screen with `lazyRouteComponent`, because the registry imports every routes file at start. The router keeps hash history. TanStack Router cannot type a tree it finds by file convention, so the router is not registered for path types: a screen parses its own search parameters, as `parseGallerySearch` does, and links take plain strings.
 
 | Item                | Convention                                                                                               |
@@ -284,7 +286,7 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 - **Drag with click alternative.** `useCarry` implements one interaction for moving things. The child can press, drag, and release, or click to pick up and click to place. It supports drop targets, free positions such as a window on the toy desktop, and movement limited to an axis and a range such as a slider or a resize handle. A carried item also moves with the arrow keys and drops with Enter. Every drag in the app uses it. A lint rule bans `draggable`, `onDrag*` handlers, and `setPointerCapture` outside the kit and the paint studio.
 - **Drag exemptions.** Native form controls and text selection are exempt, because the platform already gives them a keyboard alternative. The exemption list lives next to the lint rule.
 - **Pictures.** `kit.pictures` lists the profile's gallery pictures for activities that use them, such as the jigsaw. Activities do not call the bridge.
-- **Session length.** The kit checks the session limit only between rounds, after a 1.2 second pause, and when it is reached routes to `SESSION_CLOSING_PATH` (`/closing`). `src/activityShell/paths.ts` exports it with `AREA_PATH(areaId)` and `ACTIVITY_PATH(id)`.
+- **Session length.** The kit checks the session limit only between rounds, after a 1.2 second pause, and when it is reached routes to `CLOSING_PATH` (`/closing`) from `src/app/paths.ts`. `src/activityShell/paths.ts` exports `AREA_PATH(areaId)` and `ACTIVITY_PATH(id)`.
 - **Area screen.** `/area/$areaId` shows the activities of an area that serve the profile's band as picture tiles that speak their titles on hover and focus. It is the only step between the home map and an activity.
 
 ### Hard rule checks
