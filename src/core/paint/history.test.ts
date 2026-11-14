@@ -265,6 +265,35 @@ describe('History', () => {
     expect(history.undoSteps).toBe(3);
   });
 
+  it('moves the revision for every step added, undone, or redone, also while the caps drop old steps', () => {
+    const tile = TILE_SIZE * TILE_SIZE * 4;
+    // Byte cap and step limit each hold two steps, so from the third change on both drop one.
+    for (const options of [{ byteCap: 2 * tile }, { maxSteps: 2 }]) {
+      const history = new History(createDocument(64, 64), options);
+      const seen: number[] = [history.revision];
+      for (let i = 1; i <= 4; i++) {
+        paintRect(history, 0, 0, 8, 8, i * 10);
+        seen.push(history.revision);
+      }
+      history.undo();
+      seen.push(history.revision);
+      history.redo();
+      seen.push(history.revision);
+      expect(history.undoSteps).toBe(2);
+      expect(seen).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    }
+  });
+
+  it('keeps the revision when nothing changed: an empty commit, or undo and redo with no steps', () => {
+    const history = new History(createDocument(64, 64));
+    const change = history.begin();
+    change.touch({ x: 0, y: 0, width: 64, height: 64 });
+    history.commit(change);
+    history.undo();
+    history.redo();
+    expect(history.revision).toBe(0);
+  });
+
   it('makes start over and opening a coloring page undoable, mask included', () => {
     const doc = createDocument(64, 64);
     const history = new History(doc);

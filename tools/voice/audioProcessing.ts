@@ -99,8 +99,16 @@ export interface LeadCutOptions {
   readonly sampleRate: number;
   /** A 10 ms frame quieter than this, in dBFS, counts as part of a pause. */
   readonly silenceThresholdDb: number;
-  /** The shortest pause that counts as the break after the lead-in, in ms. */
+  /**
+   * A pause at least this long, in ms, is surely the break after the lead-in when it is the first
+   * one in the window. A shorter first pause is taken only when no other pause follows it there.
+   */
   readonly minPauseMs: number;
+  /**
+   * Shorter quiet gaps are part of speech, such as the closure before a stop, never the break.
+   * A sound shorter than this between two pauses is a click, and the pauses count as one.
+   */
+  readonly shortestPauseMs: number;
   /** The pause must start inside this window, in ms from the start. */
   readonly earliestPauseMs: number;
   readonly latestPauseMs: number;
@@ -112,22 +120,32 @@ export const DEFAULT_LEAD_CUT: LeadCutOptions = {
   sampleRate: 24_000,
   silenceThresholdDb: -40,
   minPauseMs: 120,
+  shortestPauseMs: 30,
   earliestPauseMs: 400,
   latestPauseMs: 1_600,
   keepBeforeMs: 30,
 };
 
+/** A quiet stretch between two sounds. */
+export interface Pause {
+  /** When the quiet starts, in ms from the start of the audio. */
+  readonly startMs: number;
+  readonly lengthMs: number;
+  /** The sample where sound comes back. */
+  readonly resumeAt: number;
+}
+
 /**
- * Removes the lead-in phrase the generator puts before every clip. Kokoro adds a false consonant
- * to the start of a short utterance that begins with a vowel ("egg" comes out "lag"), so the
- * generator says "Ready? egg" and keeps only what follows the first pause.
- *
- * Throws when no pause of `minPauseMs` starts inside the expected window. A clip that kept its
- * lead-in, or lost its first word, must never be written.
+ * Every quiet stretch between two sounds, in 10 ms frames, in order. Silence before the first
+ * sound and after the last one is not a pause.
  */
-export function cutAfterLead(samples: Float32Array, options: LeadCutOptions = DEFAULT_LEAD_CUT): Float32Array {
+export function findPauses(
+  samples: Float32Array,
+  options: Pick<LeadCutOptions, 'sampleRate' | 'silenceThresholdDb'>,
+): Pause[] {
   const frame = Math.max(1, Math.round(options.sampleRate * 0.01));
   const threshold = dbToGain(options.silenceThresholdDb);
+  const pauses: Pause[] = [];
   let heardSound = false;
   let quietFrames = 0;
   for (let start = 0, index = 0; start < samples.length; start += frame, index += 1) {
@@ -138,18 +156,82 @@ export function cutAfterLead(samples: Float32Array, options: LeadCutOptions = DE
       if (heardSound) quietFrames += 1;
       continue;
     }
-    if (heardSound && quietFrames * 10 >= options.minPauseMs) {
-      const pauseStartMs = (index - quietFrames) * 10;
-      if (pauseStartMs < options.earliestPauseMs || pauseStartMs > options.latestPauseMs) break;
-      const keep = Math.round((options.keepBeforeMs / 1000) * options.sampleRate);
-      return samples.slice(Math.max(0, start - keep));
+    if (heardSound && quietFrames > 0) {
+      pauses.push({ startMs: (index - quietFrames) * 10, lengthMs: quietFrames * 10, resumeAt: start });
     }
     heardSound = true;
     quietFrames = 0;
   }
-  throw new Error(
-    `No pause of ${String(options.minPauseMs)} ms between ${String(options.earliestPauseMs)} and ${String(options.latestPauseMs)} ms after the lead-in.`,
+  return pauses;
+}
+
+/**
+ * Joins a short pause to the next one when only a click lies between them: a sound shorter than
+ * `shortestPauseMs`. The letter sound "/ks/" ends its lead-in with a 30 ms dip, a 20 ms click,
+ * and then the 370 ms break. A pause of `minPauseMs` or more is never joined to what follows,
+ * because a word can start with a burst that short, such as the "h" of "horse".
+ */
+function mergeClicks(pauses: readonly Pause[], options: LeadCutOptions): Pause[] {
+  const merged: Pause[] = [];
+  for (const pause of pauses) {
+    const previous = merged.at(-1);
+    const soundMs = previous === undefined ? Infinity : pause.startMs - (previous.startMs + previous.lengthMs);
+    if (previous !== undefined && previous.lengthMs < options.minPauseMs && soundMs < options.shortestPauseMs) {
+      merged[merged.length - 1] = {
+        startMs: previous.startMs,
+        lengthMs: pause.startMs + pause.lengthMs - previous.startMs,
+        resumeAt: pause.resumeAt,
+      };
+    } else {
+      merged.push(pause);
+    }
+  }
+  return merged;
+}
+
+/**
+ * The pause after the lead-in: the earliest pause of at least `shortestPauseMs` that starts
+ * inside the window. A later pause is never taken for it, because cutting there would drop the
+ * first words. Throws when there is no such pause, and when the cut is ambiguous: the earliest
+ * pause is shorter than `minPauseMs` and a longer one follows it in the window, so the longer one
+ * could as well be the break. In every clip generated so far the break started 810 to 1300 ms in;
+ * a later, shorter gap is the closure of a stop inside the speech, which is no rival.
+ */
+function leadPause(samples: Float32Array, options: LeadCutOptions = DEFAULT_LEAD_CUT): Pause {
+  const inWindow = mergeClicks(findPauses(samples, options), options).filter(
+    (pause) =>
+      pause.lengthMs >= options.shortestPauseMs &&
+      pause.startMs >= options.earliestPauseMs &&
+      pause.startMs <= options.latestPauseMs,
   );
+  const [first, ...later] = inWindow;
+  if (first === undefined) {
+    throw new Error(
+      `No pause of ${String(options.shortestPauseMs)} ms or more starts between ${String(options.earliestPauseMs)} and ${String(options.latestPauseMs)} ms, after the lead-in.`,
+    );
+  }
+  const rival =
+    first.lengthMs < options.minPauseMs ? later.find((pause) => pause.lengthMs > first.lengthMs) : undefined;
+  if (rival !== undefined) {
+    throw new Error(
+      `The pause after the lead-in is ambiguous: the first one, at ${String(first.startMs)} ms, lasts only ${String(first.lengthMs)} ms, and one of ${String(rival.lengthMs)} ms follows at ${String(rival.startMs)} ms.`,
+    );
+  }
+  return first;
+}
+
+/**
+ * Removes the lead-in phrase the generator puts before every clip. Kokoro adds a false consonant
+ * to the start of a short utterance that begins with a vowel ("egg" comes out "lag"), so the
+ * generator says "Ready? egg" and keeps only what follows the pause after the lead-in.
+ *
+ * Throws when that pause is missing or ambiguous; see leadPause. A clip that kept its lead-in, or
+ * lost its first word, must never be written.
+ */
+export function cutAfterLead(samples: Float32Array, options: LeadCutOptions = DEFAULT_LEAD_CUT): Float32Array {
+  const pause = leadPause(samples, options);
+  const keep = Math.round((options.keepBeforeMs / 1000) * options.sampleRate);
+  return samples.slice(Math.max(0, pause.resumeAt - keep));
 }
 
 /** Trim, then even out loudness, then fade. Throws when the model produced only silence. */

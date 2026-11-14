@@ -36,6 +36,7 @@
     "perf": "node tools/paintPerf.ts && npm run build && node e2e/paint/studioPerf.ts",
     "paint:goldens": "node tools/paintGoldens.ts",
     "voice:generate": "vitest run --config tools/tasks/vitest.config.ts tools/tasks/writeSpokenList.task.ts && node tools/voice/generate.ts",
+    "voice:audit": "vitest run --config tools/tasks/vitest.config.ts tools/tasks/writeSpokenList.task.ts && node tools/voice/audit.ts",
     "voice:round-trip": "vitest run --config tools/tasks/vitest.config.ts tools/tasks/writeSpokenList.task.ts && HF_HOME=\"$HOME/.cache/wkc/hf\" \"$HOME/.cache/wkc/venv-asr/bin/python\" -I tools/voice/roundTrip.py",
     "dist": "npm run build && electron-builder --publish never",
     "prepare": "husky",

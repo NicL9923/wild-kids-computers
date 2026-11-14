@@ -221,6 +221,7 @@ export class History {
   private readonly undoStack: Change[] = [];
   private readonly redoStack: Change[] = [];
   private open: Change | null = null;
+  private revisionCount = 0;
 
   constructor(doc: PaintDocument, options: HistoryOptions = {}) {
     this.doc = doc;
@@ -248,6 +249,15 @@ export class History {
   }
 
   /**
+   * Counts every change to the picture that went through the history: each step added, undone,
+   * or redone. Dropping the oldest steps to stay under the caps does not change the picture, so it
+   * does not count. A caller that saved at one revision knows the picture changed when it differs.
+   */
+  get revision(): number {
+    return this.revisionCount;
+  }
+
+  /**
    * Bytes held by every undo and redo step. Summed from the steps each time, never kept as a
    * running total: undo and redo swap a saved mask in and out, which changes a step's size.
    */
@@ -272,6 +282,7 @@ export class History {
     if (change.isEmpty) return false;
     this.redoStack.length = 0;
     this.undoStack.push(change);
+    this.revisionCount++;
     this.trim(change);
     return true;
   }
@@ -287,6 +298,7 @@ export class History {
     const step = this.undoStack.pop();
     if (step === undefined) return EMPTY_RECT;
     this.redoStack.push(step);
+    this.revisionCount++;
     const area = step.swap();
     // Swapping a mask in can make the step larger, so the cap applies here too.
     this.trim(step);
@@ -298,6 +310,7 @@ export class History {
     const step = this.redoStack.pop();
     if (step === undefined) return EMPTY_RECT;
     this.undoStack.push(step);
+    this.revisionCount++;
     // No trim: redo returns to a point undo already passed through, holding the same steps or
     // fewer, so the total there already fit the cap.
     return step.swap();

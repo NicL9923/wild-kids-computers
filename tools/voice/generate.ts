@@ -57,11 +57,13 @@ async function main(): Promise<void> {
   const failed: string[] = [];
   for (const clip of missing) {
     const { samples, sampleRate } = await synthesizer.synthesize(clip.speech);
-    const spoken = cutLead(samples, sampleRate);
-    if (spoken === undefined) {
+    let spoken: Float32Array;
+    try {
+      spoken = cutAfterLead(samples, { ...DEFAULT_LEAD_CUT, sampleRate });
+    } catch (error) {
       // One speech with no clear pause after the lead-in must not stop the other clips.
       failed.push(clip.speech);
-      console.log(`No clip for "${clip.speech}": no pause after the lead-in.`);
+      console.log(`No clip for "${clip.speech}": ${error instanceof Error ? error.message : String(error)}`);
       continue;
     }
     const processed = processSpeech(spoken, { ...DEFAULT_PROCESS_OPTIONS, sampleRate });
@@ -78,22 +80,6 @@ async function main(): Promise<void> {
     for (const speech of failed) console.log(`  "${speech}"`);
     process.exitCode = 1;
   }
-}
-
-/**
- * Cuts the lead-in. Some sentences run the lead-in closer to the first word than the default
- * 120 ms pause, so shorter pauses are tried before giving up. The pause must still start inside
- * the lead-in window, so a pause later in the sentence is never taken for it.
- */
-function cutLead(samples: Float32Array, sampleRate: number): Float32Array | undefined {
-  for (const minPauseMs of [DEFAULT_LEAD_CUT.minPauseMs, 80, 50, 30]) {
-    try {
-      return cutAfterLead(samples, { ...DEFAULT_LEAD_CUT, sampleRate, minPauseMs });
-    } catch {
-      // Try the next, shorter pause.
-    }
-  }
-  return undefined;
 }
 
 await main();

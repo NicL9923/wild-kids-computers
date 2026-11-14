@@ -1,6 +1,7 @@
-import { useNavigate } from '@tanstack/react-router';
+import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBand, usePictures, useSessionLength, useStorageProblems } from '../../../app/session/sessionHooks.ts';
+import { quitWork } from '../../../app/kiosk/quitWork.ts';
+import { useBand, usePictures, useSessionLength } from '../../../app/session/sessionHooks.ts';
 import type { ProfilePictures } from '../../../app/session/sessionStore.ts';
 import { useAudio, useMute } from '../../../audio/AudioProvider.tsx';
 import type { ContinuousSound } from '../../../audio/audioEngine.ts';
@@ -25,10 +26,10 @@ import { CLOSING_PATH, HOME_PATH } from '../../../app/paths.ts';
 import { PAINT_GALLERY_PATH } from '../paths.ts';
 import { clearStartingPicture, paintLines, peekStartingPicture, type StartingPicture } from '../startingPicture.ts';
 import { strings } from '../strings.ts';
-import { createScope, type OwnedScope } from '../../../core/activityKit/scope.ts';
+import { createScope, type OwnedScope, type Scope } from '../../../core/activityKit/scope.ts';
 import { kitScheduler } from '../../../activityShell/kitTime.ts';
 import { createEffectRunner, startEffectWorker, type EffectRunner } from '../worker/effectRunner.ts';
-import { Autosaver } from './autosave.ts';
+import { Autosaver, type KeptPicture } from './autosave.ts';
 import { decodePngUrl, fitOnPaper, rasterizeSvg } from './browserPixels.ts';
 import { EmojiPicture, Glyph, SizeDot, StudioButton } from './controls.tsx';
 import { Palette } from './Palette.tsx';
@@ -63,6 +64,8 @@ import { unflattenUnderMask } from './unflatten.ts';
 
 /** How long painting must pause before the picture saves itself. */
 const AUTOSAVE_DELAY_MS = 1500;
+/** How long input waits after a save for leaving, in case the route change that asked for it never came. */
+const STALLED_LEAVE_MS = 2000;
 /** Brush speed, in document pixels per millisecond, that makes the brush sound loudest. */
 const LOUDEST_SPEED = 3;
 
@@ -125,7 +128,6 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   const [muted, toggleMute] = useMute();
   const pictures = usePictures();
   const { isLimitReached } = useSessionLength();
-  const { saveProblem } = useStorageProblems();
   const navigate = useNavigate();
   const youngest = isYoungest(band);
 
@@ -158,22 +160,30 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   const [effectId, setEffectId] = useState<string>(effects[0]?.id ?? 'confetti');
   const [panel, setPanel] = useState<Panel | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The studio is saving the picture before it lets go of it. Input waits. */
+  const [leaving, setLeaving] = useState(false);
+  /** The newest save failed. The picture stays, and the screen says so. */
+  const [saveFailed, setSaveFailed] = useState(false);
   const [penIsDown, setPenIsDown] = useState(false);
   const [text, setText] = useState<{ at: ToolPoint; content: string } | null>(null);
   const [font, setFont] = useState<GlyphTable | null>(null);
   const seedRef = useRef(Date.now() >>> 0);
   const sound = useRef<ContinuousSound | null>(null);
   const lastMove = useRef<{ point: ToolPoint; time: number } | null>(null);
-  const leaving = useRef(false);
   const textInput = useRef<HTMLInputElement>(null);
 
   const say = useCallback((handle: SpokenHandle) => void audio.speak(handle), [audio]);
+  const locked = busy || leaving;
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
   const effect = effects.find((item) => item.id === effectId);
   const tip = brushTips.find((item) => item.id === tipId) ?? brushTips[0];
   const sizeChoice = sizes[Math.min(sizeIndex, sizes.length - 1)] ?? sizes[0];
   const stampSize = (sizes[Math.min(stamp.size, sizes.length - 1)] ?? sizes[0])?.stamp ?? 170;
 
-  // The timers, frames, and worker live as long as the screen.
+  // The timers, frames, and worker live as long as the screen. Before the worker stops, the
+  // picture is saved one last time, in case the screen closed without a route change, such as
+  // when the profile stopped being ready. Every route change has saved it already; see below.
   useEffect(() => {
     const scope = createScope(kitScheduler);
     const runner = createEffectRunner(startEffectWorker, encodePicture);
@@ -185,42 +195,61 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     setRuntime({ scope, runner });
     return () => {
       live = false;
+      const saver = saverRef.current;
+      saverRef.current = null;
       scope.dispose();
-      runner.dispose();
+      void (async () => {
+        try {
+          await saver?.keep();
+        } finally {
+          saver?.dispose();
+          runner.dispose();
+        }
+      })();
     };
   }, []);
 
-  const makeSaver = useCallback(
-    (owner: StudioDocument, id: string | null, savedVersion: number, { scope, runner }: StudioRuntime) =>
-      new Autosaver(
-        {
-          scope,
-          delayMs: AUTOSAVE_DELAY_MS,
-          encode: () => runner.encode(owner.doc, owner.pageId),
-          save: pictures.save,
-        },
-        id,
-        savedVersion,
-      ),
-    [pictures],
+  /** Saving fails or works again. The child and the adult hear and see it the first time it fails. */
+  const onFailingChange = useCallback(
+    (failing: boolean) => {
+      setSaveFailed(failing);
+      if (failing) say(strings.pictureNotSaved);
+    },
+    [say],
   );
 
-  /** Shows another picture. The old one saves first if it changed. */
-  const switchPicture = useCallback(
-    (next: StudioDocument, id: string | null, savedVersion: number) => {
-      if (runtime === null) return;
-      void saverRef.current?.flush();
-      saverRef.current = makeSaver(next, id, savedVersion, runtime);
-      setStudio(next);
+  /** Says again that the picture is not saved, when a try to leave it found saving still failing. */
+  const repeatNotSaved = useCallback(
+    (wasFailing: boolean) => {
+      if (wasFailing) say(strings.pictureNotSaved);
     },
-    [makeSaver, runtime],
+    [say],
+  );
+
+  /**
+   * Shows another picture. The saver saves the old one first and lets go of it only when that
+   * landed. Resolves to whether it switched; on false the old picture stays, and the child heard why.
+   */
+  const switchPicture = useCallback(
+    async (next: KeptPicture): Promise<boolean> => {
+      const saver = saverRef.current;
+      if (saver === null) return false;
+      const wasFailing = saver.failing;
+      setLeaving(true);
+      const switched = await saver.switchTo(next);
+      setLeaving(false);
+      if (switched) setStudio(next.studio);
+      else repeatNotSaved(wasFailing);
+      return switched;
+    },
+    [repeatNotSaved],
   );
 
   // Open the starting picture, the gallery picture, or blank paper.
   useEffect(() => {
     if (runtime === null) return undefined;
     let cancelled = false;
-    async function open(): Promise<void> {
+    async function open(scope: Scope, runner: EffectRunner): Promise<void> {
       const start = peekStartingPicture();
       let next = new StudioDocument();
       let id: string | null = null;
@@ -236,12 +265,21 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       if (cancelled) return;
       if (start !== null) clearStartingPicture(start);
       // A starting picture is new work, so it saves. An opened picture saves only after a change.
-      switchPicture(next, id, start === null ? next.version : 0);
-      if (start !== null) saverRef.current?.changed(next.version);
+      saverRef.current = new Autosaver(
+        {
+          scope,
+          delayMs: AUTOSAVE_DELAY_MS,
+          encode: (owner) => runner.encode(owner.doc, owner.pageId),
+          save: pictures.save,
+          onFailingChange,
+        },
+        { studio: next, id, savedVersion: start === null ? next.version : 0 },
+      );
+      setStudio(next);
       setLoaded(true);
       say(strings.instruction);
     }
-    void open();
+    void open(runtime.scope, runtime.runner);
     return () => {
       cancelled = true;
     };
@@ -249,16 +287,8 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     // oxlint-disable-next-line react/exhaustive-deps
   }, [runtime]);
 
-  // Save after a pause, and re-render when the picture changes so undo and redo stay current.
-  useEffect(() => {
-    return studio.subscribe(() => {
-      saverRef.current?.changed(studio.version);
-      setRenderCount((count) => count + 1);
-    });
-  }, [studio]);
-
-  // Save when leaving, however the child leaves.
-  useEffect(() => () => void saverRef.current?.flush(), []);
+  // Re-render when the picture changes, so undo and redo stay current. The saver saves on its own.
+  useEffect(() => studio.subscribe(() => setRenderCount((count) => count + 1)), [studio]);
 
   // The text tool's letters load on first need.
   useEffect(() => {
@@ -299,41 +329,81 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     setText(null);
   }, []);
 
-  const leave = useCallback(
-    async (to: string) => {
-      if (leaving.current) return;
-      leaving.current = true;
-      settle();
-      await saverRef.current?.flush();
-      await navigate({ to });
+  /**
+   * Saves everything, the stroke in progress too, before the studio lets go of the picture.
+   * Input waits meanwhile, so nothing new lands after the save. Resolves to whether the picture
+   * is safe; on false it stays on screen and the child heard why.
+   */
+  const keepPicture = useCallback(async (): Promise<boolean> => {
+    const saver = saverRef.current;
+    if (saver === null) return true;
+    settle();
+    const wasFailing = saver.failing;
+    setLeaving(true);
+    const kept = await saver.keep();
+    if (!kept) {
+      setLeaving(false);
+      repeatNotSaved(wasFailing);
+    } else {
+      // The screen closes next. If something stopped that route change, input comes back.
+      runtime?.scope.setTimeout(() => setLeaving(false), STALLED_LEAVE_MS);
+    }
+    return kept;
+  }, [settle, repeatNotSaved, runtime]);
+
+  // Every way out of the studio is a route change: the exit and gallery controls, browser history,
+  // the session limit, another feature's link. Each one waits here until the picture is saved,
+  // and stays when it could not be.
+  useBlocker({
+    shouldBlockFn: async ({ current, next }) => {
+      const same = current.pathname === next.pathname && JSON.stringify(current.search) === JSON.stringify(next.search);
+      if (same) return false;
+      return !(await keepPicture());
     },
-    [navigate, settle],
+    enableBeforeUnload: false,
+  });
+
+  // Quitting the app finishes the same save first; see src/app/kiosk/closeRequest.ts.
+  useEffect(
+    () =>
+      quitWork.hold({
+        pending: () => saverRef.current?.hasUnsavedChanges ?? false,
+        finish: keepPicture,
+      }),
+    [keepPicture],
   );
+
+  const leave = useCallback((to: string) => void navigate({ to }), [navigate]);
 
   // When the parent's session length is used up, wait for the pen to lift, save, and close calmly.
   useEffect(() => {
     if (runtime === null) return undefined;
     return runtime.scope.setInterval(() => {
-      if (canvasRef.current?.penDown === true || busy || studioRef.current.stroking) return;
-      if (isLimitReached()) void leave(CLOSING_PATH);
+      if (canvasRef.current?.penDown === true || lockedRef.current || studioRef.current.stroking) return;
+      // A picture that cannot be saved keeps the child here; the screen already says so.
+      if (saverRef.current?.failing === true) return;
+      if (isLimitReached()) leave(CLOSING_PATH);
     }, SESSION_CHECK_MS);
-  }, [runtime, busy, isLimitReached, leave]);
+  }, [runtime, isLimitReached, leave]);
 
   const runWholePicture = useCallback(
     async (chosen: PictureEffect) => {
-      if (runtime === null || busy) return;
+      if (runtime === null || lockedRef.current) return;
       settle();
       const target = studioRef.current;
+      const version = target.version;
       setBusy(true);
+      lockedRef.current = true;
       audio.play('sparkle');
       try {
         const pixels = await runtime.runner.run(chosen, target.doc.paint);
-        if (studioRef.current === target && !runtime.scope.disposed) target.replacePaint(pixels);
+        // A result for a picture that changed meanwhile is dropped; see replacePaintFrom.
+        if (studioRef.current === target && !runtime.scope.disposed) target.replacePaintFrom(version, pixels);
       } finally {
         if (!runtime.scope.disposed) setBusy(false);
       }
     },
-    [audio, busy, runtime, settle],
+    [audio, runtime, settle],
   );
 
   // Letters follow the typing as a preview, and land when the child puts them on.
@@ -496,6 +566,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }
 
   function undo(): void {
+    if (lockedRef.current) return;
     settle();
     studioRef.current.undo();
     audio.play('page-turn');
@@ -503,6 +574,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }
 
   function redo(): void {
+    if (lockedRef.current) return;
     settle();
     studioRef.current.redo();
     audio.play('page-turn');
@@ -510,6 +582,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }
 
   function startOver(): void {
+    if (lockedRef.current) return;
     settle();
     studioRef.current.startOver();
     audio.play('whoosh');
@@ -517,31 +590,27 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }
 
   function newPaper(): void {
+    if (lockedRef.current) return;
     settle();
     say(strings.newPicture);
     audio.play('page-turn');
     if (!hasContent() && studioRef.current.mask === null) return;
-    switchPicture(new StudioDocument(), null, 0);
+    void switchPicture({ studio: new StudioDocument(), id: null, savedVersion: 0 });
   }
 
   async function openPage(page: ColoringPage): Promise<void> {
+    if (lockedRef.current) return;
     setPanel(null);
     settle();
     say(page.title);
     const mask = await decodePngUrl(page.mask);
     const blank = createSurface(DOCUMENT_WIDTH, DOCUMENT_HEIGHT, PAPER);
     audio.play('page-turn');
-    if (hasContent()) {
-      // The picture so far stays in the gallery. The page starts a new one, and undo takes it off.
-      const next = new StudioDocument();
-      next.replace(blank, mask, page.id);
-      switchPicture(next, null, next.version);
-    } else {
-      const current = studioRef.current;
-      current.replace(blank, mask, page.id);
-      // An untouched page is not a picture yet: it saves once the child paints on it.
-      switchPicture(current, null, current.version);
-    }
+    // The picture so far stays in the gallery, and the page starts a new one that undo takes off.
+    // An untouched page is not a picture yet: it saves once the child paints on it.
+    const next = new StudioDocument();
+    next.replace(blank, mask, page.id);
+    await switchPicture({ studio: next, id: null, savedVersion: next.version });
   }
 
   // Undo and redo from the keyboard, except while typing letters.
@@ -562,9 +631,8 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   });
 
   const ready = loaded && warm && runtime !== null;
-  const canUndo = !busy && studio.canUndo;
-  const canRedo = !busy && studio.canRedo;
-  const savingFailed = saveProblem !== null && saveProblem.target === `pictures/${pictures.profileId}`;
+  const canUndo = !locked && studio.canUndo;
+  const canRedo = !locked && studio.canRedo;
 
   const sizeControls = (
     <fieldset className='wk-paint-option-group' aria-label={t(strings.size)}>
@@ -761,17 +829,13 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       <Screen
         exit={
           <>
-            <IconButton
-              label={t(strings.exit)}
-              icon={<InterfaceIcon name='exit' />}
-              onClick={() => void leave(HOME_PATH)}
-            />
+            <IconButton label={t(strings.exit)} icon={<InterfaceIcon name='exit' />} onClick={() => leave(HOME_PATH)} />
             <IconButton
               label={t(strings.gallery)}
               icon={<EmojiPicture id='picture' />}
               onClick={() => {
                 say(strings.gallery);
-                void leave(PAINT_GALLERY_PATH);
+                leave(PAINT_GALLERY_PATH);
               }}
             />
             <IconButton label={t(strings.newPicture)} icon={<Glyph name='paper' />} onClick={newPaper} />
@@ -810,7 +874,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
             <IconButton
               label={t(strings.startOver)}
               icon={<EmojiPicture id='broom' />}
-              disabled={busy}
+              disabled={locked}
               onClick={startOver}
             />
             <IconButton
@@ -843,16 +907,24 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
                   studio={studio}
                   driver={driver}
                   scope={runtime.scope}
-                  busy={busy || !ready}
+                  busy={locked || !ready}
                   onPenChange={setPenIsDown}
                   handleRef={canvasRef}
                   overlay={
-                    penIsDown && (
-                      <output className='wk-paint-pen-badge'>
-                        <EmojiPicture id='paintbrush' />
-                        <span className='wk-reading-text'>{t(strings.penDown)}</span>
-                      </output>
-                    )
+                    <>
+                      {penIsDown && (
+                        <output className='wk-paint-pen-badge'>
+                          <EmojiPicture id='paintbrush' />
+                          <span className='wk-reading-text'>{t(strings.penDown)}</span>
+                        </output>
+                      )}
+                      {busy && (
+                        <output className='wk-paint-busy' data-testid='effect-busy'>
+                          <EmojiPicture id='sparkles' />
+                          <span className='wk-reading-text'>{t(strings.effectWorking)}</span>
+                        </output>
+                      )}
+                    </>
                   }
                 />
               )}
@@ -916,7 +988,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
             </div>
             <div className='wk-paint-options'>
               {options()}
-              {savingFailed && <output className='wk-paint-problem'>{t(strings.saveProblem)}</output>}
+              {saveFailed && <output className='wk-paint-problem'>{t(strings.pictureNotSaved)}</output>}
             </div>
           </div>
           <Palette

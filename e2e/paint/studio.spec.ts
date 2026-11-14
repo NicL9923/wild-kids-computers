@@ -204,6 +204,31 @@ test('a whole-picture effect applies, and undo brings back the picture before it
   await expect.poll(() => canvasFingerprint(page)).toBe(after);
 });
 
+test('undo waits while a whole-picture effect works, so the effect never wipes the undo', async () => {
+  const page = await start('band-3-5');
+  await mouseTo(page, 300, 500, 1);
+  await page.mouse.down();
+  await mouseTo(page, 600, 500);
+  await page.mouse.up();
+  await frames(page);
+  const stroke = await canvasFingerprint(page);
+
+  await chooseTool(page, strings['tool-effects'].text);
+  const panel = page.getByRole('dialog', { name: strings.chooseEffect.text });
+  await expect(panel).toBeVisible();
+  // The child picks the effect and presses undo at once, before the effect is back from the worker.
+  await panel.getByRole('button', { name: effectNames.mirror.text, exact: true }).evaluate((mirror) => {
+    if (mirror instanceof HTMLElement) mirror.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+  });
+  await expect.poll(() => pixelAt(page, 1599 - 450, 500)).toEqual(RED);
+  await expect(page.getByTestId('effect-busy')).toHaveCount(0);
+
+  // The stroke is still one undo away, under the effect.
+  await button(page, strings.undo.text).click();
+  await expect.poll(() => canvasFingerprint(page)).toBe(stroke);
+});
+
 test('thirty undos and thirty redos walk the picture back and forward exactly', async () => {
   const page = await start('band-6-8');
   await chooseTool(page, strings['tool-stamp'].text);

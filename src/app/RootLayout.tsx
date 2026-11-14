@@ -1,6 +1,6 @@
 import { Outlet } from '@tanstack/react-router';
 import { SessionLimitGuard } from './closing/SessionLimitGuard.tsx';
-import { KioskCloseGuard } from './kiosk/KioskCloseGuard.tsx';
+import { QuitGuard } from './kiosk/QuitGuard.tsx';
 import { ParentGateProvider } from './parent-gate/ParentGate.tsx';
 import { useThemeSettings } from './session/sessionHooks.ts';
 import { ThemeRoot } from './theme/ThemeRoot.tsx';
@@ -11,9 +11,10 @@ export default function RootLayout() {
   return (
     <ThemeRoot settings={theme}>
       <ParentGateProvider>
-        <KioskCloseGuard />
-        <SessionLimitGuard />
-        <Outlet />
+        <QuitGuard>
+          <SessionLimitGuard />
+          <Outlet />
+        </QuitGuard>
       </ParentGateProvider>
     </ThemeRoot>
   );
