@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { guardContents, type GuardedContents } from './contentsGuard.ts';
 import type { KeyInput } from './shortcuts.ts';
 
-type Listener = (event: { preventDefault(): void }, input: KeyInput) => void;
+/** Any listener the guard adds. Each event passes its own arguments. */
+type Listener = (...args: never[]) => void;
 
 const NO_EVENT = { preventDefault: () => undefined };
 const NO_KEY: KeyInput = { key: '', code: '', control: false, meta: false, alt: false, shift: false };
@@ -11,7 +12,18 @@ const NO_KEY: KeyInput = { key: '', code: '', control: false, meta: false, alt: 
 function fakeContents(zoomLimits: () => Promise<void>) {
   const listeners = new Map<string, Listener[]>();
   const calls: string[] = [];
+  const debuggerCalls: string[] = [];
   const contents: GuardedContents = {
+    isDestroyed: () => false,
+    debugger: {
+      attach: () => void debuggerCalls.push('attach'),
+      isAttached: () => debuggerCalls.includes('attach'),
+      sendCommand: (method) => {
+        debuggerCalls.push(method);
+        return Promise.resolve({});
+      },
+      on: () => undefined,
+    },
     on(event: string, listener: Listener) {
       listeners.set(event, [...(listeners.get(event) ?? []), listener]);
     },
@@ -25,10 +37,39 @@ function fakeContents(zoomLimits: () => Promise<void>) {
     closeDevTools: () => void calls.push('close devtools'),
   };
   const emit = (event: string) => {
-    for (const listener of listeners.get(event) ?? []) listener(NO_EVENT, NO_KEY);
+    for (const listener of listeners.get(event) ?? []) Reflect.apply(listener, undefined, [NO_EVENT, NO_KEY]);
   };
-  return { contents, calls, emit };
+  /** The one listener for an event, called with whatever arguments Electron would pass. */
+  const listenerFor = (event: string) => {
+    const [listener] = listeners.get(event) ?? [];
+    if (listener === undefined) throw new Error(`No listener for ${event}.`);
+    return (...args: unknown[]) => void Reflect.apply(listener, undefined, args);
+  };
+  return { contents, calls, debuggerCalls, emit, listenerFor };
 }
+
+describe('guardContents Bluetooth', () => {
+  it('cancels a Bluetooth device request instead of letting Electron pick the first device', () => {
+    const { contents, listenerFor } = fakeContents(() => Promise.resolve());
+    guardContents(contents, { os: 'linux', devRun: false });
+    const steps: string[] = [];
+    listenerFor('select-bluetooth-device')(
+      { preventDefault: () => steps.push('prevented') },
+      [{ deviceId: 'speaker' }],
+      (id: string) => steps.push(`chose ${JSON.stringify(id)}`),
+    );
+    expect(steps).toEqual(['prevented', 'chose ""']);
+  });
+});
+
+describe('guardContents file chooser block', () => {
+  // A dev run keeps reload and DevTools, but a file chooser is never the app's.
+  it.each([false, true])('intercepts file choosers before the first load, dev run %s', (devRun) => {
+    const { contents, debuggerCalls } = fakeContents(() => Promise.resolve());
+    guardContents(contents, { os: 'linux', devRun });
+    expect(debuggerCalls).toEqual(['attach', 'Page.enable', 'Page.setInterceptFileChooserDialog']);
+  });
+});
 
 describe('guardContents zoom', () => {
   it('limits pinch zoom after the page loads, not before it has a frame', () => {

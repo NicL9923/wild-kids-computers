@@ -185,6 +185,17 @@ describe('file choosers', () => {
     document.body.append(input);
     expect(fire(input, 'click')).toBe(cancelled);
   });
+
+  it('cancels a click on a file input inside an open shadow root', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const input = document.createElement('input');
+    input.type = 'file';
+    host.attachShadow({ mode: 'open' }).append(input);
+    const click = new Event('click', { bubbles: true, cancelable: true, composed: true });
+    input.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+  });
 });
 
 describe('uninstall', () => {
