@@ -88,12 +88,9 @@ export interface ActivityProps<L, S = never> {
 }
 
 /** What the shell does with the kit's calls. The activity runner builds one per visit. */
-export interface KitHost<S> {
+export interface KitHost {
   readonly audio: Pick<AudioEngine, 'speak' | 'speakSequence' | 'cancelSpeech' | 'play' | 'startContinuous'>;
   readonly clock: KitClock;
-  readonly reducedMotion: boolean;
-  readonly state: KitState<S> | null;
-  readonly pictures: Pick<ProfilePictures, 'list' | 'read'>;
   readonly activityId: string;
   /** The instruction changed. `speak` says whether to say it now. */
   onInstruction(handles: readonly SpokenHandle[], speak: boolean): void;
@@ -102,6 +99,32 @@ export interface KitHost<S> {
 
 /** Called once when a round ends, with the outcome the difficulty model reads. */
 export type RoundCompleteHandler = (outcome: { mistakes: number; hintsUsed: number }) => void;
+
+/**
+ * What one round has counted so far. It outlives a kit rebuilt within the round, such as when
+ * the saved state changes, so the counts are never lost.
+ */
+export interface RoundTally {
+  mistakes: number;
+  hintsUsed: number;
+  complete: boolean;
+}
+
+export function createTally(): RoundTally {
+  return { mistakes: 0, hintsUsed: 0, complete: false };
+}
+
+export interface KitParts<S> {
+  /** The round's scope: when it is disposed, every kit call becomes a no-op. */
+  readonly scope: Scope;
+  readonly host: KitHost;
+  readonly tally: RoundTally;
+  readonly onRoundComplete: RoundCompleteHandler;
+  /** The saved state now, or null when the definition declares none. */
+  readonly state: KitState<S> | null;
+  readonly reducedMotion: boolean;
+  readonly pictures: Pick<ProfilePictures, 'list' | 'read'>;
+}
 
 function count(value: number | undefined, fallback: number, name: string): number {
   if (value === undefined) return fallback;
@@ -112,21 +135,18 @@ function count(value: number | undefined, fallback: number, name: string): numbe
 }
 
 /**
- * Builds the kit for one round. `scope` is the round's scope: when it is disposed, every kit call
- * becomes a no-op. The shell cancels the round's speech when the round ends.
+ * Builds the kit for one round. The shell rebuilds it when the state, motion, or pictures change,
+ * with the same tally, and cancels the round's speech when the round ends.
  */
-export function createKit<S>(scope: Scope, host: KitHost<S>, onRoundComplete: RoundCompleteHandler): ActivityKit<S> {
-  let mistakes = 0;
-  let hintsUsed = 0;
-  let complete = false;
-
+export function createKit<S>(parts: KitParts<S>): ActivityKit<S> {
+  const { scope, host, tally, onRoundComplete, state } = parts;
   const speakSequence = (handles: readonly SpokenHandle[]): Promise<void> =>
     scope.disposed ? Promise.resolve() : host.audio.speakSequence(handles);
 
   return {
     scope,
     clock: host.clock,
-    reducedMotion: host.reducedMotion,
+    reducedMotion: parts.reducedMotion,
     speak: (handle) => (scope.disposed ? Promise.resolve() : host.audio.speak(handle)),
     speakSequence,
     setInstruction(instruction, options) {
@@ -145,35 +165,35 @@ export function createKit<S>(scope: Scope, host: KitHost<S>, onRoundComplete: Ro
     },
     feedback: {
       correct(options = {}) {
-        if (scope.disposed || complete) return;
+        if (scope.disposed || tally.complete) return;
         host.onFeedback('correct', options);
       },
       wrong(options = {}) {
-        if (scope.disposed || complete) return;
-        mistakes += 1;
+        if (scope.disposed || tally.complete) return;
+        tally.mistakes += 1;
         host.onFeedback('wrong', options);
       },
     },
     hint(say) {
-      if (scope.disposed || complete) return;
-      hintsUsed += 1;
+      if (scope.disposed || tally.complete) return;
+      tally.hintsUsed += 1;
       if (say !== undefined) void host.audio.speak(say);
     },
     roundComplete(outcome) {
-      if (scope.disposed || complete) return;
+      if (scope.disposed || tally.complete) return;
       const result = {
-        mistakes: count(outcome?.mistakes, mistakes, 'mistakes'),
-        hintsUsed: count(outcome?.hintsUsed, hintsUsed, 'hintsUsed'),
+        mistakes: count(outcome?.mistakes, tally.mistakes, 'mistakes'),
+        hintsUsed: count(outcome?.hintsUsed, tally.hintsUsed, 'hintsUsed'),
       };
-      complete = true;
+      tally.complete = true;
       onRoundComplete(result);
     },
     get state(): KitState<S> {
-      if (host.state === null) {
+      if (state === null) {
         throw new Error(`Activity ${host.activityId} uses kit.state but declares no state in activity.ts.`);
       }
-      return host.state;
+      return state;
     },
-    pictures: host.pictures,
+    pictures: parts.pictures,
   };
 }

@@ -26,9 +26,11 @@ import { FeedbackLayer, defaultFeedbackText, type FeedbackMark } from './Feedbac
 import { FinishScreen } from './FinishScreen.tsx';
 import {
   createKit,
+  createTally,
   type ActivityKit,
   type FeedbackOptions,
   type KitHost,
+  type KitParts,
   type KitState,
   type RoundCompleteHandler,
 } from './kit.ts';
@@ -87,8 +89,11 @@ interface Player {
   readonly marks: readonly FeedbackMark[];
   /** A callback ref for the stage, which feedback marks are placed in. */
   readonly attachStage: (element: HTMLDivElement | null) => void;
-  /** Stable for the whole visit. Its getters read the newest state, motion, and pictures. */
-  readonly host: KitHost<unknown>;
+  /** Stable for the whole visit. */
+  readonly host: KitHost;
+  readonly state: KitState<unknown> | null;
+  readonly reducedMotion: boolean;
+  readonly pictures: KitParts<unknown>['pictures'];
   /** Owns the visit's timers, such as the pause between rounds. */
   readonly visit: Scope;
   readonly replay: () => void;
@@ -117,12 +122,13 @@ function ActivityRunWithState({
     stage.current = element;
   }, []);
   const nextMarkId = useRef(1);
-  const live = useRef({ state, reducedMotion, pictures, instruction });
+  // The newest instruction, for the replay control's handler.
+  const live = useRef(instruction);
   useLayoutEffect(() => {
-    live.current = { state, reducedMotion, pictures, instruction };
+    live.current = instruction;
   });
 
-  const host = useMemo<KitHost<unknown>>(() => {
+  const host = useMemo<KitHost>(() => {
     const showMark = (kind: FeedbackMark['kind'], options: FeedbackOptions) => {
       const { x, y } = spotCenter(options.at, stage.current?.getBoundingClientRect());
       const id = nextMarkId.current;
@@ -135,15 +141,6 @@ function ActivityRunWithState({
       audio,
       clock: kitScheduler,
       activityId: definition.id,
-      get reducedMotion() {
-        return live.current.reducedMotion;
-      },
-      get state() {
-        return live.current.state;
-      },
-      get pictures() {
-        return live.current.pictures;
-      },
       onInstruction(handles, speak) {
         setInstruction(handles);
         if (speak) void audio.speakSequence(handles);
@@ -157,14 +154,25 @@ function ActivityRunWithState({
   }, [audio, definition.id, visit]);
 
   // Both stay the same for the whole visit, so a round's effect never restarts the round.
-  const replay = useCallback(() => void audio.speakSequence(live.current.instruction), [audio]);
+  const replay = useCallback(() => void audio.speakSequence(live.current), [audio]);
   const startInstruction = useCallback(() => {
     setInstruction([mainInstruction]);
     void audio.speakSequence([mainInstruction]);
   }, [audio, mainInstruction]);
   const player = useMemo<Player>(
-    () => ({ instruction, marks, attachStage, host, visit, replay, startInstruction }),
-    [attachStage, host, instruction, marks, replay, startInstruction, visit],
+    () => ({
+      instruction,
+      marks,
+      attachStage,
+      host,
+      state,
+      reducedMotion,
+      pictures,
+      visit,
+      replay,
+      startInstruction,
+    }),
+    [attachStage, host, instruction, marks, pictures, reducedMotion, replay, startInstruction, state, visit],
   );
 
   // Leaving the activity stops its voice, even mid-sentence.
@@ -236,9 +244,13 @@ function Round({
   onRoundComplete: RoundCompleteHandler;
 }) {
   const scope = useScope();
-  const { host, startInstruction } = player;
-  // onRoundComplete is stable for the round, so the kit and its counts last the whole round.
-  const kit = useMemo(() => createKit(scope, host, onRoundComplete), [scope, host, onRoundComplete]);
+  const [tally] = useState(createTally);
+  const { host, startInstruction, state, reducedMotion, pictures } = player;
+  // Rebuilt when the saved state, motion, or pictures change; the tally keeps the round's counts.
+  const kit = useMemo(
+    () => createKit({ scope, host, tally, onRoundComplete, state, reducedMotion, pictures }),
+    [scope, host, tally, onRoundComplete, state, reducedMotion, pictures],
+  );
 
   useEffect(() => {
     scope.own(() => host.audio.cancelSpeech());
