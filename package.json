@@ -1,0 +1,89 @@
+{
+  "name": "wild-kids-computers",
+  "productName": "Wild Kids - Computers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A free, offline desktop app where children aged 3 to 12 learn to use a computer by playing and painting.",
+  "license": "MIT",
+  "author": "Wild Flowers Tech",
+  "type": "module",
+  "main": "dist/electron/main.cjs",
+  "engines": {
+    "node": "24.22.2"
+  },
+  "scripts": {
+    "dev": "node tools/dev.ts",
+    "build": "npm run check:licenses && npm run build:renderer && npm run build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "node tools/buildElectron.ts",
+    "lint": "oxlint",
+    "knip": "knip",
+    "typecheck": "tsrs -b",
+    "format": "oxfmt --write \"**/*.{ts,tsx,mts,cts,js,mjs,cjs}\" && prettier --write --log-level warn \"**/*.{css,json,md,yml}\"",
+    "format:check": "oxfmt --check \"**/*.{ts,tsx,mts,cts,js,mjs,cjs}\" && prettier --check --log-level warn \"**/*.{css,json,md,yml}\"",
+    "test": "vitest run --coverage",
+    "test:tz": "vitest run --mode tz-east",
+    "check": "npm run check:dependencies && npm run check:node-version && npm run check:licenses && npm run check:voice && npm run check:strings",
+    "check:dependencies": "node tools/checkDependencies.ts",
+    "check:node-version": "node tools/checkNodeVersion.ts",
+    "check:licenses": "node tools/checkLicenses.ts",
+    "check:voice": "node tools/checkVoice.ts",
+    "check:strings": "node tools/checkStrings.ts",
+    "e2e": "npm run build && playwright test --project=electron",
+    "e2e:browser": "npm run build && playwright test --project=browser",
+    "mutation": "stryker run",
+    "perf": "node -e \"console.log('perf is not implemented yet.')\"",
+    "paint:goldens": "node -e \"console.log('paint:goldens is not implemented yet.')\"",
+    "voice:generate": "node -e \"console.log('voice:generate is not implemented yet.')\"",
+    "dist": "npm run build && electron-builder --publish never",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
+    "@tailwindcss/vite": "4.3.5",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "@vitest/coverage-v8": "5.1.0",
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "husky": "9.1.7",
+    "jsdom": "31.0.1",
+    "knip": "6.45.1",
+    "lint-staged": "17.6.0",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "prettier": "3.10.1",
+    "tailwindcss": "4.3.5",
+    "tsrs": "0.25.0-ts7.1.0-beta",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.46",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "electron-winstaller@5.4.0": true
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mts,cts,js,mjs,cjs}": [
+      "oxfmt --write"
+    ],
+    "*.{css,json,md,yml}": [
+      "prettier --write"
+    ]
+  }
+}

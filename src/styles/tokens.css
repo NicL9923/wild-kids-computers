@@ -1,0 +1,18 @@
+/*
+ * Design tokens. Every size, color, radius, and duration lives here as a custom property.
+ * A band theme is a data-band attribute on the app root. :root carries the youngest band's
+ * values so that anything rendered before a profile loads uses the largest targets.
+ */
+
+:root,
+[data-band='band-3-5'] {
+  --wk-target-min: 72px;
+}
+
+[data-band='band-6-8'] {
+  --wk-target-min: 56px;
+}
+
+[data-band='band-9-12'] {
+  --wk-target-min: 44px;
+}

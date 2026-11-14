@@ -4,19 +4,19 @@ A free, offline desktop app where children aged 3 to 12 learn to use a computer 
 
 ## Repo index
 
-| Path | What it holds |
-| --- | --- |
-| [docs/spec.md](docs/spec.md) | What the app does, the hard rules, and the definition of done for an activity |
+| Path                                         | What it holds                                                                                 |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [docs/spec.md](docs/spec.md)                 | What the app does, the hard rules, and the definition of done for an activity                 |
 | [docs/architecture.md](docs/architecture.md) | How the code is organized. Read it before adding an activity, tool, effect, string, or asset. |
-| [docs/research.md](docs/research.md) | The evidence behind the design rules |
-| [docs/decisions.md](docs/decisions.md) | Choices the spec left open, and why each went the way it did |
-| `electron/` | Main process and preload |
-| `src/core/` | Paint engine, activity kit, storage, strings. No React, no Electron. |
-| `src/features/` | One directory per area of the app |
-| `assets/` | Fonts, emoji, voice clips, art. Every file has a license entry. |
-| `e2e/` | Playwright tests against the Electron app |
-| `tools/` | Build, check, and generation scripts |
-| `.github/agents/review-agent.md` | The pre-merge review prompt |
+| [docs/research.md](docs/research.md)         | The evidence behind the design rules                                                          |
+| [docs/decisions.md](docs/decisions.md)       | Choices the spec left open, and why each went the way it did                                  |
+| `electron/`                                  | Main process and preload                                                                      |
+| `src/core/`                                  | Paint engine, activity kit, storage, strings. No React, no Electron.                          |
+| `src/features/`                              | One directory per area of the app                                                             |
+| `assets/`                                    | Fonts, emoji, voice clips, art. Every file has a license entry.                               |
+| `e2e/`                                       | Playwright tests against the Electron app                                                     |
+| `tools/`                                     | Build, check, and generation scripts                                                          |
+| `.github/agents/review-agent.md`             | The pre-merge review prompt                                                                   |
 
 ## Hard rules
 
@@ -53,9 +53,32 @@ End-to-end screenshots are for human and agent review. No test compares them.
 
 ## Commands
 
-See "Quality gates" in the architecture file for the full list. Run the checks for the areas you touched before you commit.
+Node 24.22.2 is pinned in `.node-version` and `engines`. `.npmrc` sets `engine-strict` and `save-exact`, so npm refuses another Node version and always saves exact versions.
 
-Electron tests need a display. On a machine without one, run them under `xvfb-run -a`.
+| Command                                                           | What it does                                                                                                   |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                                                     | Vite dev server and Electron together. Renderer changes hot-reload. Restart for main or preload changes.       |
+| `npm run build`                                                   | `check:licenses`, then the renderer into `dist/renderer` and the main process and preload into `dist/electron` |
+| `npm run lint`                                                    | Oxlint with type-aware rules and the repository rules in `.oxlintrc.json`                                      |
+| `npm run knip`                                                    | Unused files, exports, and dependencies                                                                        |
+| `npm run format` / `npm run format:check`                         | Oxfmt for TypeScript and JavaScript, Prettier for CSS, JSON, Markdown, and YAML                                |
+| `npm run typecheck`                                               | `tsrs -b` over every TypeScript project                                                                        |
+| `npm test`                                                        | Vitest with coverage, in UTC                                                                                   |
+| `npm run test:tz`                                                 | The unit tests again in `Asia/Tokyo`                                                                           |
+| `npm run check`                                                   | Dependency deny list and license allow list, Node pins, then the license, voice, and strings checks            |
+| `npm run e2e`                                                     | Build, then Playwright against Electron                                                                        |
+| `npm run e2e:browser`                                             | Build, then Playwright against the static renderer build in Chromium                                           |
+| `npm run mutation`                                                | Stryker on `src/core/**`. Fails below an 80% mutation score.                                                   |
+| `npm run dist`                                                    | Build, then an unsigned installer for this operating system in `release/`                                      |
+| `npm run perf`, `npm run paint:goldens`, `npm run voice:generate` | Not implemented yet. Each prints a notice.                                                                     |
+
+`check:licenses`, `check:voice`, and `check:strings` are placeholders. Each one passes only while the files it would check do not exist yet, so the first asset, clip, or string catalog fails the check until someone writes the real one.
+
+Electron tests need a display. On a machine without one, run them under `xvfb-run -a`. The first `npm run e2e:browser` on a machine needs `npx playwright install chromium`.
+
+The pre-commit hook runs lint-staged, which formats staged files. Lint the workflow with actionlint: `docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12 .github/workflows/ci.yml`.
+
+Rules that Oxlint cannot express run as unit tests in `tools/sourceRules.test.ts`: `src/core/` imports that leave `src/core/` by path, and string literals in user-facing JSX attributes such as `aria-label`, `alt`, and `title`.
 
 ## Project workflow
 

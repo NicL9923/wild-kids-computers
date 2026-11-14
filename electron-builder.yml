@@ -1,0 +1,52 @@
+# Unsigned installers. No publish target, no auto-update, no code signing (spec: out of scope
+# for milestone 1). `npm run dist` builds for the current operating system.
+appId: tech.wildflowers.wildkids.computers
+productName: Wild Kids - Computers
+copyright: Copyright 2026 Wild Flowers Tech
+artifactName: wild-kids-computers-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release
+
+# Everything the app runs is bundled into dist/, so no node_modules ship.
+files:
+  - dist/electron/**
+  - dist/renderer/**
+  - package.json
+  - '!node_modules/**'
+asar: true
+npmRebuild: false
+publish: null
+
+# Hardening for the packaged app. End-to-end tests run unpackaged, so these never affect them.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+  # Flipping fuses breaks the ad hoc signature an unsigned arm64 macOS app needs to launch.
+  resetAdHocDarwinSignature: true
+
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.education
+  identity: null
+
+win:
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  target:
+    - AppImage
+  category: Education

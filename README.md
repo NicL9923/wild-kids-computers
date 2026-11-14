@@ -10,8 +10,23 @@ Milestone 1 is in development. Nothing is released yet.
 
 ## Read more
 
-- [Product spec](docs/spec.md) describes what milestone 1 contains.
-- [Research notes](docs/research.md) explain the design rules and list their sources.
+[AGENTS.md](AGENTS.md) indexes the repository: the spec, the architecture, the research behind the design rules, and where each part of the code lives.
+
+## Develop
+
+Use Node 24.22.2. The version is pinned in `.node-version`, and npm refuses to install on any other version.
+
+```sh
+npm ci              # install exact dependency versions
+npm run dev         # Vite and Electron together, with hot reload for the renderer
+npm run lint        # Oxlint with type-aware rules
+npm run typecheck   # type check every project
+npm test            # unit tests with coverage
+npm run e2e         # build, then Playwright against Electron (prefix with xvfb-run -a without a display)
+npm run dist        # unsigned installer for this operating system, written to release/
+```
+
+[AGENTS.md](AGENTS.md) lists every command.
 
 ## License
 

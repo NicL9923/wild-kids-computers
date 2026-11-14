@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Entry files knip cannot infer from a plugin. Tools run through npm scripts with node.
+  "entry": ["electron/main/index.ts", "electron/preload/index.ts", "tools/*.ts"],
+  "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "tools/**/*.ts", "e2e/**/*.ts"],
+}

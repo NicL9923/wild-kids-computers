@@ -6,11 +6,11 @@ When this file and the code disagree, fix one of them in the same change.
 
 ## Process model
 
-| Process | Code | Rules |
-| --- | --- | --- |
-| Main | `electron/main/` | Owns the window, the `app://` protocol, the network block, file storage, export, print, and kiosk lock. |
-| Preload | `electron/preload/` | Exposes one object, `window.wkBridge`, through `contextBridge`. It contains no logic beyond forwarding typed IPC calls. |
-| Renderer | `src/` | React app. No Node access. Context isolation and the sandbox stay on. |
+| Process  | Code                | Rules                                                                                                                   |
+| -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Main     | `electron/main/`    | Owns the window, the `app://` protocol, the network block, file storage, export, print, and kiosk lock.                 |
+| Preload  | `electron/preload/` | Exposes one object, `window.wkBridge`, through `contextBridge`. It contains no logic beyond forwarding typed IPC calls. |
+| Renderer | `src/`              | React app. No Node access. Context isolation and the sandbox stay on.                                                   |
 
 The renderer loads from `app://bundle/index.html`. The main process serves that scheme from the packaged renderer build. The app never loads `file://` or `http://` content, except the Vite dev server on `localhost` when the app is unpackaged and `WKC_DEV_SERVER_URL` is set.
 
@@ -64,15 +64,15 @@ Module files use camelCase. Component files use PascalCase and the `.tsx` extens
 
 A central list file causes a merge conflict every time two people add an item. The app finds items by file convention with `import.meta.glob`, which works in Vite and in Vitest.
 
-| Item | Convention |
-| --- | --- |
-| Activity definition | `src/features/**/activity.ts`, default export from `defineActivity` |
-| Strings | `src/**/strings.ts`, named export `strings` from `defineStrings` |
-| Paint tool | `src/core/paint/tools/<toolId>/index.ts` |
-| Brush tip | `src/core/paint/tips/<tipId>.ts` |
-| Paint effect | `src/core/paint/effects/<effectId>/index.ts` |
-| Coloring page | `assets/coloring/<page-id>.svg` plus an entry file `src/features/paint-studio/coloringPages/<pageId>.ts` |
-| Robot puzzle | `src/features/robot-painter/puzzles/<tier>/<puzzleId>.ts` |
+| Item                | Convention                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| Activity definition | `src/features/**/activity.ts`, default export from `defineActivity`                                      |
+| Strings             | `src/**/strings.ts`, named export `strings` from `defineStrings`                                         |
+| Paint tool          | `src/core/paint/tools/<toolId>/index.ts`                                                                 |
+| Brush tip           | `src/core/paint/tips/<tipId>.ts`                                                                         |
+| Paint effect        | `src/core/paint/effects/<effectId>/index.ts`                                                             |
+| Coloring page       | `assets/coloring/<page-id>.svg` plus an entry file `src/features/paint-studio/coloringPages/<pageId>.ts` |
+| Robot puzzle        | `src/features/robot-painter/puzzles/<tier>/<puzzleId>.ts`                                                |
 
 Each item carries an explicit `order` number where display order matters. A test fails on a duplicate id.
 
@@ -141,12 +141,12 @@ Rules:
 
 Documents:
 
-| Document | Contents |
-| --- | --- |
-| `app` | Schema version, first-launch state, kiosk lock, parent PIN hash and salt, last active profile |
-| `profiles` | List of profiles: id, avatar, color, band, optional name |
+| Document                | Contents                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `app`                   | Schema version, first-launch state, kiosk lock, parent PIN hash and salt, last active profile                        |
+| `profiles`              | List of profiles: id, avatar, color, band, optional name                                                             |
 | `profile/<id>/settings` | Voice volume, effects volume, mute, text size, letter spacing, reduced motion, session length, export and print gate |
-| `profile/<id>/progress` | Per activity: difficulty, recent outcomes, days practiced |
+| `profile/<id>/progress` | Per activity: difficulty, recent outcomes, days practiced                                                            |
 
 ## Activity kit
 
@@ -166,20 +166,20 @@ e2e/activities/<activity-id>.spec.ts
 
 `defineActivity` takes:
 
-| Field | Meaning |
-| --- | --- |
-| `id` | Kebab-case, unique |
-| `area` | `computer-skills`, `toy-desktop`, `early-learning`, or `robot-painter` |
-| `order` | Position within the area |
-| `bands` | The bands it serves |
-| `goal` | A string handle for the one learning goal, in plain words a parent can read |
-| `title`, `icon` | A string handle and an art reference |
-| `inputs` | Input needs: `pointer-move`, `click`, `drag`, `double-click`, `right-click`, `scroll`, `zoom`, `keyboard`, `text-entry` |
-| `difficulty` | Per band, the lowest and highest level on a 1 to 10 scale |
-| `roundsPerSession` | How many rounds before the finish screen |
-| `generateLevel` | `(seed, difficulty, band) => Level`. Pure. No clock, no `Math.random`. |
-| `spoken` | The string handles the activity speaks. The first is the main instruction. |
-| `load` | `() => import('./<Name>Activity')` |
+| Field              | Meaning                                                                                                                 |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `id`               | Kebab-case, unique                                                                                                      |
+| `area`             | `computer-skills`, `toy-desktop`, `early-learning`, or `robot-painter`                                                  |
+| `order`            | Position within the area                                                                                                |
+| `bands`            | The bands it serves                                                                                                     |
+| `goal`             | A string handle for the one learning goal, in plain words a parent can read                                             |
+| `title`, `icon`    | A string handle and an art reference                                                                                    |
+| `inputs`           | Input needs: `pointer-move`, `click`, `drag`, `double-click`, `right-click`, `scroll`, `zoom`, `keyboard`, `text-entry` |
+| `difficulty`       | Per band, the lowest and highest level on a 1 to 10 scale                                                               |
+| `roundsPerSession` | How many rounds before the finish screen                                                                                |
+| `generateLevel`    | `(seed, difficulty, band) => Level`. Pure. No clock, no `Math.random`.                                                  |
+| `spoken`           | The string handles the activity speaks. The first is the main instruction.                                              |
+| `load`             | `() => import('./<Name>Activity')`                                                                                      |
 
 `activity.ts` and `level.ts` import nothing from React. The component receives the level, the band, and a kit handle. It reports `kit.roundComplete({ mistakes, hintsUsed })`.
 
@@ -198,15 +198,15 @@ e2e/activities/<activity-id>.spec.ts
 
 ### Hard rule checks
 
-| Rule | Check |
-| --- | --- |
-| One goal, bands, spoken strings | Registry test over every definition |
-| An end-to-end test per activity | Registry test checks that `e2e/activities/<id>.spec.ts` exists |
-| Click before drag | Registry test: an activity with `drag` in `inputs` must use `useCarry`, and its end-to-end test must contain a test named "click to place" |
-| Double-click and right-click only where taught | A test scans `src/` for double-click and context-menu handlers outside an allow list |
-| No manipulative design | A test scans every string for banned reward words, with an allow list for false positives such as the star shape |
-| Spoken instructions | `check:voice` |
-| Timers cancelled on exit | The lint rule above, plus a kit test that the scope cancels everything |
+| Rule                                           | Check                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| One goal, bands, spoken strings                | Registry test over every definition                                                                                                        |
+| An end-to-end test per activity                | Registry test checks that `e2e/activities/<id>.spec.ts` exists                                                                             |
+| Click before drag                              | Registry test: an activity with `drag` in `inputs` must use `useCarry`, and its end-to-end test must contain a test named "click to place" |
+| Double-click and right-click only where taught | A test scans `src/` for double-click and context-menu handlers outside an allow list                                                       |
+| No manipulative design                         | A test scans every string for banned reward words, with an allow list for false positives such as the star shape                           |
+| Spoken instructions                            | `check:voice`                                                                                                                              |
+| Timers cancelled on exit                       | The lint rule above, plus a kit test that the scope cancels everything                                                                     |
 
 ### End-to-end tests
 
@@ -248,16 +248,16 @@ Paint tests run in Node with Vitest. Each test builds a document, runs a scripte
 
 ## Quality gates
 
-| Command | What it runs |
-| --- | --- |
-| `npm run lint` | Oxlint with type-aware rules |
-| `npm run format:check` | Oxfmt for TypeScript, Prettier for CSS, JSON, and Markdown |
-| `npm run typecheck` | The type checker over `src`, `electron`, `e2e`, and `tools` |
-| `npm test` | Vitest unit tests, including paint goldens and the registry test |
-| `npm run test:tz` | The unit tests again under a timezone east of UTC |
-| `npm run check` | Licenses, voice, dependencies, and strings checks |
-| `npm run e2e` | Playwright against Electron |
-| `npm run e2e:browser` | Bridge contract tests and a load test against the browser build |
-| `npm run mutation` | Stryker on paint math, level generators, the difficulty model, and storage validation |
-| `npm run perf` | Performance measurements. Prints numbers and does not gate. |
-| `npm run dist` | Unsigned installer for the current operating system |
+| Command                | What it runs                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| `npm run lint`         | Oxlint with type-aware rules                                                          |
+| `npm run format:check` | Oxfmt for TypeScript, Prettier for CSS, JSON, and Markdown                            |
+| `npm run typecheck`    | The type checker over `src`, `electron`, `e2e`, and `tools`                           |
+| `npm test`             | Vitest unit tests, including paint goldens and the registry test                      |
+| `npm run test:tz`      | The unit tests again under a timezone east of UTC                                     |
+| `npm run check`        | Licenses, voice, dependencies, and strings checks                                     |
+| `npm run e2e`          | Playwright against Electron                                                           |
+| `npm run e2e:browser`  | Bridge contract tests and a load test against the browser build                       |
+| `npm run mutation`     | Stryker on paint math, level generators, the difficulty model, and storage validation |
+| `npm run perf`         | Performance measurements. Prints numbers and does not gate.                           |
+| `npm run dist`         | Unsigned installer for the current operating system                                   |
