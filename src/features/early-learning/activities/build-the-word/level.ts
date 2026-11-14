@@ -22,7 +22,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { length: [3, 3], guide: true, spare: 0, similar: false },
   { length: [3, 3], guide: true, spare: 1, similar: false },
   { length: [3, 3], guide: false, spare: 0, similar: false },
@@ -35,9 +35,9 @@ export const TIERS: readonly Tier[] = [
 
 export const MAX_DIFFICULTY = TIERS.length;
 
-export const WORDS: readonly BuildWord[] = [...SHORT_WORDS, ...LONGER_WORDS];
+const WORDS: readonly BuildWord[] = [...SHORT_WORDS, ...LONGER_WORDS];
 
-export type TileId = `tile-${number}`;
+type TileId = `tile-${number}`;
 
 export interface Tile {
   readonly id: TileId;
@@ -53,7 +53,7 @@ export interface BuildTheWordLevel {
   readonly tiles: readonly Tile[];
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Build the word has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

@@ -27,7 +27,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { choices: 2, vowels: false, similar: 0 },
   { choices: 3, vowels: false, similar: 0 },
   { choices: 3, vowels: true, similar: 0 },
@@ -50,7 +50,7 @@ export interface FirstSoundLevel {
   readonly choices: readonly Letter[];
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`First sound has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

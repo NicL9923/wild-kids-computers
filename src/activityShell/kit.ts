@@ -38,6 +38,7 @@ export interface KitFeedback {
   readonly wrong: (options?: FeedbackOptions) => void;
 }
 
+/** @public */
 export interface InstructionOptions {
   /** Speak the new instruction now. Defaults to true. */
   readonly speak?: boolean;

@@ -166,7 +166,7 @@
 }
 
 .rd-slot[data-look='word'] {
-  min-width: calc(var(--rd-size) * 1.3);
+  min-width: var(--rd-size);
   font-size: calc(var(--rd-size) * 0.28);
 }
 
@@ -367,4 +367,15 @@
 .rd-stage .rd-picture-small {
   width: min(var(--rd-size), 20vh);
   height: min(var(--rd-size), 20vh);
+}
+
+/* A sentence reads as one line: the picture sits above it, and the places never wrap at the sizes
+   the app supports. */
+.rd-prompt-stack {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.rd-prompt-stack .rd-slots {
+  flex-wrap: nowrap;
 }

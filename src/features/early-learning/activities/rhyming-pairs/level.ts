@@ -39,7 +39,7 @@ export interface RhymingPairsLevel {
   readonly cards: readonly Card[];
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Rhyming pairs has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

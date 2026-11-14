@@ -21,7 +21,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { choices: 2, letters: FIRST_LETTERS, letterCase: 'lower', similar: 0 },
   { choices: 3, letters: FIRST_LETTERS, letterCase: 'lower', similar: 0 },
   { choices: 3, letters: ALPHABET, letterCase: 'lower', similar: 0 },
@@ -44,7 +44,7 @@ export interface FindTheLetterLevel {
   readonly letterCase: LetterCase;
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Find the letter has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

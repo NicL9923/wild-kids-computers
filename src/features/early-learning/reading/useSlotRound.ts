@@ -9,7 +9,7 @@ export type SlotId = `slot-${number}`;
 
 export const slotId = (index: number): SlotId => `slot-${index}`;
 
-export interface SlotTile<T extends string> {
+interface SlotTile<T extends string> {
   readonly id: T;
   /** What the tile says on screen, such as a letter or a word. Tiles that show the same fit the same place. */
   readonly value: string;

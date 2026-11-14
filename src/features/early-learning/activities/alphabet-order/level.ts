@@ -27,7 +27,7 @@ type Tier =
     };
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { mode: 'next', run: 3, choices: 2, lastStart: 5, near: false },
   { mode: 'next', run: 3, choices: 3, lastStart: 12, near: false },
   { mode: 'next', run: 2, choices: 3, lastStart: 23, near: true },
@@ -58,7 +58,7 @@ export type AlphabetOrderLevel =
       readonly shuffled: readonly Letter[];
     };
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Alphabet order has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

@@ -15,7 +15,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { words: [3, 3], spare: 0 },
   { words: [3, 4], spare: 0 },
   { words: [4, 4], spare: 0 },
@@ -29,7 +29,7 @@ export const TIERS: readonly Tier[] = [
 
 export const MAX_DIFFICULTY = TIERS.length;
 
-export type TileId = `word-${number}`;
+type TileId = `word-${number}`;
 
 export interface WordTile {
   readonly id: TileId;
@@ -45,7 +45,7 @@ export interface SentenceBuilderLevel {
   readonly tiles: readonly WordTile[];
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Sentence builder has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

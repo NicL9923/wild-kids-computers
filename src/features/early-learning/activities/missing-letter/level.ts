@@ -31,7 +31,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { words: SHORT_WORDS, gap: 'first', choices: 3, similar: 0 },
   { words: SHORT_WORDS, gap: 'last', choices: 3, similar: 0 },
   { words: SHORT_WORDS, gap: 'middle', choices: 3, similar: 0 },
@@ -55,7 +55,7 @@ export interface MissingLetterLevel {
   readonly choices: readonly Letter[];
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Missing letter has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

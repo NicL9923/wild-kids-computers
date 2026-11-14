@@ -27,7 +27,7 @@ interface Tier {
 }
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { choices: 2, letters: FIRST_LETTERS, similar: 0 },
   { choices: 3, letters: FIRST_LETTERS, similar: 0 },
   { choices: 3, letters: COMMON_LETTERS, similar: 0 },
@@ -47,7 +47,7 @@ export interface LetterSoundsLevel {
   readonly choices: readonly Letter[];
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Letter sounds has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

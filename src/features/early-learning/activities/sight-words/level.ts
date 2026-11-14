@@ -21,7 +21,7 @@ const EARLY: readonly SightWord[] = [...FIRST_WORDS, ...NEXT_WORDS];
 const ALL: readonly SightWord[] = [...EARLY, ...LATER_WORDS];
 
 /** One entry per difficulty, 1 first. */
-export const TIERS: readonly Tier[] = [
+const TIERS: readonly Tier[] = [
   { choices: 3, words: FIRST_WORDS, similar: 0 },
   { choices: 3, words: EARLY, similar: 0 },
   { choices: 4, words: EARLY, similar: 0 },
@@ -53,7 +53,7 @@ export function lookAlike(a: SightWord, b: SightWord): boolean {
   return a.charAt(0).toLowerCase() === b.charAt(0).toLowerCase() || sortedLetters(a) === sortedLetters(b);
 }
 
-export function tierFor(difficulty: number): Tier {
+function tierFor(difficulty: number): Tier {
   const tier = TIERS[difficulty - 1];
   if (!Number.isInteger(difficulty) || tier === undefined) {
     throw new RangeError(`Sight words has difficulty 1 to ${String(MAX_DIFFICULTY)}, not ${String(difficulty)}.`);

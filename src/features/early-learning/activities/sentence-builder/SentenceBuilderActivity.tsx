@@ -28,7 +28,7 @@ export default function SentenceBuilderActivity({ level, kit }: ActivityProps<Se
 
   return (
     <div className='rd-stage' data-sentence={level.sentence} data-crowded={level.tiles.length > 6}>
-      <div className='rd-prompt'>
+      <div className='rd-prompt rd-prompt-stack'>
         <button
           type='button'
           className='rd-listen rd-picture-button rd-picture-small'
