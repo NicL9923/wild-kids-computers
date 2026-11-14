@@ -1,0 +1,30 @@
+import { defineStrings } from '../../../../core/strings/defineStrings.ts';
+
+export const strings = defineStrings('controls', {
+  title: { text: 'Controls' },
+  goal: {
+    text: 'Uses a checkbox, radio buttons, a dropdown, a slider, a text field, and a scrolling list to change settings.',
+    silent: 'parent',
+  },
+  instruction: { text: 'Change the settings to match the card.' },
+  card: { text: 'Make it like this', silent: 'decorative' },
+  namesOn: { text: 'Tick the box so names show under the icons.' },
+  namesOff: { text: 'Clear the box so names hide under the icons.' },
+  chooseBackground: { text: 'Choose this background:' },
+  chooseIconSize: { text: 'Open the icon size list and choose:' },
+  brightnessLowest: { text: 'Slide the brightness all the way down.' },
+  brightnessMiddle: { text: 'Slide the brightness to the middle.' },
+  typeName: { text: 'Type this computer name:' },
+  chooseSound: { text: 'Scroll the alert sounds and choose:' },
+  lowest: { text: 'All the way down', silent: 'decorative' },
+  middle: { text: 'The middle', silent: 'decorative' },
+  shown: { text: 'Shown', silent: 'decorative' },
+  hidden: { text: 'Hidden', silent: 'decorative' },
+  fox: { text: 'Fox' },
+  owl: { text: 'Owl' },
+  frog: { text: 'Frog' },
+  bee: { text: 'Bee' },
+  notYet: { text: 'Not yet', silent: 'decorative' },
+  matches: { text: 'Done', silent: 'decorative' },
+  otherChoice: { text: 'That is a different one. Look at the card again.' },
+});
