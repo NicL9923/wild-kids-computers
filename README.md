@@ -28,7 +28,12 @@ The parent corner holds profiles, sound, text, session length, kiosk lock, and t
 
 ## Read more
 
-[AGENTS.md](AGENTS.md) indexes the repository: the spec, the architecture, the research behind the design rules, and where each part of the code lives.
+- [docs/spec.md](docs/spec.md): what the app does and its hard rules
+- [docs/architecture.md](docs/architecture.md): how the code is organized
+- [docs/adding-an-activity.md](docs/adding-an-activity.md): how to add an activity
+- [docs/decisions.md](docs/decisions.md): choices the spec left open, and why
+- [docs/research.md](docs/research.md): the evidence behind the design rules
+- [AGENTS.md](AGENTS.md): the repository index and every command
 
 ## Develop
 
@@ -36,15 +41,17 @@ Use Node 24.22.2. The version is pinned in `.node-version`, and npm refuses to i
 
 ```sh
 npm ci              # install exact dependency versions
+node node_modules/electron/install.js   # download the Electron binary once
 npm run dev         # Vite and Electron together, with hot reload for the renderer
 npm run lint        # Oxlint with type-aware rules
 npm run typecheck   # type check every project
 npm test            # unit tests with coverage
-npm run e2e         # build, then Playwright against Electron (prefix with xvfb-run -a without a display)
+npm run e2e         # build, then Playwright against Electron
+npm run check       # licenses, voice clips, strings, and dependency rules
 npm run dist        # unsigned installer for this operating system, written to release/
 ```
 
-[AGENTS.md](AGENTS.md) lists every command.
+Without a display, run the Electron tests under a virtual screen at least 1920 by 1080: `xvfb-run -a -s "-screen 0 1920x1200x24" npm run e2e`. [AGENTS.md](AGENTS.md) lists every command.
 
 ## License
 
