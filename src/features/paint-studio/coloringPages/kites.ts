@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/kites.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/kites.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'kites',
   order: 280,
-  title: 'Kites',
+  title: strings.kites,
   bands: ['band-9-12'],
   mask,
   thumbnail,

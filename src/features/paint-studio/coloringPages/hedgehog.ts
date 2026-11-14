@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/hedgehog.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/hedgehog.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'hedgehog',
   order: 170,
-  title: 'Hedgehog',
+  title: strings.hedgehog,
   bands: ['band-6-8', 'band-9-12'],
   mask,
   thumbnail,

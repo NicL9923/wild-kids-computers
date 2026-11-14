@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/tulip.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/tulip.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'tulip',
   order: 70,
-  title: 'Tulip',
+  title: strings.tulip,
   bands: ['band-3-5', 'band-6-8'],
   mask,
   thumbnail,

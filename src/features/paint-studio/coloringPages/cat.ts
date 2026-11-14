@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/cat.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/cat.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'cat',
   order: 50,
-  title: 'Cat',
+  title: strings.cat,
   bands: ['band-3-5', 'band-6-8'],
   mask,
   thumbnail,

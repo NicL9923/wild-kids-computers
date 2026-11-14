@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/underwater.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/underwater.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'underwater',
   order: 300,
-  title: 'Under the sea',
+  title: strings.underwater,
   bands: ['band-9-12'],
   mask,
   thumbnail,

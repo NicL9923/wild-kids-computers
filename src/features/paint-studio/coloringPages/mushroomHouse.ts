@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/mushroom-house.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/mushroom-house.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'mushroom-house',
   order: 200,
-  title: 'Mushroom house',
+  title: strings.mushroomHouse,
   bands: ['band-6-8', 'band-9-12'],
   mask,
   thumbnail,

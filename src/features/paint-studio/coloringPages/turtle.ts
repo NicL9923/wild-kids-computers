@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/turtle.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/turtle.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'turtle',
   order: 180,
-  title: 'Turtle',
+  title: strings.turtle,
   bands: ['band-6-8', 'band-9-12'],
   mask,
   thumbnail,

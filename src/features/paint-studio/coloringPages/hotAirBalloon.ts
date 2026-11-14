@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/hot-air-balloon.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/hot-air-balloon.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'hot-air-balloon',
   order: 100,
-  title: 'Hot air balloon',
+  title: strings.hotAirBalloon,
   bands: ['band-3-5', 'band-6-8'],
   mask,
   thumbnail,

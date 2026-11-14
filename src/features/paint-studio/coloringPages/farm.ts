@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/farm.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/farm.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'farm',
   order: 230,
-  title: 'Farm',
+  title: strings.farm,
   bands: ['band-9-12'],
   mask,
   thumbnail,

@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/cupcakes.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/cupcakes.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'cupcakes',
   order: 270,
-  title: 'Cupcakes',
+  title: strings.cupcakes,
   bands: ['band-9-12'],
   mask,
   thumbnail,

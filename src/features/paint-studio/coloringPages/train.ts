@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/train.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/train.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'train',
   order: 210,
-  title: 'Train',
+  title: strings.train,
   bands: ['band-6-8', 'band-9-12'],
   mask,
   thumbnail,
