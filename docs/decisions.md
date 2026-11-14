@@ -119,6 +119,9 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Sound effect names are one typed list** in `src/audio/sfx/sfxNames.ts`. A typo in `play('pop')` is then a compile error. The list is short and the audio layer owns it, so it is an exception to discovery by file.
 - **Generated clips are licensed MIT**, like the rest of the project's own work. The model's Apache-2.0 license covers the model, not its output.
 
+- **Third-party notices are one generated text file**, built from the license files the dependencies and assets already carry. A package with no license file needs a fallback notice in `tools/notices.ts`, which states the license and holder its package.json names; react-remove-scroll-bar is the one case. Electron and Chromium keep their own notice files, which electron-builder ships beside the program, because the Chromium notices alone are several megabytes.
+- **The Kokoro-82M notice lives in `assets/voice/NOTICE.txt`**, one folder above the clips, because `check:voice` allows only clips in `assets/voice/en/`. The clips stay MIT; the notice credits the model and carries its Apache-2.0 text. The model's repository has no NOTICE file, so the attribution names the model, its author, and its model card.
+
 ### Emoji
 
 - **401 emoji in 12 categories.** People use the upstream "Default" tone, which is not a human skin color. Flags, alcohol, weapons, tobacco, religious symbols, scary pictures, reward symbols, and timers are left out.

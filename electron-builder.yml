@@ -14,6 +14,13 @@ files:
   - dist/renderer/**
   - package.json
   - '!node_modules/**'
+# A copy of the third-party notices beside the program files, as Electron ships its own LICENSE
+# and LICENSES.chromium.html. The parent corner shows the copy inside the renderer build. The
+# renderer build writes this copy outside dist/renderer, because electron-builder moves an
+# extraResources source out of app.asar.
+extraResources:
+  - from: dist/notices/third-party-notices.txt
+    to: third-party-notices.txt
 asar: true
 npmRebuild: false
 publish: null

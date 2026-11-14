@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { NOTICES_FILE_NAME } from './notices.ts';
 
 /**
  * Hard rule 3 for the build: every non-code file in the renderer build came from assets/, where
@@ -12,6 +13,12 @@ import path from 'node:path';
 
 /** Code the build writes itself. Everything else must be a copy of a file under assets/. */
 const CODE_EXTENSIONS = new Set(['.html', '.js', '.mjs', '.css', '.map']);
+
+/**
+ * Text the build writes itself from license files. check:notices vouches for every text in it, so
+ * it is the one generated file outside assets/.
+ */
+const GENERATED_FILES = new Set([NOTICES_FILE_NAME]);
 
 export interface BuildFile {
   readonly path: string;
@@ -27,6 +34,7 @@ export function findForeignBuildFiles(buildFiles: readonly BuildFile[], assetFil
   const known = new Set(assetFiles.map((file) => contentHash(file.bytes)));
   return buildFiles
     .filter((file) => !CODE_EXTENSIONS.has(path.extname(file.path).toLowerCase()))
+    .filter((file) => !GENERATED_FILES.has(file.path))
     .filter((file) => !known.has(contentHash(file.bytes)))
     .map((file) => file.path)
     .toSorted();

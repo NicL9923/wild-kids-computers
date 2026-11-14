@@ -24,7 +24,17 @@ const entrySchema = z
 
 const manifestSchema = z.array(entrySchema).min(1);
 
-type LicenseEntry = z.infer<typeof entrySchema>;
+export type LicenseEntry = z.infer<typeof entrySchema>;
+
+/** The entries of one LICENSES.json, or null when it is not a valid manifest. check:licenses reports why. */
+export function parseLicenseManifest(text: string): LicenseEntry[] | null {
+  try {
+    const parsed = manifestSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface AssetTree {
   /** Every file under assets/, as a path relative to assets/ with forward slashes. */

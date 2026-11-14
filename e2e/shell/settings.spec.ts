@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { strings as cornerStrings } from '../../src/app/parent-corner/strings.ts';
+import { expectAccessible } from '../support/accessibility.ts';
 import { launchApp, restartApp, type LaunchedApp } from '../support/launchApp.ts';
 import { openParentCorner, waitForHome } from './shellSupport.ts';
 
@@ -34,4 +35,20 @@ test('a setting changed in the parent corner survives a restart and applies to t
       name: cornerStrings['text-size-larger'].text,
     }),
   ).toBeChecked();
+});
+
+test('the parent corner shows the third-party notices the build ships', async () => {
+  launched = await launchApp({ band: 'band-6-8' });
+  const { page } = launched;
+  await waitForHome(page);
+  await openParentCorner(page);
+  const section = page.getByRole('region', { name: cornerStrings.notices.text });
+  await section.getByRole('button', { name: cornerStrings.showNotices.text }).click();
+  const text = section.locator('pre');
+  // The notices name a bundled package with its license text, the emoji license, and the voice model.
+  await expect(text).toContainText('react-dom');
+  await expect(text).toContainText('Copyright (c) Microsoft Corporation.');
+  await expect(text).toContainText('Kokoro-82M');
+  await expect(text).toContainText('SIL Open Font License');
+  await expectAccessible(page);
 });

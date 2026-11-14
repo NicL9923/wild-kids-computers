@@ -19,6 +19,7 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.opus': 'audio/ogg',
   '.woff2': 'font/woff2',
   '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 export function contentTypeFor(filePath: string): string {

@@ -174,7 +174,8 @@ export const strings = defineStrings('pop-the-seed-pods', {
 - Fluent Emoji files live in `assets/emoji/`. Import them with `tools/importEmoji.ts`, which copies from a local clone of the upstream repository and keeps the upstream MIT notice in `assets/emoji/LICENSE`.
 - Sound effects are synthesized at runtime with the Web Audio API in `src/audio/sfx/`. They are original work and add no files.
 - Original art is SVG, authored in this repository, and licensed MIT.
-- A build check fails when a non-code file in the renderer output did not come from `assets/`. `npm run build` runs it as `check:build-assets` after the renderer build. It matches files by content, because Vite renames them.
+- The app ships third-party notices. `tools/notices.ts` collects the license text of every production dependency and of Electron, every `LICENSES.json` entry with its license text, and the project's own license into one plain text file. A license text file in an asset folder covers that folder and the folders below it, so `assets/voice/NOTICE.txt` carries the Kokoro-82M attribution for the clips in `assets/voice/en/`. The renderer build writes the file as `third-party-notices.txt`, the parent corner shows it, and electron-builder puts a copy beside the program files. `npm run check:notices` fails when a shipped package or an asset entry by someone else has no license text, and `npm run check:packaged-notices` checks a packaged app for both copies.
+- A build check fails when a non-code file in the renderer output did not come from `assets/`. The generated notices file is the one exception. `npm run build` runs it as `check:build-assets` after the renderer build. It matches files by content, because Vite renames them.
 
 ## Platform bridge
 
@@ -373,7 +374,7 @@ Each page has an entry, `src/features/paint-studio/coloringPages/<pageId>.ts`, f
 | `npm run typecheck`    | The type checker over `src`, `electron`, `e2e`, and `tools`                                                  |
 | `npm test`             | Vitest unit tests, including paint goldens and the registry test                                             |
 | `npm run test:tz`      | The unit tests again under a timezone east of UTC                                                            |
-| `npm run check`        | Licenses, voice, dependencies, and strings checks                                                            |
+| `npm run check`        | Licenses, voice, dependencies, strings, and third-party notices checks                                       |
 | `npm run e2e`          | Playwright against Electron                                                                                  |
 | `npm run e2e:browser`  | Bridge contract tests and a load test against the browser build                                              |
 | `npm run mutation`     | Stryker on paint math, level generators, the difficulty model, and storage validation                        |
