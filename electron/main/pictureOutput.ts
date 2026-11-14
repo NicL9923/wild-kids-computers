@@ -3,7 +3,7 @@ import { BrowserWindow, dialog } from 'electron';
 import { BridgeError, type ExportResult, type PrintResult } from '../../src/core/platform/bridge.ts';
 import { isExportFileStem } from '../../src/core/platform/names.ts';
 import { writeFileAtomic } from './atomicWrite.ts';
-import { checkOutputPng, exportTarget } from './outputChecks.ts';
+import { checkOutputPng, exportTarget, printOutcome } from './outputChecks.ts';
 
 /**
  * Shows the save dialog and writes the PNG where the adult chose. The dialog is the only source
@@ -58,9 +58,9 @@ export async function printPicture(png: Uint8Array): Promise<PrintResult> {
     );
     return await new Promise<PrintResult>((resolve, reject) => {
       printWindow.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
-        if (success) resolve('printed');
-        else if (failureReason === 'cancelled') resolve('cancelled');
-        else reject(new BridgeError('io', `Printing failed: ${failureReason}`));
+        const outcome = printOutcome(success, failureReason);
+        if (outcome instanceof BridgeError) reject(outcome);
+        else resolve(outcome);
       });
     });
   } finally {
