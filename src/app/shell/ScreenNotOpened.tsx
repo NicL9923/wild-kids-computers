@@ -1,6 +1,7 @@
 import { useRouter, type ErrorComponentProps } from '@tanstack/react-router';
 import { ExitControl } from '../../activityShell/ShellControls.tsx';
 import { TryAgainScreen } from '../../activityShell/TryAgainScreen.tsx';
+import { reloadFailedScreens } from '../lazyScreen.ts';
 import { HOME_PATH } from '../paths.ts';
 import { strings } from './strings.ts';
 
@@ -13,8 +14,10 @@ const NOT_OPENED = [strings.notOpened] as const;
  */
 export function ScreenNotOpened({ reset }: ErrorComponentProps) {
   const router = useRouter();
-  // The match stays in its error state until the router loads it again.
+  // A failed screen load, a route's or one inside it, stays failed until it loads again, and the
+  // match stays in its error state until the router loads it again.
   const tryAgain = () => {
+    reloadFailedScreens();
     reset();
     void router.invalidate();
   };

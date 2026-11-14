@@ -31,6 +31,9 @@ function fakeDebugger(options: { attachThrows?: boolean; failCommand?: string } 
   return { debug, calls, detach };
 }
 
+/** Lets the block's deferred check run. */
+const nextTask = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 describe('blockFileChoosers', () => {
   it('attaches, turns the Page domain on, then intercepts and cancels every chooser', () => {
     const { debug, calls } = fakeDebugger();
@@ -39,22 +42,29 @@ describe('blockFileChoosers', () => {
     expect(calls).toEqual(['attach', ['Page.enable'], INTERCEPT]);
   });
 
-  it('turns the block back on after an unexpected detach', () => {
-    const { debug, calls, detach } = fakeDebugger();
-    blockFileChoosers(debug, () => false);
-    calls.length = 0;
-    detach('canceled by client');
-    expect(calls).toEqual(['attach', ['Page.enable'], INTERCEPT]);
-  });
+  // Electron says "target closed" both when its own session is detached while the page lives and
+  // when the web contents is closing, and the web contents reports destroyed only a step later.
+  it.each(['target closed', 'canceled by client'])(
+    'turns the block back on after a %s detach while the web contents lives',
+    async (reason) => {
+      const { debug, calls, detach } = fakeDebugger();
+      blockFileChoosers(debug, () => false);
+      calls.length = 0;
+      detach(reason);
+      expect(calls).toEqual([]);
+      await nextTask();
+      expect(calls).toEqual(['attach', ['Page.enable'], INTERCEPT]);
+    },
+  );
 
-  it.each([
-    ['the web contents closed', 'target closed', false],
-    ['the web contents is destroyed', 'canceled by client', true],
-  ])('stays off when %s', (_label, reason, destroyed) => {
+  it('stays off when the web contents is destroyed by the time it would turn back on', async () => {
     const { debug, calls, detach } = fakeDebugger();
+    let destroyed = false;
     blockFileChoosers(debug, () => destroyed);
     calls.length = 0;
-    detach(reason);
+    detach('target closed');
+    destroyed = true;
+    await nextTask();
     expect(calls).toEqual([]);
   });
 

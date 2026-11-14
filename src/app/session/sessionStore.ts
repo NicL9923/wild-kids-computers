@@ -42,8 +42,10 @@ import { isSessionLimitReached, type SessionClock } from './sessionLength.ts';
  * the fewest writes that still end with the newest value. A read that started before an update
  * never replaces the updated value. A failed write becomes `saveProblem`, never a rejection.
  *
- * Every bridge call has a deadline, so one call that never answers cannot hold its queue, and with
- * it every later read or write of the same document or pictures, or the start of the app.
+ * Every bridge call has a deadline, so one call that never answers cannot hold its caller, or the
+ * start of the app. A deadline changes what the child and the adult are told, never the order of
+ * operations: a document write past its deadline shows as a save problem, but its document's
+ * queue waits until the write really ends, and the document in memory stays the truth until then.
  */
 
 export type SessionStatus =
@@ -221,10 +223,22 @@ export interface SessionStore {
  */
 export const SESSION_CALL_DEADLINE_MS = 10_000;
 
+/**
+ * A bridge call whose answer has a deadline. `answer` settles the way the call does, or rejects
+ * at the deadline. `landed` settles when the call really ends, however late.
+ */
+interface HeldCall<T> {
+  readonly answer: Promise<T>;
+  readonly landed: Promise<T>;
+}
+
 /** The part of the bridge the session uses. */
 interface SessionBridge {
   readonly info: PlatformBridge['info'];
-  readonly documents: DocumentStore;
+  /** A write's answer has a deadline; the document's queue waits for `landed`. */
+  readonly documents: Omit<DocumentStore, 'write'> & {
+    write(name: DocumentName, text: string): HeldCall<void>;
+  };
   readonly pictures: PictureStore;
   readonly window: Pick<PlatformBridge['window'], 'setKioskLock'>;
 }
@@ -236,7 +250,7 @@ interface SessionBridge {
  * the types list every method of a store, so a new call cannot skip the deadline.
  */
 function boundedBridge(bridge: PlatformBridge, timers: Pick<Scheduler, 'setTimeout'>, ms: number): SessionBridge {
-  function bound<A extends unknown[], T>(what: string, call: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+  function held<A extends unknown[], T>(what: string, call: (...args: A) => Promise<T>): (...args: A) => HeldCall<T> {
     return (...args) => {
       let work: Promise<T>;
       try {
@@ -244,17 +258,27 @@ function boundedBridge(bridge: PlatformBridge, timers: Pick<Scheduler, 'setTimeo
       } catch (error) {
         work = Promise.reject(error instanceof Error ? error : new Error(String(error)));
       }
-      return withDeadline(work, ms, timers, `The bridge call ${what}`).catch((error: unknown) => {
+      const landed = work.catch((error: unknown) => {
         throw toBridgeError(error);
       });
+      // Whoever waits only for the answer must not see `landed` reject unhandled.
+      landed.catch(() => undefined);
+      const answer = withDeadline(work, ms, timers, `The bridge call ${what}`).catch((error: unknown) => {
+        throw toBridgeError(error);
+      });
+      return { answer, landed };
     };
+  }
+  function bound<A extends unknown[], T>(what: string, call: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+    const heldCall = held(what, call);
+    return (...args) => heldCall(...args).answer;
   }
   const { documents, pictures, window } = bridge;
   return {
     info: bound('info', () => bridge.info()),
     documents: {
       read: bound('documents.read', (name) => documents.read(name)),
-      write: bound('documents.write', (name, text) => documents.write(name, text)),
+      write: held('documents.write', (name, text) => documents.write(name, text)),
       setAside: bound('documents.setAside', (name) => documents.setAside(name)),
       removeProfile: bound('documents.removeProfile', (profileId) => documents.removeProfile(profileId)),
     },
@@ -286,6 +310,8 @@ class Cell<T> {
   value: T;
   loaded = false;
   writeQueued = false;
+  /** Reads and writes of this cell queued or running, including a write past its deadline. */
+  tasks = 0;
   /**
    * Set for a document the app cannot start without, when its read failed. The cell then stays
    * unloaded with its value untouched, so nothing writes defaults over the saved file.
@@ -327,10 +353,7 @@ interface ActiveProfile {
   grantedMs: number;
 }
 
-function isCellOf<S>(
-  cell: Cell<ActivityStateDocument<unknown>>,
-  spec: DocumentSpec<ActivityStateDocument<S>>,
-): cell is Cell<ActivityStateDocument<S>> {
+function isCellOf<T, S extends T>(cell: Cell<T>, spec: DocumentSpec<S>): cell is Cell<S> {
   return cell.spec === spec;
 }
 
@@ -357,7 +380,8 @@ const EMPTY_PROGRESS = progressDocument.defaults();
 
 export function createSessionStore(options: SessionStoreOptions): SessionStore {
   const { audio } = options;
-  const bridge = boundedBridge(options.bridge, options.timers ?? systemScheduler(), SESSION_CALL_DEADLINE_MS);
+  const timers = options.timers ?? systemScheduler();
+  const bridge = boundedBridge(options.bridge, timers, SESSION_CALL_DEADLINE_MS);
   const clock = options.clock ?? systemClock;
   const queues = createSerialQueues();
   const listeners = new Set<() => void>();
@@ -367,6 +391,12 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   const profiles = new Cell(documentNames.profiles, profilesDocument, true);
   /** Profiles whose files are being removed. Their pictures take no more changes. */
   const removed = new Set<string>();
+  /**
+   * Documents with a read or write still queued or running, by name. Choosing a profile again, or
+   * opening an activity's state again, takes the cell from here instead of reading the file, which
+   * may not have the newest value yet. A cell leaves once its queue is empty.
+   */
+  const busyCells = new Map<DocumentName, Cell<unknown>>();
   let active: ActiveProfile | null = null;
   let testInfo: TestInfo | null = null;
   let saveProblem: SaveProblem | null = null;
@@ -457,7 +487,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     const read = () => loadDocument(bridge.documents, cell.name, cell.spec);
     let result: LoadResult<T>;
     try {
-      result = await (queued ? queues.run(cell.name, read) : read());
+      result = await (queued ? runFor(cell, read) : read());
     } catch (error) {
       // loadDocument never throws on bad data. This covers a bridge that broke its contract.
       result = { value: cell.spec.defaults(), status: 'unreadable', problem: toBridgeError(error).message };
@@ -476,10 +506,36 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     emit();
   }
 
+  /** Runs a read or write of the cell in its document's queue, and keeps the cell findable meanwhile. */
+  function runFor<T, R>(cell: Cell<T>, task: () => Promise<R>): Promise<R> {
+    cell.tasks += 1;
+    busyCells.set(cell.name, cell);
+    const result = queues.run(cell.name, task);
+    void result
+      .finally(() => {
+        cell.tasks -= 1;
+        if (cell.tasks === 0 && busyCells.get(cell.name) === cell) busyCells.delete(cell.name);
+      })
+      .catch(() => undefined);
+    return result;
+  }
+
+  /**
+   * The cell of a profile document. While an earlier cell of the same document still has work
+   * queued, that cell is the truth, so it is used again; otherwise a new cell reads the file.
+   */
+  function openCell<T>(name: DocumentName, spec: DocumentSpec<T>): Cell<T> {
+    const busy = busyCells.get(name);
+    if (busy !== undefined && isCellOf(busy, spec)) return busy;
+    const cell = new Cell(name, spec);
+    load(cell);
+    return cell;
+  }
+
   function queueWrite<T>(cell: Cell<T>): void {
     if (cell.writeQueued) return;
     cell.writeQueued = true;
-    void queues.run(cell.name, async () => {
+    void runFor(cell, async () => {
       // Writes the newest value when the turn comes, so a burst of updates costs one write.
       cell.writeQueued = false;
       await writeNow(cell);
@@ -487,8 +543,25 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   async function writeNow<T>(cell: Cell<T>): Promise<void> {
+    let landed: Promise<void> = Promise.resolve();
+    const documents = {
+      write(name: DocumentName, text: string): Promise<void> {
+        const call = bridge.documents.write(name, text);
+        landed = call.landed;
+        return call.answer;
+      },
+    };
     try {
-      await saveDocument(bridge.documents, cell.name, cell.spec, cell.value);
+      await saveDocument(documents, cell.name, cell.spec, cell.value);
+      clearProblem(cell.name);
+      return;
+    } catch (error) {
+      reportProblem(cell.name, 'write', error);
+    }
+    // A write past its deadline may still land. Until it ends, no later read or write of this
+    // document passes it, so the disk never takes an older value after a newer one.
+    try {
+      await landed;
       clearProblem(cell.name);
     } catch (error) {
       reportProblem(cell.name, 'write', error);
@@ -508,7 +581,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     // document, such as when the profile is chosen again, waits until this update is on disk.
     cell.early.push({ apply: (current) => applyUpdate(current, update) });
     if (cell.early.length > 1) return;
-    void queues.run(cell.name, async () => {
+    void runFor(cell, async () => {
       await cell.ready;
       for (const early of cell.early.splice(0)) {
         try {
@@ -545,14 +618,12 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     }
     active = {
       profileId,
-      settings: new Cell(documentNames.settings(profileId), settingsDocument),
-      progress: new Cell(documentNames.progress(profileId), progressDocument),
+      settings: openCell(documentNames.settings(profileId), settingsDocument),
+      progress: openCell(documentNames.progress(profileId), progressDocument),
       activityStates: new Map(),
       startedAt: clock.monotonic(),
       grantedMs: 0,
     };
-    load(active.settings);
-    load(active.progress);
   }
 
   function chooseProfile(profileId: string | null): void {
@@ -578,10 +649,11 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   async function deleteProfile(profileId: string): Promise<BridgeResult<void>> {
     if (active?.profileId === profileId) chooseProfile(null);
     removed.add(profileId);
-    // Writes already queued for this profile finish first, so none lands after the removal.
-    await queues.settled(`profile/${profileId}/`);
-    await queues.settled(`pictures/${profileId}`);
     try {
+      // Writes already queued for this profile finish first, so none lands after the removal. A
+      // write past its deadline holds its queue until it ends, so this wait has a deadline too.
+      const pending = Promise.all([queues.settled(`profile/${profileId}/`), queues.settled(`pictures/${profileId}`)]);
+      await withDeadline(pending, SESSION_CALL_DEADLINE_MS, timers, `Saving profile ${profileId} before its removal`);
       await bridge.documents.removeProfile(profileId);
     } catch (error) {
       removed.delete(profileId);
@@ -614,9 +686,8 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       }
       return existing;
     }
-    const cell = new Cell(documentNames.activity(profile.profileId, activityId), spec);
+    const cell = openCell(documentNames.activity(profile.profileId, activityId), spec);
     profile.activityStates.set(activityId, cell);
-    load(cell);
     return cell;
   }
 

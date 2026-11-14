@@ -167,6 +167,30 @@ test.describe('a click that would open a file chooser opens nothing', () => {
   }
 });
 
+test('a chooser is still cancelled after the main process loses its DevTools session on a live page', async () => {
+  const { app, page } = launched;
+  const attached = () =>
+    app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((win) => win.webContents.debugger.isAttached()),
+    );
+  expect(await attached()).toEqual([true]);
+  // Electron reports this detach as "target closed", as it does for a closing window.
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.debugger.detach();
+  });
+  await expect.poll(attached).toEqual([true]);
+
+  // The closed shadow root is the case that only the main process stops.
+  await addFileInputs();
+  const box = await page.locator('[data-case="closed shadow root"]').boundingBox();
+  if (box === null) throw new Error('No closed shadow root on screen.');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect.poll(() => chooserRequests).toBe(1);
+  await expect
+    .poll(() => fileInputState('closed shadow root'))
+    .toEqual({ cancels: 1, changes: 0, files: 0, outcome: undefined });
+});
+
 test('a file dragged onto the window never reaches the page', async () => {
   const { page } = launched;
   // The app settles on the home map first. A dropped file would navigate away from it.

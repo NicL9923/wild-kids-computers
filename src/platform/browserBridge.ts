@@ -227,7 +227,10 @@ export function createBrowserBridge(options: BrowserBridgeOptions): PlatformBrid
         requireId(profileId, 'profileId');
         const png = requirePng(input.png, MAX_PICTURE_BYTES, 'picture');
         const thumbnail = requirePng(input.thumbnail, MAX_THUMBNAIL_BYTES, 'thumbnail');
-        if (input.id !== undefined) await requirePicture(profileId, input.id, 'gallery');
+        // A save under a known id creates or overwrites that picture, as in the Electron build.
+        if (input.id !== undefined && (await getPicture(profileId, requireId(input.id, 'id')))?.place === 'trash') {
+          throw new BridgeError('not-found', `Picture ${input.id} is in the trash.`);
+        }
         const record: PictureRecord = {
           profileId,
           id: input.id ?? newId(),

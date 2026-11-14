@@ -67,6 +67,17 @@ describe('documents', () => {
     expect(await documents.read('app')).toBe('3');
   });
 
+  it('reads a document only after the writes called before the read have landed', async () => {
+    const { documents } = store();
+    await documents.write('profile/p1/settings', 'old');
+    // The renderer may read again while a write it gave up waiting for is still committing. The
+    // read must not bring back the older text.
+    const writing = documents.write('profile/p1/settings', 'new');
+    const reading = documents.read('profile/p1/settings');
+    expect(await reading).toBe('new');
+    await writing;
+  });
+
   // Each name fits the DocumentName type, so only the runtime check stops it.
   it.each<[string, DocumentName]>([
     ['a parent segment as the profile', 'profile/../settings'],
@@ -149,10 +160,24 @@ describe('pictures', () => {
     expect((await pictures.list('p1', 'gallery')).map((p) => p.id)).toEqual(['pic-a']);
   });
 
-  it('refuses to save under an id that is not in the gallery', async () => {
-    expect(await rejection(store().pictures.save('p1', { id: 'nope', png: png(1), thumbnail: png(1) }))).toMatchObject({
+  it('creates a picture under an id the renderer chose, and a second save under it overwrites', async () => {
+    const { pictures } = store();
+    expect(await pictures.save('p1', { id: 'chosen', png: png(1), thumbnail: png(2) })).toMatchObject({ id: 'chosen' });
+    await pictures.save('p1', { id: 'chosen', png: png(3), thumbnail: png(4) });
+    expect((await pictures.list('p1', 'gallery')).map((p) => p.id)).toEqual(['chosen']);
+    expect(await pictures.read('p1', 'chosen', 'picture')).toEqual(png(3));
+  });
+
+  it('refuses to save under the id of a picture in the trash', async () => {
+    const { pictures } = store();
+    await pictures.save('p1', { png: png(1), thumbnail: png(2) });
+    await pictures.trash('p1', 'pic-a');
+    expect(await rejection(pictures.save('p1', { id: 'pic-a', png: png(3), thumbnail: png(3) }))).toEqual({
       code: 'not-found',
+      message: 'Picture pic-a is in the trash.',
     });
+    expect(await pictures.list('p1', 'gallery')).toEqual([]);
+    expect(await pictures.read('p1', 'pic-a', 'picture')).toEqual(png(1));
   });
 
   it.each([
