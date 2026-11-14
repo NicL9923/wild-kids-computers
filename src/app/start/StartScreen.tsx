@@ -1,7 +1,7 @@
-import { Navigate } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { DEFAULT_BAND } from '../../core/bands.ts';
-import { HOME_PATH } from '../paths.ts';
+import { HOME_PATH, START_PATH } from '../paths.ts';
 import ProfileChoice from '../profile-choice/ProfileChoice.tsx';
 import { useActiveProfile, useProfiles, useSessionStatus, useThemeSettings } from '../session/sessionHooks.ts';
 import { ThemeRoot } from '../theme/ThemeRoot.tsx';
@@ -38,10 +38,17 @@ export default function StartScreen() {
 function GoHome() {
   const { profiles, chooseProfile } = useProfiles();
   const active = useActiveProfile();
+  const router = useRouter();
   const only = profiles[0];
   useEffect(() => {
-    if (active === null && only !== undefined) chooseProfile(only.id);
-  }, [active, only, chooseProfile]);
-  // Navigate only once a profile is active, so the home map never sees a moment without one.
-  return active === null ? null : <Navigate to={HOME_PATH} replace />;
+    if (active === null) {
+      if (only !== undefined) chooseProfile(only.id);
+      return;
+    }
+    // A navigation that started while the profile loaded, such as a link the child already
+    // pressed, is still pending here and must not be overridden.
+    if (router.state.location.pathname !== START_PATH) return;
+    void router.navigate({ to: HOME_PATH, replace: true });
+  }, [active, only, chooseProfile, router]);
+  return null;
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { strings as homeStrings } from '../src/app/home/strings.ts';
+import { strings as firstLaunchStrings } from '../src/app/first-launch/strings.ts';
 import { expectAccessible } from './support/accessibility.ts';
 import { tryInlineScript } from './support/contentSecurityPolicy.ts';
 import { launchApp, type LaunchedApp } from './support/launchApp.ts';
@@ -17,7 +17,8 @@ test.afterEach(async () => {
 test('opens the bundled app with the renderer locked down', async () => {
   const { page } = launched;
 
-  await expect(page.getByRole('heading', { level: 1, name: homeStrings.title.text })).toBeVisible();
+  // A new install opens on first launch.
+  await expect(page.getByRole('heading', { level: 1, name: firstLaunchStrings.animalHeading.text })).toBeVisible();
   expect(page.url()).toMatch(/^app:\/\/bundle\/index\.html/);
 
   // Hard rule 8: no Node in the renderer.
