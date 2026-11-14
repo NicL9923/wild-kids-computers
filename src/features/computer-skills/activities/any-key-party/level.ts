@@ -53,9 +53,9 @@ export const FRIENDS = [
 export const GRID = { columns: 4, rows: 2 } as const;
 /** A friend's size in units, and how far it may shift from the middle of its cell. */
 export const FRIEND_SIZE = 180;
-export const JITTER = 30;
+const JITTER = 30;
 
-export interface Friend {
+interface Friend {
   readonly id: string;
   readonly emoji: (typeof FRIENDS)[number];
   /** The center, in meadow units. */
@@ -68,7 +68,7 @@ export interface PartyLevel {
   readonly friends: readonly Friend[];
 }
 
-export function pressesFor(difficulty: number): number {
+function pressesFor(difficulty: number): number {
   const presses = PRESSES[difficulty - 1];
   if (!Number.isInteger(difficulty) || presses === undefined) {
     throw new RangeError(
@@ -89,6 +89,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Pa
   const kinds = random.sample(FRIENDS, count);
   const friends = places.map((cell, index) => ({
     id: `friend-${String(index)}`,
+    // Both lists hold `count` items; the default only satisfies the type checker.
     emoji: kinds[index] ?? 'dog',
     x: Math.round((cell % GRID.columns) * cellWidth + cellWidth / 2 + random.int(-JITTER, JITTER)),
     y: Math.round(Math.floor(cell / GRID.columns) * cellHeight + cellHeight / 2 + random.int(-JITTER, JITTER)),

@@ -56,7 +56,7 @@ export interface MazeLevel {
 }
 
 /** Maze size per difficulty, 1 first. Each step adds a row or a column, never both. */
-export const SIZES: readonly (readonly [columns: number, rows: number])[] = [
+const SIZES: readonly (readonly [columns: number, rows: number])[] = [
   [4, 1],
   [3, 2],
   [4, 2],
@@ -95,57 +95,66 @@ export function canMove(cells: MazeLevel['cells'], cell: Cell, direction: Direct
   return ((cells[cell.y]?.[cell.x] ?? 0) & OPEN[direction]) !== 0;
 }
 
+const keyOf = (cell: Cell) => `${String(cell.x)},${String(cell.y)}`;
+
 /** Grows a perfect maze from `start` by a depth-first walk that turns at random. */
-export function carve(random: Random, columns: number, rows: number, start: Cell): number[][] {
-  const cells = Array.from({ length: rows }, () => Array.from<number>({ length: columns }).fill(0));
-  const seen = new Set([`${String(start.x)},${String(start.y)}`]);
+function carve(random: Random, columns: number, rows: number, start: Cell): number[][] {
+  // One flat list of cells, row by row, cut into rows at the end.
+  const open = Array.from({ length: columns * rows }, () => 0);
+  const seen = new Set([keyOf(start)]);
   const stack: Cell[] = [start];
-  while (stack.length > 0) {
-    const cell = stack.at(-1);
-    if (cell === undefined) break;
+  for (let cell = stack.at(-1); cell !== undefined; cell = stack.at(-1)) {
+    const from = cell;
     const next = random
       .shuffle(DIRECTIONS)
-      .map((direction) => ({ direction, to: neighbor(cell, direction, columns, rows) }))
-      .find(({ to }) => to !== null && !seen.has(`${String(to.x)},${String(to.y)}`));
+      .map((direction) => ({ direction, to: neighbor(from, direction, columns, rows) }))
+      .find(({ to }) => to !== null && !seen.has(keyOf(to)));
     if (next?.to == null) {
       stack.pop();
       continue;
     }
     const { direction, to } = next;
-    const row = cells[cell.y];
-    const toRow = cells[to.y];
-    if (row === undefined || toRow === undefined) throw new RangeError('A carved cell left the maze.');
-    row[cell.x] = (row[cell.x] ?? 0) | OPEN[direction];
-    toRow[to.x] = (toRow[to.x] ?? 0) | OPEN[OPPOSITE[direction]];
-    seen.add(`${String(to.x)},${String(to.y)}`);
+    const index = from.y * columns + from.x;
+    open[index] = (open[index] ?? 0) | OPEN[direction];
+    // The cell carved into is new, so its only open side is the way back.
+    open[to.y * columns + to.x] = OPEN[OPPOSITE[direction]];
+    seen.add(keyOf(to));
     stack.push(to);
   }
-  return cells;
+  return Array.from({ length: rows }, (_, row) => open.slice(row * columns, (row + 1) * columns));
 }
 
 /**
- * The way from `from` to every cell, by breadth-first search through open sides. In a perfect
- * maze each way is the only one.
+ * The way from `from` to every cell, by breadth-first search through open sides, in the order
+ * the search reaches them. In a perfect maze each way is the only one.
  */
 export function waysFrom(cells: MazeLevel['cells'], from: Cell): Map<string, Direction[]> {
-  const rows = cells.length;
+  // Equivalent to cells[0].length: every row of a maze has the same length.
   const columns = cells[0]?.length ?? 0;
-  const ways = new Map<string, Direction[]>([[`${String(from.x)},${String(from.y)}`, []]]);
-  const queue: Cell[] = [from];
-  for (let index = 0; index < queue.length; index += 1) {
-    const cell = queue[index];
-    if (cell === undefined) break;
-    const way = ways.get(`${String(cell.x)},${String(cell.y)}`) ?? [];
+  const ways = new Map<string, Direction[]>([[keyOf(from), []]]);
+  // A for...of over an array that grows visits the cells added while it runs.
+  const queue: { cell: Cell; way: Direction[] }[] = [{ cell: from, way: [] }];
+  for (const { cell, way } of queue) {
     for (const direction of DIRECTIONS) {
-      const to = neighbor(cell, direction, columns, rows);
-      if (to === null || !canMove(cells, cell, direction)) continue;
-      const key = `${String(to.x)},${String(to.y)}`;
-      if (ways.has(key)) continue;
-      ways.set(key, [...way, direction]);
-      queue.push(to);
+      const to = neighbor(cell, direction, columns, cells.length);
+      if (to === null || !canMove(cells, cell, direction) || ways.has(keyOf(to))) continue;
+      ways.set(keyOf(to), [...way, direction]);
+      queue.push({ cell: to, way: [...way, direction] });
     }
   }
   return ways;
+}
+
+/** The cell with the longest way. The first the search reached wins a tie. */
+export function farthest(ways: ReadonlyMap<string, readonly Direction[]>): { cell: Cell; way: readonly Direction[] } {
+  let best: { cell: Cell; way: readonly Direction[] } | null = null;
+  for (const [key, way] of ways) {
+    if (best !== null && way.length <= best.way.length) continue;
+    const [x = 0, y = 0] = key.split(',').map(Number);
+    best = { cell: { x, y }, way };
+  }
+  if (best === null) throw new RangeError('A maze has at least one cell.');
+  return best;
 }
 
 /** Pure: the same seed and difficulty give the same maze. The band does not change it. */
@@ -160,15 +169,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Ma
   ];
   const start = random.pick(corners);
   const cells = carve(random, columns, rows, start);
-  // The goal is the cell with the longest way; the nearest to the start in search order wins a tie.
-  let goal = start;
-  let path: Direction[] = [];
-  for (const [key, way] of waysFrom(cells, start)) {
-    if (way.length <= path.length) continue;
-    const [x = 0, y = 0] = key.split(',').map(Number);
-    goal = { x, y };
-    path = way;
-  }
+  const { cell: goal, way: path } = farthest(waysFrom(cells, start));
   const [critter, snack] = random.pick(PAIRS);
   return { columns, rows, cells, start, goal, path, critter, snack };
 }

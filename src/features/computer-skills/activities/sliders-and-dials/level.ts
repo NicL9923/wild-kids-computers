@@ -8,7 +8,7 @@ import { createRandom, type Random } from '../../../../core/activityKit/random.t
  * the dial, which is the harder of the two to steer.
  */
 
-export type ControlKind = 'slider' | 'dial';
+type ControlKind = 'slider' | 'dial';
 
 /** Each control's color, which also names it for a screen reader. */
 export const CONTROL_COLORS = ['blue', 'orange', 'pink'] as const;
@@ -51,7 +51,7 @@ export const MIN_MOVE = 2;
 /** The pause after the last control reaches its flag. */
 export const ALL_MATCHED_MS = 900;
 
-export function stepFor(difficulty: number): Step {
+function stepFor(difficulty: number): Step {
   const step = STEPS[difficulty - 1];
   if (!Number.isInteger(difficulty) || step === undefined) {
     throw new RangeError(
@@ -78,6 +78,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Di
   const controls = step.kinds.map((kind, index) => ({
     id: `control-${String(index)}`,
     kind,
+    // There are as many colors as the most controls; the default only satisfies the type checker.
     color: colors[index] ?? 'blue',
     stops: step.stops,
     ...startAndTarget(random, step.stops),

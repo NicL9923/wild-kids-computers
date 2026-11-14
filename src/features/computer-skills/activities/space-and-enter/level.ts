@@ -24,7 +24,7 @@ export const STAND_GAP = 76;
 export const EARLY_WINDOW = 150;
 
 export type StopKind = 'jump' | 'gate' | 'home';
-export type Walk = 'waits' | 'keeps-walking';
+type Walk = 'waits' | 'keeps-walking';
 
 export interface Stop {
   readonly id: string;
@@ -66,7 +66,7 @@ export interface JumpLevel {
   readonly speed: number;
 }
 
-export function stepFor(difficulty: number): Step {
+function stepFor(difficulty: number): Step {
   const step = STEPS[difficulty - 1];
   if (!Number.isInteger(difficulty) || step === undefined) {
     throw new RangeError(

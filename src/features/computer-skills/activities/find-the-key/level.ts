@@ -9,7 +9,7 @@ import { LETTERS, type Letter } from '../../shared/keyboardLayout.ts';
  */
 
 /** How the keyboard picture helps: light the key, tint its row, or show nothing. */
-export type KeyHelp = 'key' | 'row' | 'none';
+type KeyHelp = 'key' | 'row' | 'none';
 
 export interface Step {
   readonly count: number;
@@ -48,7 +48,7 @@ export interface KeyLevel {
   readonly help: KeyHelp;
 }
 
-export function stepFor(difficulty: number): Step {
+function stepFor(difficulty: number): Step {
   const step = STEPS[difficulty - 1];
   if (!Number.isInteger(difficulty) || step === undefined) {
     throw new RangeError(`Find the key has difficulty 1 to ${String(MAX_KEY_DIFFICULTY)}, not ${String(difficulty)}.`);

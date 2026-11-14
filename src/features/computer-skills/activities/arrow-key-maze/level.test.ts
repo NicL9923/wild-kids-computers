@@ -3,6 +3,7 @@ import type { Band } from '../../../../core/bands.ts';
 import activity from './activity.ts';
 import {
   canMove,
+  farthest,
   DIRECTIONS,
   generateLevel,
   MAX_MAZE_DIFFICULTY,
@@ -124,5 +125,51 @@ describe('canMove', () => {
     ['from a cell off the grid', { x: 5, y: 5 }, 'up', false],
   ] as const)('moves %s: %s', (_label, from, direction, expected) => {
     expect(canMove(cells, from, direction)).toBe(expected);
+  });
+});
+
+describe('neighbor', () => {
+  it.each([
+    ['up', { x: 1, y: 0 }],
+    ['right', { x: 2, y: 1 }],
+    ['down', { x: 1, y: 2 }],
+    ['left', { x: 0, y: 1 }],
+  ] as const)('goes %s to the cell on that side', (direction, expected) => {
+    expect(neighbor({ x: 1, y: 1 }, direction, 3, 3)).toEqual(expected);
+  });
+
+  it.each([
+    ['up', { x: 0, y: 0 }],
+    ['left', { x: 0, y: 0 }],
+    ['right', { x: 2, y: 0 }],
+    ['down', { x: 0, y: 2 }],
+  ] as const)('gives nothing past the %s edge', (direction, from) => {
+    expect(neighbor(from, direction, 3, 3)).toBeNull();
+  });
+});
+
+describe('waysFrom and farthest', () => {
+  // A hall of three cells, left to right, with a side cell below the middle one.
+  const cells = [
+    [OPEN.right, OPEN.left | OPEN.right | OPEN.down, OPEN.left],
+    [0, OPEN.up, 0],
+  ];
+
+  it('gives the start an empty way and every reachable cell its one way, nearest first', () => {
+    expect([...waysFrom(cells, { x: 0, y: 0 })]).toEqual([
+      ['0,0', []],
+      ['1,0', ['right']],
+      ['2,0', ['right', 'right']],
+      ['1,1', ['right', 'down']],
+    ]);
+  });
+
+  it('picks the longest way, and the first one reached when two are as long', () => {
+    expect(farthest(waysFrom(cells, { x: 0, y: 0 }))).toEqual({ cell: { x: 2, y: 0 }, way: ['right', 'right'] });
+    expect(farthest(new Map([['4,4', []]]))).toEqual({ cell: { x: 4, y: 4 }, way: [] });
+  });
+
+  it('rejects a maze with no cells', () => {
+    expect(() => farthest(new Map())).toThrow('A maze has at least one cell.');
   });
 });

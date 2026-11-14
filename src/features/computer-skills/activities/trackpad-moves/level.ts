@@ -41,7 +41,7 @@ export const THINGS = [
 ] as const satisfies readonly EmojiId[];
 
 /** Decorations in every screen, so scrolling shows the scene moving. */
-export const DECOR = [
+const DECOR = [
   'tree',
   'pine-tree',
   'cloud',
@@ -97,7 +97,7 @@ export interface Find {
   readonly y: number;
 }
 
-export interface Decoration {
+interface Decoration {
   readonly id: string;
   readonly kind: (typeof DECOR)[number];
   /** The center, in units across the whole scene. */
@@ -120,7 +120,7 @@ const STEP_OF: Readonly<Record<Direction, readonly [number, number]>> = {
   left: [-1, 0],
 };
 
-export function stepFor(difficulty: number): Step {
+function stepFor(difficulty: number): Step {
   const step = STEPS[difficulty - 1];
   if (!Number.isInteger(difficulty) || step === undefined) {
     throw new RangeError(
@@ -181,12 +181,14 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Tr
   const finds: Find[] = [];
   let at: ScreenCell = start;
   for (const [index, kind] of kinds.entries()) {
-    // Prefer a screen that holds no earlier find, so two never share a spot. A small grid may
-    // have none left; then any move will do, and the earlier find is already tapped.
+    // A screen that holds no earlier find, so two never share a spot. Every step leaves one: from
+    // any screen there are at least two moves, and at most one is used by an earlier find other
+    // than the one the child is on (four moves and two others at the top difficulty). The level
+    // test checks every difficulty over many seeds.
     const fresh = movesFrom(at, step).filter(
       ({ to }) => !finds.some(({ screen }) => screen.column === to.column && screen.row === to.row),
     );
-    const { direction, to } = random.pick(fresh.length > 0 ? fresh : movesFrom(at, step));
+    const { direction, to } = random.pick(fresh);
     finds.push({
       id: `find-${String(index)}`,
       kind,

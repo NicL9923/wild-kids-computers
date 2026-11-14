@@ -31,6 +31,14 @@ describe('generateLevel', () => {
     ]);
   });
 
+  it('starts with eight familiar letters, and every letter is a real one', () => {
+    // The first letters are the design: shapes that do not mirror and letters children see often.
+    expect(FIRST_LETTERS).toEqual(['a', 'b', 'c', 'e', 'm', 'o', 's', 't']);
+    for (const seed of SEEDS) {
+      for (const letter of generateLevel(seed, 1, 'band-3-5').letters) expect(letter).toMatch(/^[a-z]$/);
+    }
+  });
+
   it('always lights the key for the youngest band', () => {
     const range = activity.kind === 'rounds' ? activity.difficulty['band-3-5'] : undefined;
     for (let difficulty = range?.min ?? 1; difficulty <= (range?.max ?? 0); difficulty += 1) {

@@ -58,6 +58,10 @@ function problems(level: TrackpadLevel, difficulty: number): string[] {
   return found;
 }
 
+/** How far a value is from the nearest of two corner lines. */
+const offset = (value: number, lines: readonly number[]) =>
+  lines.reduce((best, line) => (Math.abs(value - line) < Math.abs(best) ? value - line : best), Infinity);
+
 /** Every direction the finds use at a difficulty, across the seeds. */
 const directions = (difficulty: number) =>
   new Set(SEEDS.flatMap((seed) => generateLevel(seed, difficulty, 'band-9-12').finds.map((find) => find.direction)));
@@ -101,6 +105,50 @@ describe('generateLevel', () => {
       const { finds } = generateLevel(seed, 6, 'band-9-12');
       const screens = finds.map((find) => `${String(find.screen.column)},${String(find.screen.row)}`);
       expect(new Set(screens).size, `seed ${String(seed)}`).toBe(screens.length);
+    }
+  });
+
+  it.each(DIFFICULTIES)('at difficulty %i never puts two finds in one screen, for every seed', (difficulty) => {
+    for (const seed of SEEDS) {
+      const { finds } = generateLevel(seed, difficulty, 'band-9-12');
+      const screens = new Set(finds.map((find) => `${String(find.screen.column)},${String(find.screen.row)}`));
+      expect(screens.size, `seed ${String(seed)}`).toBe(finds.length);
+      expect(new Set(finds.map((find) => find.id)).size).toBe(finds.length);
+    }
+  });
+
+  it('starts a tall scene on the top screen and a square one in the middle', () => {
+    expect(generateLevel(1, 2, 'band-6-8').start).toEqual({ column: 0, row: 0 });
+    expect(generateLevel(1, 5, 'band-6-8').start).toEqual({ column: 1, row: 1 });
+  });
+
+  it('puts two decorations in the corners of every screen, shifted a little either way', () => {
+    const shifts = { x: [] as number[], y: [] as number[] };
+    for (const seed of SEEDS.slice(0, 60)) {
+      const level = generateLevel(seed, 7, 'band-9-12');
+      expect(level.decorations).toHaveLength(level.columns * level.rows * 2);
+      expect(new Set(level.decorations.map((decoration) => decoration.id)).size).toBe(level.decorations.length);
+      for (let column = 0; column < level.columns; column += 1) {
+        for (let row = 0; row < level.rows; row += 1) {
+          const inside = level.decorations.filter(
+            (decoration) =>
+              Math.floor(decoration.x / SCREEN.width) === column && Math.floor(decoration.y / SCREEN.height) === row,
+          );
+          expect(inside).toHaveLength(2);
+        }
+      }
+      for (const decoration of level.decorations) {
+        shifts.x.push(offset(decoration.x % SCREEN.width, [130, 870]));
+        shifts.y.push(offset(decoration.y % SCREEN.height, [120, 480]));
+      }
+    }
+    for (const [axis, limit] of [
+      ['x', 40],
+      ['y', 30],
+    ] as const) {
+      expect(Math.min(...shifts[axis]), axis).toBeLessThan(0);
+      expect(Math.max(...shifts[axis]), axis).toBeGreaterThan(0);
+      expect(Math.max(...shifts[axis].map(Math.abs)), axis).toBeLessThanOrEqual(limit);
     }
   });
 

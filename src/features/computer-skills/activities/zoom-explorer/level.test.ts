@@ -74,13 +74,40 @@ describe('generateLevel', () => {
     ]);
   });
 
-  it('places the big scenery inside the picture', () => {
+  it('lists the tiny things in reading order, so Tab goes left to right and top to bottom', () => {
     for (const seed of SEEDS.slice(0, 50)) {
-      for (const piece of generateLevel(seed, 4, 'band-6-8').scenery) {
+      const { things } = generateLevel(seed, 8, 'band-9-12');
+      const order = things.map((thing) => thing.id);
+      const reading = things.toSorted((a, b) => a.y - b.y || a.x - b.x).map((thing) => thing.id);
+      expect(order).toEqual(reading);
+      expect(order).toEqual(things.map((_, index) => `thing-${String(index)}`));
+    }
+  });
+
+  it('scatters the tiny things in new places for each seed, not in a fixed grid', () => {
+    const firsts = new Set(
+      SEEDS.slice(0, 60).map((seed) => JSON.stringify(generateLevel(seed, 8, 'band-9-12').things[0])),
+    );
+    expect(firsts.size).toBeGreaterThan(50);
+  });
+
+  it('places five pieces of scenery inside the picture, shifted a little either way', () => {
+    const shifts = { x: [] as number[], y: [] as number[] };
+    for (const seed of SEEDS.slice(0, 50)) {
+      const { scenery } = generateLevel(seed, 4, 'band-6-8');
+      expect(scenery).toHaveLength(5);
+      expect(new Set(scenery.map((piece) => piece.kind)).size).toBe(5);
+      shifts.x.push(...scenery.map((piece, index) => piece.x - ([120, 330, 520, 720, 880][index] ?? piece.x)));
+      shifts.y.push(...scenery.map((piece, index) => piece.y - ([400, 470, 380, 470, 390][index] ?? piece.y)));
+      for (const piece of scenery) {
         expect(piece.x - piece.size / 2).toBeGreaterThanOrEqual(0);
         expect(piece.x + piece.size / 2).toBeLessThanOrEqual(SCENE.width);
         expect(piece.y + piece.size / 2).toBeLessThanOrEqual(SCENE.height);
       }
+    }
+    for (const axis of ['x', 'y'] as const) {
+      expect(Math.min(...shifts[axis]), axis).toBeLessThan(0);
+      expect(Math.max(...shifts[axis]), axis).toBeGreaterThan(0);
     }
   });
 
@@ -121,6 +148,9 @@ describe('placeThings', () => {
       for (const other of spots.slice(index + 1)) {
         expect(Math.hypot(spot.x - other.x, spot.y - other.y)).toBeGreaterThanOrEqual(34 * SPACING);
       }
+      expect(spot.x).toBeGreaterThanOrEqual(EDGE_MARGIN);
+      expect(spot.x).toBeLessThanOrEqual(SCENE.width - EDGE_MARGIN);
+      expect(spot.y).toBeGreaterThanOrEqual(EDGE_MARGIN);
       expect(spot.y).toBeLessThanOrEqual(SCENE.height - EDGE_MARGIN);
     });
   });

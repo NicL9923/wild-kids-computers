@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FRIEND_SIZE, FRIENDS, generateLevel, MAX_PARTY_DIFFICULTY, MEADOW, PRESSES } from './level.ts';
+import { FRIEND_SIZE, FRIENDS, generateLevel, GRID, MAX_PARTY_DIFFICULTY, MEADOW, PRESSES } from './level.ts';
 
 const SEEDS = Array.from({ length: 400 }, (_, index) => index * 6007 + 1);
 const DIFFICULTIES = Array.from({ length: MAX_PARTY_DIFFICULTY }, (_, index) => index + 1);
+
+/** How far a center is from the middle of the grid cell it sits in. */
+const shift = (value: number, cell: number) => value - (Math.floor(value / cell) * cell + cell / 2);
 
 describe('generateLevel', () => {
   it.each(DIFFICULTIES)(
@@ -34,6 +37,15 @@ describe('generateLevel', () => {
     expect(DIFFICULTIES.map((difficulty) => generateLevel(9, difficulty, 'band-3-5').friends.length)).toEqual([
       4, 5, 6, 8,
     ]);
+  });
+
+  it.each(['x', 'y'] as const)('shifts friends both ways along %s from the middle of their cells', (axis) => {
+    const cell = axis === 'x' ? MEADOW.width / GRID.columns : MEADOW.height / GRID.rows;
+    const shifts = SEEDS.slice(0, 80).flatMap((seed) =>
+      generateLevel(seed, 4, 'band-3-5').friends.map((friend) => shift(friend[axis], cell)),
+    );
+    expect(Math.min(...shifts)).toBeLessThan(0);
+    expect(Math.max(...shifts)).toBeGreaterThan(0);
   });
 
   it('moves friends around from seed to seed', () => {

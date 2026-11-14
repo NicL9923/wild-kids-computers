@@ -4,14 +4,14 @@
  * units; every main row adds up to MAIN_WIDTH, so the right edge is straight.
  */
 
-export const MAIN_WIDTH = 15;
+const MAIN_WIDTH = 15;
 /** The arrow keys sit to the right of the main block, after a half-key gap. */
-export const ARROW_GAP = 0.5;
+const ARROW_GAP = 0.5;
 export const PICTURE_WIDTH = MAIN_WIDTH + ARROW_GAP + 3;
 export const PICTURE_ROWS = 5;
 
 /** What a key shows: a letter, a digit, a drawn symbol, or nothing. */
-export type KeyFace =
+type KeyFace =
   | { readonly kind: 'letter'; readonly letter: Letter }
   | { readonly kind: 'digit'; readonly digit: number }
   | { readonly kind: 'symbol'; readonly symbol: 'enter' | 'backspace' | 'shift' | 'tab' | 'arrow' }

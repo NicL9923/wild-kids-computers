@@ -8,9 +8,9 @@ import { EARLY_WINDOW, STAND_GAP, type JumpLevel, type Stop } from './level.ts';
 export const JUMP_MS = 650;
 export const OPEN_MS = 500;
 /** How high a jump goes, in path units. */
-export const JUMP_HEIGHT = 120;
+const JUMP_HEIGHT = 120;
 
-export type Phase = 'walking' | 'waiting' | 'jumping' | 'opening' | 'home';
+type Phase = 'walking' | 'waiting' | 'jumping' | 'opening' | 'home';
 
 export interface WalkState {
   readonly x: number;

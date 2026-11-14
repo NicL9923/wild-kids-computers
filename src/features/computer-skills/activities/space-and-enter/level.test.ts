@@ -28,6 +28,7 @@ describe('generateLevel', () => {
       expect(kinds.filter((kind) => kind === 'jump')).toHaveLength(step?.jumps ?? -1);
       expect(kinds.filter((kind) => kind === 'gate')).toHaveLength(step?.gates ?? -1);
       expect(CRITTERS).toContain(level.critter);
+      expect(new Set(level.stops.map((stop) => stop.id)).size, 'stop ids are unique').toBe(level.stops.length);
       for (const stop of level.stops) expect(stop.thing === null).toBe(stop.kind !== 'jump');
       // Room to walk before the first stop, and every landing is short of the next place to wait.
       expect((level.stops[0]?.x ?? 0) - STAND_GAP).toBeGreaterThan(START_X);

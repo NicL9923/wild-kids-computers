@@ -47,7 +47,7 @@ export const TINY = [
 ] as const satisfies readonly EmojiId[];
 
 /** The big pieces of the meadow, behind the tiny things. */
-export const SCENERY = [
+const SCENERY = [
   'tree',
   'pine-tree',
   'house',
@@ -93,7 +93,7 @@ export interface Thing {
   readonly isTarget: boolean;
 }
 
-export interface Piece {
+interface Piece {
   readonly kind: (typeof SCENERY)[number];
   readonly x: number;
   readonly y: number;
@@ -110,7 +110,7 @@ export interface ZoomLevel {
   readonly scenery: readonly Piece[];
 }
 
-export function stepFor(difficulty: number): Step {
+function stepFor(difficulty: number): Step {
   const step = STEPS[difficulty - 1];
   if (!Number.isInteger(difficulty) || step === undefined) {
     throw new RangeError(
@@ -162,13 +162,17 @@ export function placeThings(random: Random, count: number, size: number): { x: n
 export function generateLevel(seed: number, difficulty: number, _band: Band): ZoomLevel {
   const step = stepFor(difficulty);
   const random = createRandom(seed);
-  const [target, ...others] = random.sample(TINY, step.others + 1);
-  if (target === undefined) throw new RangeError('The tiny things list is empty.');
-  const count = step.targets + step.others;
-  const spots = placeThings(random, count, step.size);
+  const target = random.pick(TINY);
+  const others = random.sample(
+    TINY.filter((kind) => kind !== target),
+    step.others,
+  );
   const kinds = random.shuffle([...Array.from({ length: step.targets }, () => target), ...others]);
-  const things = spots
-    .map((spot, index) => ({ ...spot, kind: kinds[index] ?? target }))
+  const spots = placeThings(random, kinds.length, step.size);
+  // Spots and kinds have the same length; the spare spot only satisfies the type checker.
+  const things = kinds
+    .map((kind, index) => ({ ...(spots[index] ?? { x: 0, y: 0 }), kind }))
+    // Reading order, so Tab goes left to right and top to bottom.
     .toSorted((a, b) => a.y - b.y || a.x - b.x)
     .map((thing, index) => ({ id: `thing-${String(index)}`, ...thing, isTarget: thing.kind === target }));
   const scenery = random
