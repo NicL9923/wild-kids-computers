@@ -68,15 +68,37 @@ describe('quitting under kiosk lock', () => {
   it('acknowledges before asking, then saves the picture and the session before it quits', async () => {
     const { flow, calls, holdPicture } = harness();
     holdPicture([true]);
-    expect(await flow.closeRequested()).toBe(true);
+    expect(await flow.closeRequested({ kioskLock: true })).toBe(true);
     expect(calls).toEqual(['acknowledge', 'gate quit', 'save true', 'session flush', 'quit']);
   });
 
   it('stays open and saves nothing when the adult cancels the gate', async () => {
     const { flow, calls, holdPicture } = harness({ gatePasses: false });
     holdPicture([true]);
-    expect(await flow.closeRequested()).toBe(false);
+    expect(await flow.closeRequested({ kioskLock: true })).toBe(false);
     expect(calls).toEqual(['acknowledge', 'gate quit']);
+  });
+});
+
+describe('closing the window without kiosk lock', () => {
+  it('acknowledges at once, then saves the picture and the session and quits with no parent gate', async () => {
+    const { flow, calls, holdPicture } = harness({ gatePasses: false });
+    holdPicture([true]);
+    expect(await flow.closeRequested({ kioskLock: false })).toBe(true);
+    expect(calls).toEqual(['acknowledge', 'save true', 'session flush', 'quit']);
+  });
+
+  it('quits at once when nothing is unsaved', async () => {
+    const { flow, calls } = harness({ gatePasses: false });
+    expect(await flow.closeRequested({ kioskLock: false })).toBe(true);
+    expect(calls).toEqual(['acknowledge', 'session flush', 'quit']);
+  });
+
+  it('lets the unload through once the close request is quitting, so the window can close', async () => {
+    const { flow, holdPicture } = harness();
+    holdPicture([true]);
+    await flow.closeRequested({ kioskLock: false });
+    expect(flow.unloadRequested()).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BridgeError, isBridgeError } from './bridge.ts';
+import { BridgeError, isBridgeError, toCloseRequest } from './bridge.ts';
 
 describe('BridgeError', () => {
   it('names itself, so a logged error says where it came from', () => {
@@ -15,5 +15,18 @@ describe('BridgeError', () => {
     ['a plain error with a code field', Object.assign(new Error('x'), { code: 'io' }), 'io', false],
   ] as const)('isBridgeError recognizes %s', (_label, error, code, expected) => {
     expect(isBridgeError(error, code)).toBe(expected);
+  });
+});
+
+describe('toCloseRequest', () => {
+  // A close request without kiosk lock skips the parent gate, so only an exact false may say so.
+  it.each([
+    ['kiosk lock off', { kioskLock: false }, false],
+    ['kiosk lock on', { kioskLock: true }, true],
+    ['no message', undefined, true],
+    ['a missing field', {}, true],
+    ['a field that is not a boolean', { kioskLock: 0 }, true],
+  ] as const)('reads %s', (_label, message, kioskLock) => {
+    expect(toCloseRequest(message)).toEqual({ kioskLock });
   });
 });

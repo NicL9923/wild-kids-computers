@@ -79,6 +79,21 @@ export function isMenuCommand(value: unknown): value is MenuCommand {
   return value === 'undo' || value === 'redo';
 }
 
+/** What the main process says when someone tries to close the window. */
+export interface CloseRequest {
+  /** With kiosk lock on, the parent gate decides. With it off, the app saves and quits. */
+  kioskLock: boolean;
+}
+
+/**
+ * Reads a close request from the main process. Anything malformed counts as kiosk lock, so a
+ * bad message can only ever ask for the parent gate, never skip it.
+ */
+export function toCloseRequest(value: unknown): CloseRequest {
+  const kioskLock: unknown = typeof value === 'object' && value !== null ? Reflect.get(value, 'kioskLock') : true;
+  return { kioskLock: kioskLock !== false };
+}
+
 export interface WindowState {
   fullscreen: boolean;
   kioskLock: boolean;
@@ -90,18 +105,19 @@ interface WindowControl {
   /** Fullscreen, plus a close request goes to the renderer instead of closing. Best effort. */
   setKioskLock(on: boolean): Promise<WindowState>;
   /**
-   * Called when someone tries to close the app while kiosk lock is on. The renderer shows the
-   * parent gate and calls acknowledgeCloseRequest() at once. Without that answer the app closes
-   * after a few seconds, because a hung app must still close. Returns an unsubscribe function.
+   * Called on every attempt to close the window. The renderer calls acknowledgeCloseRequest() at
+   * once, then saves unsaved work and calls quit(); with kiosk lock on, only after the parent gate
+   * passes. Without that answer the app closes after a few seconds, because a hung app must still
+   * close. Returns an unsubscribe function.
    */
-  onCloseRequest(listener: () => void): () => void;
+  onCloseRequest(listener: (request: CloseRequest) => void): () => void;
   /**
    * Called when the adult or child chooses Undo or Redo from the macOS Edit menu, so the page's
    * own models handle it instead of the browser. Returns an unsubscribe function.
    */
   onMenuCommand(listener: (command: MenuCommand) => void): () => void;
   acknowledgeCloseRequest(): Promise<void>;
-  /** Quits the app. The renderer calls it after the parent gate passes. */
+  /** Quits the app. The renderer calls it after saving, and under kiosk lock after the parent gate. */
   quit(): Promise<void>;
 }
 

@@ -1,6 +1,6 @@
-import type { WindowState } from '../../src/core/platform/bridge.ts';
+import type { CloseRequest, WindowState } from '../../src/core/platform/bridge.ts';
 
-/** How long the renderer has to say it is showing the parent gate before a close goes through. */
+/** How long the renderer has to answer a close request before the close goes through. */
 const CLOSE_ACK_TIMEOUT_MS = 3_000;
 
 /** The parts of BrowserWindow the kiosk lock uses. */
@@ -18,16 +18,18 @@ export interface LockableWindow {
 
 export interface WindowControlOptions<Timer> {
   /** Tells the renderer someone tried to close the app. */
-  notifyCloseRequest: () => void;
+  notifyCloseRequest: (request: CloseRequest) => void;
   setTimeout: (callback: () => void, ms: number) => Timer;
   clearTimeout: (timer: Timer) => void;
   ackTimeoutMs?: number;
 }
 
 /**
- * Fullscreen and kiosk lock for the main window. With the lock on, a close request goes to the
- * renderer, which shows the parent gate and answers at once. The app closes when the renderer
- * calls quit, or when it does not answer in time, because a hung app must still close.
+ * Fullscreen, kiosk lock, and closing for the main window. Every close attempt goes to the
+ * renderer, which answers at once, saves unsaved work, and calls quit; under kiosk lock it asks
+ * the parent gate first. A page's beforeunload cannot do this, because Chromium ignores a
+ * cancelled unload on a page nobody has clicked. The app closes when the renderer calls quit, or
+ * when it does not answer in time, because a hung app must still close.
  */
 export function createWindowControl<Timer>(window: LockableWindow, options: WindowControlOptions<Timer>) {
   const ackTimeoutMs = options.ackTimeoutMs ?? CLOSE_ACK_TIMEOUT_MS;
@@ -54,9 +56,9 @@ export function createWindowControl<Timer>(window: LockableWindow, options: Wind
   }
 
   window.on('close', (event) => {
-    if (!kioskLock || closeAllowed) return;
+    if (closeAllowed) return;
     event.preventDefault();
-    options.notifyCloseRequest();
+    options.notifyCloseRequest({ kioskLock });
     // Each attempt needs a fresh answer, so a renderer that answered once and then hung
     // still lets the next attempt through.
     clearPending();

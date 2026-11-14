@@ -67,7 +67,7 @@ async function start(): Promise<void> {
     ),
   );
   const windowControl = createWindowControl(window, {
-    notifyCloseRequest: () => window.webContents.send(CLOSE_REQUEST_CHANNEL),
+    notifyCloseRequest: (request) => window.webContents.send(CLOSE_REQUEST_CHANNEL, request),
     setTimeout: (callback, ms) => setTimeout(callback, ms),
     clearTimeout: (timer) => clearTimeout(timer),
   });

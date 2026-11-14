@@ -1,5 +1,5 @@
 import type { Cancel } from '../../core/activityKit/scheduler.ts';
-import type { PlatformBridge } from '../../core/platform/bridge.ts';
+import type { CloseRequest, PlatformBridge } from '../../core/platform/bridge.ts';
 import type { RequestParentGate } from '../parent-gate/reasons.ts';
 import type { QuitWorkRegistry } from './quitWork.ts';
 
@@ -27,11 +27,12 @@ export interface QuitFlowOptions {
 
 export interface QuitFlow {
   /**
-   * Kiosk lock is on and someone tried to close the app. The main process waits a few seconds
-   * for an answer and then closes anyway, so this acknowledges at once, before the adult has
-   * typed anything. The app quits only when the parent gate passes. Resolves to whether it quit.
+   * Someone tried to close the window. The main process waits a few seconds for an answer and
+   * then closes anyway, so this acknowledges at once, before any saving or typing. Under kiosk
+   * lock the app quits only when the parent gate passes; without it, the app saves and quits.
+   * Resolves to whether it quit.
    */
-  closeRequested(): Promise<boolean>;
+  closeRequested(request: CloseRequest): Promise<boolean>;
   /** An adult chose to close the app past the parent gate, such as on the closing screen. */
   quit(): Promise<boolean>;
   /**
@@ -89,9 +90,9 @@ export function createQuitFlow(options: QuitFlowOptions): QuitFlow {
   }
 
   return {
-    async closeRequested() {
+    async closeRequested(request) {
       await options.window.acknowledgeCloseRequest();
-      if (!(await options.askParent('quit'))) return false;
+      if (request.kioskLock && !(await options.askParent('quit'))) return false;
       return finishAndQuit();
     },
     quit: finishAndQuit,

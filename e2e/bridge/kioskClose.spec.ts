@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
 import { waitForBridge } from './contract.ts';
 
-// With kiosk lock on, a close request goes to the renderer, which shows the parent gate. The
+// Every close request goes to the renderer. With kiosk lock on, it shows the parent gate. The
 // app quits when the renderer confirms, or after a few seconds without an answer.
 
 let launched: LaunchedApp;
@@ -73,8 +73,24 @@ test('a renderer that does not answer still lets the app close', async () => {
   expect(elapsed).toBeLessThan(6_000);
 });
 
-test('without kiosk lock a close goes straight through', async () => {
+// Without kiosk lock the close still goes to the renderer, so it can save first. The main process
+// prints what it sends, because the page is gone by the time the test could ask it.
+test('without kiosk lock a close goes to the renderer, which quits without the answer timeout', async () => {
+  const sent: string[] = [];
+  launched.app.process().stdout?.on('data', (chunk: Buffer) => {
+    for (const line of chunk.toString().split('\n')) if (line.startsWith('wkc-sent ')) sent.push(line.slice(9));
+  });
+  await launched.app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    if (contents === undefined) throw new Error('No window.');
+    const send = contents.send.bind(contents);
+    contents.send = (channel: string, ...args: unknown[]) => {
+      process.stdout.write(`wkc-sent ${channel} ${JSON.stringify(args)}\n`);
+      send(channel, ...args);
+    };
+  });
   const exit = exited();
   await requestClose();
   expect(await exit).toBeLessThan(2_000);
+  expect(sent).toEqual(['wkc:close-request [{"kioskLock":false}]']);
 });

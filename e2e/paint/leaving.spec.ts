@@ -203,6 +203,18 @@ test('the kiosk close flow keeps a stroke the pause has not saved yet', async ()
   await launched.page.evaluate(() => window.wkcTest?.bridge.window.setKioskLock(false));
 });
 
+// Chromium ignores a cancelled beforeunload on a page nobody clicked, so without kiosk lock the
+// main process sends the close to the renderer, which saves before it quits.
+test('closing the window without kiosk lock keeps a stroke the pause has not saved yet', async () => {
+  const page = await start();
+  await paintLine(page, 500, { lift: false });
+  const exited = new Promise<void>((resolve) => launched.app.process().once('exit', () => resolve()));
+  await launched.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+  await exited;
+  expect(await relaunchAndCount()).toBe(1);
+  await expectNewestHasLine(500);
+});
+
 /** Makes every picture save fail, as a full disk would, or work again, through the app's own bridge. */
 async function breakSaves(page: Page, broken: boolean): Promise<void> {
   await page.evaluate((on) => {
