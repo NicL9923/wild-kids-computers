@@ -19,6 +19,11 @@ export interface ActivityFacts {
   readonly definition: ActivityDefinition;
   /** Every non-test source file in the activity's directory. */
   readonly sources: readonly SourceText[];
+  /**
+   * Source files outside the directory that its files import by relative path, at any depth. A
+   * drag may live in a shared component, such as the toy desktop every toy desktop lesson renders.
+   */
+  readonly imported?: readonly SourceText[];
   /** Whether level.test.ts sits next to level.ts. */
   readonly hasLevelTest: boolean;
   /** The text of `e2e/activities/<id>.spec.ts`, or null when it does not exist. */
@@ -48,6 +53,41 @@ const IMPORT = /\b(?:import|export)\s[^;'"]*?\bfrom\s*['"]([^'"]+)['"]|\bimport\
 
 function staticImports(text: string): string[] {
   return [...text.matchAll(IMPORT)].map((match) => match[1] ?? match[2] ?? '').filter(Boolean);
+}
+
+/**
+ * The source files that `start` imports by relative path, at any depth, leaving out `start`
+ * itself. `read` returns a file by its path from the repository root, or null when there is
+ * none, such as a package or an asset.
+ */
+export function importedSources(start: readonly SourceText[], read: (path: string) => SourceText | null): SourceText[] {
+  const seen = new Set(start.map((file) => file.path));
+  const found: SourceText[] = [];
+  const queue = [...start];
+  for (let file = queue.shift(); file !== undefined; file = queue.shift()) {
+    const from = file.path.slice(0, file.path.lastIndexOf('/'));
+    for (const specifier of staticImports(file.text)) {
+      if (!specifier.startsWith('.')) continue;
+      const target = posixJoin(from, specifier);
+      if (seen.has(target)) continue;
+      seen.add(target);
+      const next = read(target);
+      if (next === null) continue;
+      found.push(next);
+      queue.push(next);
+    }
+  }
+  return found;
+}
+
+/** Joins a relative import to the folder of the importing file, resolving `.` and `..`. */
+function posixJoin(folder: string, specifier: string): string {
+  const parts = folder.split('/');
+  for (const part of specifier.split('/')) {
+    if (part === '..') parts.pop();
+    else if (part !== '.') parts.push(part);
+  }
+  return parts.join('/');
 }
 
 /** A Playwright test whose title contains "click to place". */
@@ -109,7 +149,8 @@ export function checkActivity(facts: ActivityFacts): string[] {
   }
   if (!facts.hasLevelTest) problems.push(`${id}: level.test.ts is missing.`);
   if (definition.inputs.includes('drag')) {
-    if (!facts.sources.some((file) => /\buseCarry\s*[<(]/.test(file.text))) {
+    const reachable = [...facts.sources, ...(facts.imported ?? [])];
+    if (!reachable.some((file) => /\buseCarry\s*[<(]/.test(file.text))) {
       problems.push(`${id}: an activity with drag in inputs must move things with useCarry.`);
     }
     if (facts.e2eSpec !== null && !CLICK_TO_PLACE_TEST.test(facts.e2eSpec)) {

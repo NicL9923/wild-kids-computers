@@ -5,7 +5,13 @@ import { defineActivity } from '../core/activityKit/defineActivity.ts';
 import { defineStrings } from '../core/strings/defineStrings.ts';
 import { activitiesFor, activityById, allActivityModules, collectActivities } from './activities.ts';
 import { activityArtIds } from './activityArt.ts';
-import { checkActivity, findTaughtPointerHandlers, orphanSpecs, type SourceText } from './testing/activityChecks.ts';
+import {
+  checkActivity,
+  findTaughtPointerHandlers,
+  importedSources,
+  orphanSpecs,
+  type SourceText,
+} from './testing/activityChecks.ts';
 
 /**
  * The registry test: every activity passes the hard rule checks in testing/activityChecks.ts.
@@ -14,6 +20,13 @@ import { checkActivity, findTaughtPointerHandlers, orphanSpecs, type SourceText 
 
 const root = process.cwd();
 const specDir = path.join(root, 'e2e', 'activities');
+
+/** A source file by its path from the repository root, or null for anything that is not one. */
+function readSource(relative: string): SourceText | null {
+  if (!/\.(ts|tsx)$/.test(relative) || /\.test\.tsx?$/.test(relative)) return null;
+  const file = path.join(root, relative);
+  return existsSync(file) ? { path: relative, text: readFileSync(file, 'utf8') } : null;
+}
 
 function readTree(dir: string): SourceText[] {
   return readdirSync(path.join(root, dir), { recursive: true, encoding: 'utf8' })
@@ -42,10 +55,12 @@ describe('every activity', () => {
         definition.kind === 'sequence' && definition.stepsDirectory !== null
           ? path.join(root, directory, definition.stepsDirectory)
           : null;
+      const sources = files.filter((file) => !/\.test\.tsx?$/.test(file.path));
       const problems = checkActivity({
         modulePath: module.path,
         definition,
-        sources: files.filter((file) => !/\.test\.tsx?$/.test(file.path)),
+        sources,
+        imported: importedSources(sources, readSource),
         hasLevelTest: files.some((file) => file.path === `${directory}/level.test.ts`),
         e2eSpec: existsSync(specPath) ? readFileSync(specPath, 'utf8') : null,
         stepFiles:
