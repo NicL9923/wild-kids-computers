@@ -25,6 +25,9 @@ const config = {
     // Every activity's level generator, toy desktop lessons included.
     'src/features/*/activities/*/level.ts',
     'src/features/toy-desktop/lessons/*/level.ts',
+    // The choice and scatter helpers the number and math level generators share.
+    'src/features/early-learning/math/choices.ts',
+    'src/features/early-learning/math/scatter.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
