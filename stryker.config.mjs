@@ -17,6 +17,7 @@ const config = {
     'src/core/paint/raster.ts',
     'src/core/paint/recolor.ts',
     'src/core/paint/warp.ts',
+    'src/core/paint/scatter.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
