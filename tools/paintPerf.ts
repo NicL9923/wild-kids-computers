@@ -12,6 +12,7 @@ import round from '../src/core/paint/tips/round.ts';
 import soft from '../src/core/paint/tips/soft.ts';
 import brush from '../src/core/paint/tools/brush/index.ts';
 import fill from '../src/core/paint/tools/fill/index.ts';
+import { paintScene } from '../src/core/paint/testing/scenes.ts';
 import type { BrushTip, PaintEffect, ToolPoint, ToolSettings } from '../src/core/paint/types.ts';
 
 /**
@@ -120,7 +121,9 @@ function measureEffects(effects: readonly PaintEffect[]): { id: string; first: n
   for (const effect of effects) {
     if (effect.group !== 'whole-picture') continue;
     const id = effect.id;
+    // The test scene, not blank paper, so an effect whose cost depends on the picture has edges to find.
     const doc = createDocument();
+    paintScene(doc);
     const source = cloneSurface(doc.paint);
     const target = cloneSurface(doc.paint);
     const first = time(() => effect.apply(source, target));
