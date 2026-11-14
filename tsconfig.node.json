@@ -6,5 +6,7 @@
     "moduleResolution": "NodeNext",
     "types": ["node"]
   },
-  "include": ["electron/main", "tools", "vite.config.ts"]
+  // Tools import the paint engine to build glyph tables, fixtures, and benchmarks.
+  "include": ["electron/main", "tools", "vite.config.ts", "src/core/paint"],
+  "exclude": ["src/**/*.test.ts", "src/**/testing/**"]
 }

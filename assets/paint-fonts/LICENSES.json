@@ -1,0 +1,20 @@
+[
+  {
+    "files": "Andika-Bold.ttf",
+    "source": "https://software.sil.org/downloads/r/andika/Andika-7.000.zip (Andika 7.000, unmodified)",
+    "author": "SIL Global",
+    "license": "OFL-1.1"
+  },
+  {
+    "files": "OFL.txt",
+    "source": "https://software.sil.org/downloads/r/andika/Andika-7.000.zip (the license text shipped with Andika 7.000)",
+    "author": "SIL Global",
+    "license": "OFL-1.1"
+  },
+  {
+    "files": "meadow-sans.glyphs.json",
+    "source": "Glyph outlines and kerning from Andika-Bold.ttf, subset to printable ASCII and a few punctuation marks by tools/buildGlyphTables.ts. Renamed Meadow Sans because \"Andika\" is a Reserved Font Name under the OFL.",
+    "author": "SIL Global",
+    "license": "OFL-1.1"
+  }
+]
