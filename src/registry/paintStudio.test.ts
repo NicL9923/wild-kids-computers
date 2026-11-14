@@ -28,6 +28,7 @@ describe('stamp category registry', () => {
 
   it.each([
     [{ id: 'Sea-bugs' }, 'camelCase'],
+    [{ id: 'seaBugs!' }, 'camelCase'],
     [{ order: -1 }, 'order must be a whole number'],
     [{ order: 1.5 }, 'order must be a whole number'],
     [{ stamps: [] }, 'has no stamps'],
@@ -35,6 +36,14 @@ describe('stamp category registry', () => {
   ] as const)('rejects a bad category: %o', (change, reason) => {
     const good = { id: 'pets', order: 1, title: categoryNames.animals, icon: 'cat', stamps: ['cat', 'dog'] } as const;
     expect(() => defineStampCategory({ ...good, ...change })).toThrow(reason);
+  });
+});
+
+describe('stamp category order', () => {
+  it('accepts order zero', () => {
+    expect(
+      defineStampCategory({ id: 'first', order: 0, title: categoryNames.animals, icon: 'cat', stamps: ['cat'] }).order,
+    ).toBe(0);
   });
 });
 

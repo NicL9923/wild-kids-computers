@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CLICK_SLOP,
   PEN_UP,
+  isPenDown,
   penDown,
   penKey,
   penLift,
@@ -21,12 +22,19 @@ type Step =
   | { lift: true }
   | { key: ScreenPoint; behavior?: PenBehavior };
 
-const name = (action: PenAction): string =>
-  action.kind === 'begin'
-    ? `begin ${action.at.x},${action.at.y}`
-    : action.kind === 'move'
-      ? `move ${action.to.x},${action.to.y}`
-      : 'end';
+/** A readable name for each action. An action of no known kind shows up as such, so the test fails. */
+function name(action: PenAction): string {
+  switch (action.kind) {
+    case 'begin':
+      return `begin ${action.at.x},${action.at.y}`;
+    case 'move':
+      return `move ${action.to.x},${action.to.y}`;
+    case 'end':
+      return 'end';
+    default:
+      return `unknown ${JSON.stringify(action)}`;
+  }
+}
 
 /** Runs a script of pointer events and returns every action in order and the last state. */
 function run(steps: readonly Step[]): { actions: string[]; state: PenState } {
@@ -128,9 +136,29 @@ describe('keyboard pen', () => {
     expect(state.mode).toBe('up');
   });
 
+  it('puts a stroke tool down as a sticky pen at the cursor', () => {
+    expect(run([{ key: { x: 3, y: 4 } }]).state).toEqual({ mode: 'sticky', downAt: null });
+  });
+
   it('puts a stroke tool down, follows the cursor, and lifts on the next press', () => {
     const { actions, state } = run([{ key: { x: 0, y: 0 } }, { move: { x: 10, y: 0 } }, { key: { x: 10, y: 0 } }]);
     expect(actions).toEqual(['begin 0,0', 'move 10,0', 'end']);
     expect(state.mode).toBe('up');
+  });
+
+  it('says whether the pen is down', () => {
+    expect(isPenDown(PEN_UP)).toBe(false);
+    expect(isPenDown(run([{ key: { x: 0, y: 0 } }]).state)).toBe(true);
+  });
+});
+
+describe('click slop', () => {
+  it.each([
+    ['a short diagonal wobble is still a click', { x: 14, y: 14 }, 'sticky'],
+    ['a straight move past the slop is a drag', { x: 10, y: 17 }, 'up'],
+    ['a diagonal move past the slop is a drag', { x: 15, y: 15 }, 'up'],
+  ] as const)('%s', (_label, to, mode) => {
+    const { state } = run([{ down: { x: 10, y: 10 } }, { move: to }, { up: to }]);
+    expect(state.mode).toBe(mode);
   });
 });

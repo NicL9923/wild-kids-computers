@@ -36,4 +36,35 @@ describe('PNG text chunk', () => {
     expect(() => withTextChunk(tinyPng(), 'k', 'snow☃')).toThrow('Latin-1');
     expect(readTextChunk(new Uint8Array([0x89, 0x50]), 'k')).toBeNull();
   });
+
+  it('keeps every Latin-1 character, up to the last one', () => {
+    const tagged = withTextChunk(tinyPng(), 'k', 'caf\u00e9 \u00ff');
+    expect(readTextChunk(tagged, 'k')).toBe('caf\u00e9 \u00ff');
+  });
+
+  it.each([
+    ['a keyword of 80 characters', 'k'.repeat(80)],
+    ['a keyword that starts with a control character', '\nkey'],
+    ['a keyword that ends with a control character', 'key\n'],
+  ])('refuses %s', (_label, keyword) => {
+    expect(() => withTextChunk(tinyPng(), keyword, 'v')).toThrow('keyword');
+  });
+
+  it('accepts a keyword of 79 characters', () => {
+    expect(readTextChunk(withTextChunk(tinyPng(), 'k'.repeat(79), 'v'), 'k'.repeat(79))).toBe('v');
+  });
+
+  it('refuses a file that has the signature but no header, and one that only starts like a PNG', () => {
+    const png = tinyPng();
+    expect(() => withTextChunk(png.slice(0, 8), 'k', 'v')).toThrow('no header chunk');
+    const notPng = withTextChunk(png, 'k', 'v');
+    notPng[3] = 0;
+    expect(() => withTextChunk(notPng, 'k', 'v')).toThrow('Not a PNG');
+    expect(readTextChunk(notPng, 'k')).toBeNull();
+  });
+
+  it('reads nothing from a file cut off in the middle of the note', () => {
+    const tagged = withTextChunk(tinyPng(), 'k', 'a long enough note');
+    expect(readTextChunk(tagged.slice(0, 8 + 25 + 12), 'k')).toBeNull();
+  });
 });

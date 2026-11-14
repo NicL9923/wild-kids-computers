@@ -13,6 +13,8 @@ export interface StudioScope {
   /** Cancels everything. Later calls do nothing and return a no-op cancel. */
   dispose(): void;
   readonly disposed: boolean;
+  /** How many callbacks are still waiting. A fired or cancelled one is forgotten, so this never grows by itself. */
+  readonly pending: number;
 }
 
 /** The platform timers the scope wraps. Each call returns a function that cancels it. Tests pass fakes. */
@@ -44,6 +46,9 @@ export function createStudioScope(host: TimerHost = browserTimers()): StudioScop
   return {
     get disposed() {
       return disposed;
+    },
+    get pending() {
+      return cancels.size;
     },
     setTimeout: (callback, ms) =>
       track((done) =>

@@ -61,25 +61,31 @@ export class Autosaver {
     while (this.running !== null) await this.running;
     if (!this.hasUnsavedChanges) return;
     const run = this.saveLatest();
-    this.running = run;
+    this.running = run.then(() => undefined);
+    let saved: boolean;
     try {
-      await run;
+      saved = await run;
     } finally {
       this.running = null;
     }
     // A change made while that save ran gets its own save. A failed save stops here.
-    if (this.hasUnsavedChanges && this.lastSaveOk) await this.flush();
+    if (saved && this.hasUnsavedChanges) await this.flush();
   }
 
-  private lastSaveOk = true;
-
-  private async saveLatest(): Promise<void> {
+  /** Saves the newest version. Resolves to whether the save landed. */
+  private async saveLatest(): Promise<boolean> {
     const version = this.latest;
-    const picture = await this.options.encode();
+    let picture: EncodedPicture;
+    try {
+      picture = await this.options.encode();
+    } catch {
+      // The picture could not be turned into files. It stays unsaved, and leaving tries again.
+      return false;
+    }
     const result = await this.options.save({ ...(this.id === null ? {} : { id: this.id }), ...picture });
-    this.lastSaveOk = result.ok;
-    if (!result.ok) return;
+    if (!result.ok) return false;
     this.id = result.value.id;
     this.saved = version;
+    return true;
   }
 }

@@ -130,4 +130,112 @@ describe('StudioDocument', () => {
     studio.end();
     expect(() => studio.load(createSurface(40, 20), null, null)).toThrow('new StudioDocument');
   });
+
+  it('offers no undo or redo while a stroke is open, and says it is stroking', () => {
+    const studio = new StudioDocument(40, 20);
+    studio.begin(brush, RED, { x: 5, y: 5 });
+    studio.end();
+    studio.begin(brush, RED, { x: 30, y: 15 });
+    studio.end();
+    studio.undo();
+    expect(studio.canUndo).toBe(true);
+    expect(studio.canRedo).toBe(true);
+    studio.begin(brush, RED, { x: 5, y: 5 });
+    expect(studio.stroking).toBe(true);
+    expect(studio.canUndo).toBe(false);
+    expect(studio.canRedo).toBe(false);
+    studio.cancel();
+    expect(studio.stroking).toBe(false);
+    expect(studio.canUndo).toBe(true);
+    expect(studio.canRedo).toBe(true);
+  });
+
+  it('ends the open stroke when another begins, so both land as steps', () => {
+    const studio = new StudioDocument(40, 20);
+    studio.begin(brush, RED, { x: 5, y: 5 });
+    studio.begin(brush, RED, { x: 30, y: 15 });
+    studio.end();
+    expect(studio.version).toBe(2);
+    expect(studio.history.undoSteps).toBe(2);
+  });
+
+  it('ends an open stroke before redo, replace, and whole-picture changes', () => {
+    const studio = new StudioDocument(40, 20);
+    studio.begin(brush, RED, { x: 5, y: 5 });
+    studio.end();
+    studio.undo();
+    studio.begin(brush, RED, { x: 30, y: 15 });
+    // Redo meets the stroke: the stroke lands, which clears the redo step.
+    studio.redo();
+    expect(studio.history.undoSteps).toBe(1);
+    studio.begin(brush, RED, { x: 30, y: 5 });
+    studio.replace(createSurface(40, 20, rgba(255, 255, 255)), null, null);
+    expect(studio.history.undoSteps).toBe(3);
+    studio.begin(brush, RED, { x: 10, y: 5 });
+    studio.replacePaint(createSurface(40, 20, rgba(1, 2, 3)).data);
+    expect(studio.history.undoSteps).toBe(5);
+  });
+
+  it('does nothing and tells no one when there is nothing to end, undo, or redo', () => {
+    const studio = new StudioDocument(40, 20);
+    let calls = 0;
+    studio.subscribe(() => calls++);
+    studio.end();
+    studio.cancel();
+    studio.move([{ x: 3, y: 3 }]);
+    studio.undo();
+    studio.redo();
+    expect(calls).toBe(0);
+    expect(studio.takeDirty().width).toBe(0);
+    expect(studio.version).toBe(0);
+  });
+
+  it('tells listeners about undo, redo, loads, and replacements', () => {
+    const studio = new StudioDocument(40, 20);
+    let calls = 0;
+    studio.subscribe(() => calls++);
+    studio.load(createSurface(40, 20, rgba(9, 9, 9)), null, null);
+    expect(calls).toBe(1);
+    studio.replace(createSurface(40, 20, rgba(255, 255, 255)), null, null);
+    expect(calls).toBe(2);
+    studio.replacePaint(createSurface(40, 20, rgba(1, 2, 3)).data);
+    expect(calls).toBe(3);
+    studio.undo();
+    expect(calls).toBe(4);
+    studio.redo();
+    expect(calls).toBe(5);
+    studio.begin(brush, RED, { x: 5, y: 5 });
+    studio.cancel();
+    expect(calls).toBe(7);
+  });
+
+  it('remembers a page id only for a page with lines and a name', () => {
+    const studio = new StudioDocument(40, 20);
+    const blank = createSurface(40, 20, rgba(255, 255, 255));
+    studio.replace(blank, lineMask(40, 20), null);
+    expect(studio.pageId).toBeNull();
+    studio.replace(blank, null, 'tulip');
+    expect(studio.pageId).toBeNull();
+    const loaded = new StudioDocument(40, 20);
+    loaded.load(blank, lineMask(40, 20), null);
+    expect(loaded.pageId).toBeNull();
+    const unnamed = new StudioDocument(40, 20);
+    unnamed.load(blank, null, 'tulip');
+    expect(unnamed.pageId).toBeNull();
+  });
+
+  it('marks the whole picture for repainting after a load and on request', () => {
+    const studio = new StudioDocument(40, 20);
+    studio.load(createSurface(40, 20, rgba(9, 9, 9)), null, null);
+    expect(studio.takeDirty()).toEqual({ x: 0, y: 0, width: 40, height: 20 });
+    studio.invalidate();
+    expect(studio.takeDirty()).toEqual({ x: 0, y: 0, width: 40, height: 20 });
+  });
+
+  it('refuses a load of the wrong width or while a stroke is open', () => {
+    expect(() => new StudioDocument(40, 20).load(createSurface(30, 20), null, null)).toThrow('30 by 20');
+    const stroking = new StudioDocument(40, 20);
+    stroking.begin(brush, RED, { x: 5, y: 5 });
+    expect(() => stroking.load(createSurface(40, 20), null, null)).toThrow('new StudioDocument');
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createStudioScope, type TimerHost } from './studioScope.ts';
 
 /** Timers that fire only when the test says so, and remember what is still pending. */
@@ -37,8 +37,11 @@ describe('studio scope', () => {
     const cancel = scope.setTimeout(() => seen.push('cancelled'), 10);
     cancel();
     expect(timers.pending()).toBe(2);
+    expect(scope.pending).toBe(2);
     timers.fireAll();
     expect(seen).toEqual(['timeout', 'frame 16']);
+    // Callbacks that ran are forgotten, so a frame loop never piles up entries.
+    expect(scope.pending).toBe(0);
   });
 
   it('cancels everything still pending on dispose, and schedules nothing afterwards', () => {
@@ -65,5 +68,37 @@ describe('studio scope', () => {
     cancel();
     scope.dispose();
     expect(fired).toBe(1);
+  });
+});
+
+describe('studio scope on the platform timers', () => {
+  it('runs and cancels real timeouts, intervals, and frames', () => {
+    vi.useFakeTimers();
+    try {
+      const frames = new Map<number, FrameRequestCallback>();
+      let next = 1;
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        frames.set(next, callback);
+        return next++;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+      const scope = createStudioScope();
+      const seen: string[] = [];
+      scope.setTimeout(() => seen.push('timeout'), 100);
+      scope.setInterval(() => seen.push('tick'), 40);
+      scope.requestFrame(() => seen.push('frame'));
+      const cancelled = scope.requestFrame(() => seen.push('cancelled frame'));
+      cancelled();
+      const cancelledTimeout = scope.setTimeout(() => seen.push('cancelled timeout'), 10);
+      cancelledTimeout();
+      vi.advanceTimersByTime(100);
+      for (const callback of frames.values()) callback(0);
+      expect(seen).toEqual(['tick', 'tick', 'timeout', 'frame']);
+      scope.dispose();
+      vi.advanceTimersByTime(200);
+      expect(seen).toHaveLength(4);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

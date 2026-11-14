@@ -32,6 +32,23 @@ describe('starting picture', () => {
     expect(pixel(paint, 800, 470)).toEqual([255, 255, 255, 255]);
   });
 
+  it('fits a wide drawing to the paper width, centers it top to bottom, and paints every line', () => {
+    // 100 by 10 scales by 16 to fill 1600 px across, and sits in the middle of the 1000 px height.
+    const paint = paintLines({
+      kind: 'lines',
+      width: 100,
+      height: 10,
+      lines: [
+        { from: { x: 0, y: 0 }, to: { x: 100, y: 0 }, color: BLUE, width: 1 },
+        { from: { x: 0, y: 10 }, to: { x: 100, y: 10 }, color: BLUE, width: 1 },
+      ],
+    });
+    expect(pixel(paint, 800, 420)).toEqual([44, 95, 174, 255]);
+    expect(pixel(paint, 800, 580)).toEqual([44, 95, 174, 255]);
+    expect(pixel(paint, 800, 500)).toEqual([255, 255, 255, 255]);
+    expect(pixel(paint, 800, 20)).toEqual([255, 255, 255, 255]);
+  });
+
   it('keeps a picture for the studio until the studio clears it, and never clears a newer one', () => {
     const first: StartingPicture = { kind: 'pixels', width: 1, height: 1, data: new Uint8ClampedArray(4) };
     const second: StartingPicture = { kind: 'pixels', width: 1, height: 1, data: new Uint8ClampedArray(4) };
@@ -48,6 +65,16 @@ describe('starting picture', () => {
     [{ kind: 'pixels', width: 0, height: 1, data: new Uint8ClampedArray() }, 'whole-number size'],
     [{ kind: 'pixels', width: 1.5, height: 1, data: new Uint8ClampedArray(6) }, 'whole-number size'],
     [{ kind: 'pixels', width: 2, height: 2, data: new Uint8ClampedArray(4) }, 'has 16 bytes, got 4'],
+    [{ kind: 'pixels', width: 1, height: 0, data: new Uint8ClampedArray() }, 'whole-number size'],
+    [
+      {
+        kind: 'lines',
+        width: 5,
+        height: 5,
+        lines: [{ from: { x: 0, y: 0 }, to: { x: 1, y: 1 }, color: BLUE, width: Infinity }],
+      },
+      'Line 0 needs a width',
+    ],
     [
       {
         kind: 'lines',

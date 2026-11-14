@@ -50,13 +50,9 @@ function* chunks(bytes: Uint8Array): Generator<Chunk> {
 }
 
 function latin1(text: string): Uint8Array {
-  const out = new Uint8Array(text.length);
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    if (code > 0xff) throw new RangeError('PNG text must be Latin-1.');
-    out[i] = code;
-  }
-  return out;
+  const codes = Array.from(text, (character) => character.codePointAt(0) ?? 0);
+  if (codes.some((code) => code > 0xff)) throw new RangeError('PNG text must be Latin-1.');
+  return Uint8Array.from(codes);
 }
 
 /** The PNG with a `tEXt` chunk added right after the header. Throws on a file that is not a PNG. */
@@ -83,7 +79,6 @@ export function withTextChunk(png: Uint8Array, keyword: string, text: string): U
 export function readTextChunk(png: Uint8Array, keyword: string): string | null {
   if (!isPng(png)) return null;
   for (const chunk of chunks(png)) {
-    if (chunk.type === 'IDAT' || chunk.type === 'IEND') return null;
     if (chunk.type !== 'tEXt') continue;
     const separator = chunk.data.indexOf(0);
     if (separator < 0) continue;

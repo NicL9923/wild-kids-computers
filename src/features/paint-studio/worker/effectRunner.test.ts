@@ -3,7 +3,7 @@ import { rgba } from '../../../core/paint/color.ts';
 import { createSurface, surfaceFromData } from '../../../core/paint/surface.ts';
 import type { PictureEffect } from '../../../core/paint/types.ts';
 import { paintEffects } from '../../../registry/paint.ts';
-import { createEffectRunner, type WorkerLike } from './effectRunner.ts';
+import { createEffectRunner, startEffectWorker, type WorkerLike } from './effectRunner.ts';
 import type { EffectRequest, EffectResponse } from './protocol.ts';
 
 const flip = paintEffects.find((effect): effect is PictureEffect => effect.id === 'flipSideways');
@@ -19,14 +19,16 @@ function picture() {
 /** A worker that answers in a later task, the way a real one does, and records what it got. */
 function fakeWorker(answer: (request: EffectRequest) => EffectResponse | 'crash') {
   const received: EffectRequest[] = [];
+  const transfers: Transferable[][] = [];
   const listeners: { message: ((event: MessageEvent<EffectResponse>) => void)[]; error: ((event: Event) => void)[] } = {
     message: [],
     error: [],
   };
   let terminated = false;
   const worker: WorkerLike = {
-    postMessage(message) {
+    postMessage(message, transfer) {
       received.push(message);
+      transfers.push(transfer);
       setImmediate(() => {
         const response = answer(message);
         if (response === 'crash') for (const listener of listeners.error) listener(new Event('error'));
@@ -40,7 +42,7 @@ function fakeWorker(answer: (request: EffectRequest) => EffectResponse | 'crash'
       terminated = true;
     },
   };
-  return { worker, received, terminated: () => terminated };
+  return { worker, received, transfers, terminated: () => terminated };
 }
 
 function applyInFake(request: EffectRequest): EffectResponse {
@@ -81,7 +83,57 @@ describe('effect runner', () => {
     await runner.run(flip, picture());
     expect(crashing.received).toHaveLength(1);
 
-    const none = createEffectRunner(() => null);
+    let attempts = 0;
+    const none = createEffectRunner(() => {
+      attempts++;
+      return null;
+    });
     expect([...(await none.run(flip, picture())).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
+    await none.run(flip, picture());
+    // It does not keep trying to start a worker that cannot start.
+    expect(attempts).toBe(1);
+    none.dispose();
+  });
+
+  it('starts one worker and sends each effect its own copy of the pixels, which it hands over', async () => {
+    const fake = fakeWorker(applyInFake);
+    let started = 0;
+    const runner = createEffectRunner(() => {
+      started++;
+      return fake.worker;
+    });
+    await runner.warm();
+    const source = picture();
+    await runner.run(flip, source);
+    await runner.run(flip, source);
+    expect(started).toBe(1);
+    expect(fake.transfers[0]).toEqual([]);
+    const sent = fake.received[1];
+    if (sent?.kind !== 'apply') throw new Error('Expected an apply request.');
+    expect(sent.pixels).not.toBe(source.data);
+    expect(fake.transfers[1]).toEqual([sent.pixels.buffer]);
+    expect(new Set(fake.received.map((request) => request.id)).size).toBe(3);
+  });
+
+  it('stops the worker when the studio closes and applies later effects on this thread', async () => {
+    const fake = fakeWorker(applyInFake);
+    const runner = createEffectRunner(() => fake.worker);
+    await runner.warm();
+    runner.dispose();
+    expect(fake.terminated()).toBe(true);
+    expect([...(await runner.run(flip, picture())).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
+    expect(fake.received).toHaveLength(1);
+  });
+
+  it('applies effects on this thread when making the worker throws', async () => {
+    const runner = createEffectRunner(() => {
+      throw new Error('workers are off');
+    });
+    await runner.warm();
+    expect([...(await runner.run(flip, picture())).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
+  });
+
+  it('has no worker to start outside a browser', () => {
+    expect(startEffectWorker()).toBeNull();
   });
 });

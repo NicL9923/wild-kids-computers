@@ -30,4 +30,21 @@ describe('unflattenUnderMask', () => {
   it('refuses a mask of another size', () => {
     expect(() => unflattenUnderMask(createSurface(4, 2), createSurface(4, 1))).toThrow('4 by 2');
   });
+
+  it('reverses the blend of colored lines, and treats the hidden threshold as hidden', () => {
+    const doc = createDocument(2, 1);
+    doc.paint.data.set([200, 150, 100, 255, 200, 150, 100, 255]);
+    const mask = createSurface(2, 1);
+    mask.data.set([20, 40, 160, 100, 20, 40, 160, 250]);
+    doc.mask = mask;
+    const recovered = unflattenUnderMask(flattenDocument(doc), mask).data;
+    for (const [c, expected] of [200, 150, 100].entries()) {
+      expect(Math.abs((recovered[c] ?? 0) - expected), `channel ${c}`).toBeLessThanOrEqual(2);
+    }
+    expect([...recovered.subarray(4, 8)]).toEqual([255, 255, 255, 255]);
+  });
+
+  it('refuses a mask of another width', () => {
+    expect(() => unflattenUnderMask(createSurface(5, 1), createSurface(4, 1))).toThrow('5 by 1');
+  });
 });

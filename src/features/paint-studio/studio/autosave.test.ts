@@ -145,4 +145,54 @@ describe('Autosaver', () => {
     expect(timers.pending()).toBe(0);
     await settle();
   });
+
+  it('saves a change made during a save right after it, from the same flush', async () => {
+    const { saver, saves, paint, holdNextSave, releaseSave, timers } = setup();
+    holdNextSave();
+    paint(1);
+    saver.changed(1);
+    const flushing = saver.flush();
+    await settle();
+    paint(2);
+    saver.changed(2);
+    releaseSave();
+    await flushing;
+    expect(saves.map((save) => [...save.png])).toEqual([[1], [2]]);
+    // The flush took care of the change, so the waiting timer was cancelled.
+    expect(timers.pending()).toBe(0);
+  });
+
+  it('cancels the waiting timer when a flush saves first', async () => {
+    const { saver, timers, saves } = setup();
+    saver.changed(1);
+    expect(timers.pending()).toBe(1);
+    await saver.flush();
+    expect(timers.pending()).toBe(0);
+    expect(saves).toHaveLength(1);
+  });
+
+  it('keeps the picture unsaved when it cannot be encoded, without throwing', async () => {
+    const timers = manualTimers();
+    let fail = true;
+    const saves: SavePictureInput[] = [];
+    const saver = new Autosaver({
+      scope: createStudioScope(timers),
+      delayMs: 10,
+      encode: () =>
+        fail
+          ? Promise.reject(new Error('no canvas'))
+          : Promise.resolve({ png: new Uint8Array([1]), thumbnail: new Uint8Array([1]) }),
+      save: (input) => {
+        saves.push(input);
+        return Promise.resolve({ ok: true, value: { id: 'pic-9', updatedAt: 1 } });
+      },
+    });
+    saver.changed(1);
+    await saver.flush();
+    expect(saves).toHaveLength(0);
+    expect(saver.hasUnsavedChanges).toBe(true);
+    fail = false;
+    await saver.flush();
+    expect(saver.pictureId).toBe('pic-9');
+  });
 });
