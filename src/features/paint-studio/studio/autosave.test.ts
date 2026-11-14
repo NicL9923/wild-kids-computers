@@ -1,32 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { BridgeError, type PictureSummary, type SavePictureInput } from '../../../core/platform/bridge.ts';
 import type { BridgeResult } from '../../../app/session/sessionStore.ts';
-import { createStudioScope, type TimerHost } from '../studioScope.ts';
+import { createManualScheduler } from '../../../core/activityKit/scheduler.ts';
+import { createScope } from '../../../core/activityKit/scope.ts';
 import { Autosaver, type EncodedPicture } from './autosave.ts';
 
 /** Timers that run only when the test says so. */
-function manualTimers(): TimerHost & { runAll: () => void; pending: () => number } {
-  let next = 1;
-  const timers = new Map<number, () => void>();
-  return {
-    setTimeout: (callback) => {
-      const id = next++;
-      timers.set(id, callback);
-      return () => timers.delete(id);
-    },
-    setInterval: () => {
-      throw new Error('not used');
-    },
-    requestAnimationFrame: () => {
-      throw new Error('not used');
-    },
-    runAll: () => {
-      const callbacks = [...timers.values()];
-      timers.clear();
-      for (const callback of callbacks) callback();
-    },
-    pending: () => timers.size,
-  };
+function manualTimers() {
+  const scheduler = createManualScheduler({ wall: 0 });
+  return Object.assign(scheduler, { runAll: () => scheduler.advance(60_000) });
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -37,7 +19,7 @@ function setup(results: BridgeResult<PictureSummary>[] = []) {
   let pixel = 0;
   let release: (() => void) | null = null;
   const options = {
-    scope: createStudioScope(timers),
+    scope: createScope(timers),
     delayMs: 1500,
     encode: (): Promise<EncodedPicture> => {
       const png = new Uint8Array([pixel]);
@@ -133,7 +115,7 @@ describe('Autosaver', () => {
 
   it('stops waiting to save once the scope is disposed', async () => {
     const timers = manualTimers();
-    const scope = createStudioScope(timers);
+    const scope = createScope(timers);
     const saver = new Autosaver({
       scope,
       delayMs: 10,
@@ -176,7 +158,7 @@ describe('Autosaver', () => {
     let fail = true;
     const saves: SavePictureInput[] = [];
     const saver = new Autosaver({
-      scope: createStudioScope(timers),
+      scope: createScope(timers),
       delayMs: 10,
       encode: () =>
         fail

@@ -1,6 +1,6 @@
 import type { PictureSummary, SavePictureInput } from '../../../core/platform/bridge.ts';
 import type { BridgeResult } from '../../../app/session/sessionStore.ts';
-import type { StudioScope } from '../studioScope.ts';
+import type { Scope } from '../../../core/activityKit/scope.ts';
 
 export interface EncodedPicture {
   readonly png: Uint8Array;
@@ -8,7 +8,7 @@ export interface EncodedPicture {
 }
 
 export interface AutosaveOptions {
-  readonly scope: StudioScope;
+  readonly scope: Scope;
   /** How long painting must pause before a save, in milliseconds. */
   readonly delayMs: number;
   /** Reads the picture as it is now. Take the pixels before the first await. */

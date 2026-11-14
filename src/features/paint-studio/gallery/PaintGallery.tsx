@@ -12,7 +12,8 @@ import { getBridge } from '../../../platform/getBridge.ts';
 import { useRequestParentGate, type ParentGateReason } from '../parentGate.ts';
 import { PAINT_STUDIO_PATH } from '../paths.ts';
 import { strings } from '../strings.ts';
-import { createStudioScope, type StudioScope } from '../studioScope.ts';
+import { createScope, type OwnedScope } from '../../../core/activityKit/scope.ts';
+import { kitScheduler } from '../../../activityShell/kitTime.ts';
 import { EmojiPicture } from '../studio/controls.tsx';
 import '../paintStudio.css';
 
@@ -58,7 +59,7 @@ function GalleryScreen() {
   const [items, setItems] = useState<readonly GalleryItem[] | null>(null);
   const [trashed, setTrashed] = useState<string | null>(null);
   const [outputFailed, setOutputFailed] = useState(false);
-  const scope = useRef<StudioScope | null>(null);
+  const scope = useRef<OwnedScope | null>(null);
   const hideUndo = useRef<() => void>(() => undefined);
   const urls = useRef<string[]>([]);
 
@@ -71,7 +72,7 @@ function GalleryScreen() {
   const refresh = useCallback(async () => show(await loadGallery(pictures)), [pictures, show]);
 
   useEffect(() => {
-    const created = createStudioScope();
+    const created = createScope(kitScheduler);
     scope.current = created;
     let live = true;
     void (async () => {

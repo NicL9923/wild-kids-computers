@@ -43,7 +43,7 @@ While the profile's settings say export and print need the gate (`outputNeedsPar
 | `studio/studioOptions.ts`                                          | What each band sees: tools, effects, sizes, colors, fill styles                                                      |
 | `studio/previews.ts`                                               | Picker previews painted by the engine: tips, shapes, fills, and effects on the child's own picture or a sample scene |
 | `worker/`                                                          | The Web Worker that runs whole-picture effects, and the runner that falls back to this thread if the worker fails    |
-| `studioScope.ts`                                                   | The studio's timers and frames, all cancelled when it closes. The only place here that touches the global timers.    |
+| Timers                                                             | The studio and the gallery use the activity kit's scope on `kitScheduler`, disposed when the screen closes           |
 | `stamps/<categoryId>.ts`, `coloringPages/<pageId>.ts`              | Stamp categories and coloring pages, found by `src/registry/stampCategories.ts` and `src/registry/coloringPages.ts`  |
 | `effects/strings.ts`                                               | The spoken name of every effect and effect group                                                                     |
 | `gallery/PaintGallery.tsx`                                         | Thumbnails of the active profile's pictures: open, copy, trash with a "bring it back" control, export, and print     |

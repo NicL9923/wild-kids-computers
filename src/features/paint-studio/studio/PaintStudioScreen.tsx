@@ -25,7 +25,8 @@ import { CLOSING_PATH, HOME_PATH } from '../../../app/paths.ts';
 import { PAINT_GALLERY_PATH } from '../paths.ts';
 import { clearStartingPicture, paintLines, peekStartingPicture, type StartingPicture } from '../startingPicture.ts';
 import { strings } from '../strings.ts';
-import { createStudioScope, type StudioScope } from '../studioScope.ts';
+import { createScope, type OwnedScope } from '../../../core/activityKit/scope.ts';
+import { kitScheduler } from '../../../activityShell/kitTime.ts';
 import { createEffectRunner, startEffectWorker, type EffectRunner } from '../worker/effectRunner.ts';
 import { Autosaver } from './autosave.ts';
 import { decodePngUrl, fitOnPaper, rasterizeSvg } from './browserPixels.ts';
@@ -69,7 +70,7 @@ const LOUDEST_SPEED = 3;
 type Panel = 'stamps' | 'effects' | 'pages' | 'tips' | 'shapes';
 
 interface StudioRuntime {
-  readonly scope: StudioScope;
+  readonly scope: OwnedScope;
   readonly runner: EffectRunner;
 }
 
@@ -175,7 +176,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
 
   // The timers, frames, and worker live as long as the screen.
   useEffect(() => {
-    const scope = createStudioScope();
+    const scope = createScope(kitScheduler);
     const runner = createEffectRunner(startEffectWorker);
     let live = true;
     void (async () => {
@@ -191,7 +192,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }, []);
 
   const makeSaver = useCallback(
-    (owner: StudioDocument, id: string | null, savedVersion: number, scope: StudioScope) =>
+    (owner: StudioDocument, id: string | null, savedVersion: number, scope: OwnedScope) =>
       new Autosaver(
         { scope, delayMs: AUTOSAVE_DELAY_MS, encode: () => encodePicture(owner), save: pictures.save },
         id,

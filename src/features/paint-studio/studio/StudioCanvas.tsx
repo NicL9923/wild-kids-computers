@@ -4,7 +4,7 @@ import { isEmptyRect } from '../../../core/paint/rect.ts';
 import type { ToolPoint } from '../../../core/paint/types.ts';
 import { t } from '../../../core/strings/defineStrings.ts';
 import { strings } from '../strings.ts';
-import type { StudioScope } from '../studioScope.ts';
+import type { Scope } from '../../../core/activityKit/scope.ts';
 import {
   PEN_UP,
   isPenDown,
@@ -42,7 +42,7 @@ export interface StudioCanvasHandle {
 interface StudioCanvasProps {
   readonly studio: StudioDocument;
   readonly driver: ToolDriver;
-  readonly scope: StudioScope;
+  readonly scope: Scope;
   /** True while a whole-picture effect runs. Input waits. */
   readonly busy: boolean;
   readonly onPenChange: (down: boolean) => void;
