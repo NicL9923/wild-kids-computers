@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
+import {
+  readSystemClipboard as readClipboard,
+  withSystemClipboard,
+  writeSystemClipboard,
+} from '../support/systemClipboard.ts';
 
 // "Keyboard and clipboard ownership": the app never reads or writes the system clipboard, and
 // app-level shortcuts are blocked while the shortcuts a lesson teaches reach the page.
@@ -15,45 +20,48 @@ test.afterEach(async () => {
   await launched.close();
 });
 
-const readSystemClipboard = () => launched.app.evaluate(({ clipboard }) => clipboard.readText());
+const readSystemClipboard = () => readClipboard(launched);
 
 test('system clipboard text cannot be pasted in, and copied text does not leave', async () => {
-  const { page } = launched;
-  await launched.app.evaluate(({ clipboard }) => clipboard.writeText('adult password'));
-  await page.evaluate(() => {
-    const field = document.createElement('textarea');
-    field.setAttribute('aria-label', 'probe');
-    const editable = document.createElement('div');
-    editable.contentEditable = 'true';
-    editable.setAttribute('aria-label', 'editable probe');
-    document.body.append(field, editable);
+  // Other workers on this display share the clipboard, so it is held until the last check.
+  await withSystemClipboard(async () => {
+    const { page } = launched;
+    await writeSystemClipboard(launched, 'adult password');
+    await page.evaluate(() => {
+      const field = document.createElement('textarea');
+      field.setAttribute('aria-label', 'probe');
+      const editable = document.createElement('div');
+      editable.contentEditable = 'true';
+      editable.setAttribute('aria-label', 'editable probe');
+      document.body.append(field, editable);
+    });
+    const field = page.getByLabel('probe', { exact: true });
+
+    // Nothing copied in the app yet, so a paste brings in nothing.
+    await field.focus();
+    await page.keyboard.press(`${primary}+V`);
+    await expect(field).toHaveValue('');
+
+    await page.keyboard.type('a picture of a fox');
+    await page.keyboard.press(`${primary}+A`);
+    await page.keyboard.press(`${primary}+C`);
+    expect(await readSystemClipboard()).toBe('adult password');
+
+    await page.keyboard.press(`${primary}+X`);
+    await expect(field).toHaveValue('');
+    expect(await readSystemClipboard()).toBe('adult password');
+
+    await page.keyboard.press(`${primary}+V`);
+    await page.keyboard.press(`${primary}+V`);
+    await expect(field).toHaveValue('a picture of a foxa picture of a fox');
+
+    // A content-editable area takes the toy clipboard too.
+    const editable = page.getByLabel('editable probe');
+    await editable.focus();
+    await page.keyboard.press(`${primary}+V`);
+    await expect(editable).toHaveText('a picture of a fox');
+    expect(await readSystemClipboard()).toBe('adult password');
   });
-  const field = page.getByLabel('probe', { exact: true });
-
-  // Nothing copied in the app yet, so a paste brings in nothing.
-  await field.focus();
-  await page.keyboard.press(`${primary}+V`);
-  await expect(field).toHaveValue('');
-
-  await page.keyboard.type('a picture of a fox');
-  await page.keyboard.press(`${primary}+A`);
-  await page.keyboard.press(`${primary}+C`);
-  expect(await readSystemClipboard()).toBe('adult password');
-
-  await page.keyboard.press(`${primary}+X`);
-  await expect(field).toHaveValue('');
-  expect(await readSystemClipboard()).toBe('adult password');
-
-  await page.keyboard.press(`${primary}+V`);
-  await page.keyboard.press(`${primary}+V`);
-  await expect(field).toHaveValue('a picture of a foxa picture of a fox');
-
-  // A content-editable area takes the toy clipboard too.
-  const editable = page.getByLabel('editable probe');
-  await editable.focus();
-  await page.keyboard.press(`${primary}+V`);
-  await expect(editable).toHaveText('a picture of a fox');
-  expect(await readSystemClipboard()).toBe('adult password');
 });
 
 interface Press {
