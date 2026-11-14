@@ -16,11 +16,19 @@ Each clip goes through these steps:
 
 1. espeak-ng (through the `phonemizer` package) turns the text into phonemes, and `toKokoroPhonemes` maps them to the alphabet Kokoro was trained on, with one symbol per diphthong and affricate. kokoro-js skips that mapping, and the model then says "boy" as "bye". A speech with no end punctuation gets a period, or Kokoro clips the last sound of a short word ("bed" came out "bad").
 2. Kokoro says a lead-in and then the speech, at the voice and speed in `VOICE_PROFILE` (`src/core/strings/voice.ts`). The lead-in is "Ready?" before words and "Say." plus an empty sentence before a bare sound.
-3. `cutAfterLead` keeps only what follows the pause after the lead-in. Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" comes out "lag"). After a lead-in it does not. The cut fails loudly if the pause is not where it should be.
+3. `cutAfterLead` keeps only what follows the pause after the lead-in: the earliest pause of 30 ms or more that starts 400 to 1600 ms in. Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" comes out "lag"). After a lead-in it does not. The cut fails loudly when there is no pause there, or when the first pause is shorter than 120 ms and a pause as long follows it, because then either could be the break and a wrong guess drops the first word.
 4. Silence is trimmed to a 40 ms lead and 80 ms tail, the voiced part is evened out to -20 dBFS RMS under a -1.5 dBFS peak, and the edges fade over 8 ms.
 5. ffmpeg (on PATH) encodes mono Opus in Ogg at 24 kbit/s, voice mode, with no metadata.
 
 A speech wrapped in slashes, such as `/bə/`, is read as Kokoro phonemes. The letter sounds use it.
+
+## Audit the committed clips
+
+```sh
+npm run voice:audit -- --raw ~/.cache/wkc/voice-raw
+```
+
+Synthesizes every speech again, cuts and processes it as `voice:generate` would, and lists each committed clip whose length differs by more than 20 ms, and each speech whose lead-in pause is now missing or ambiguous. Run it after changing the lead-in cut. `--raw` keeps the raw speech for the next run. Delete a listed clip and run `npm run voice:generate` to make it again.
 
 Changing post-processing changes no clip name, so bump `revision` in `VOICE_PROFILE` to regenerate everything.
 
