@@ -43,7 +43,6 @@ export function MusicBoxApp({ windowId, app }: { readonly windowId: string; read
           className='td-tool td-tool-text'
           data-music-command={playCommand}
           data-highlight={isHighlighted(highlight, { kind: 'command', command: playCommand })}
-          data-autofocus
           aria-pressed={app.playing}
           {...sayName(app.playing ? strings.stop : strings.play)}
           onClick={() => dispatch({ type: 'command', windowId, command: playCommand })}

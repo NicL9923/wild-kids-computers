@@ -1383,3 +1383,8 @@ button.td-resize[data-carry-item] {
   width: calc(var(--td-control) * 1.25);
   height: calc(var(--td-control) * 1.25);
 }
+
+/* A 3-year-old types single letters; make each one big. */
+.td-monitor[data-band='band-3-5'] .td-notepad-text {
+  font-size: var(--wk-text-display);
+}

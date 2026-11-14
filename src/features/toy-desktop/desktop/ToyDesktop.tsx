@@ -187,7 +187,9 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
     }
     const element = root.querySelector<HTMLElement>(`[data-window="${focusRequest.windowId}"]`);
     if (element === null || element.contains(document.activeElement)) return;
-    const target = element.querySelector<HTMLElement>('[data-autofocus], textarea') ?? element;
+    // Focus goes to the text of a notepad, ready to type, and otherwise to the window itself, so
+    // opening a window never makes one of its buttons say its name.
+    const target = element.querySelector<HTMLElement>('textarea') ?? element;
     target.focus();
   }, [focusRequest]);
 

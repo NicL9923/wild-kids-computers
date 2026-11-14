@@ -54,7 +54,6 @@ export function PictureViewerApp({ windowId, app }: { readonly windowId: string;
           type='button'
           className='wk-button'
           data-variant='primary'
-          data-autofocus
           {...sayName(strings.openPicture)}
           onClick={() => dispatch({ type: 'command', windowId, command: 'open' })}
         >
@@ -94,7 +93,6 @@ export function PictureViewerApp({ windowId, app }: { readonly windowId: string;
         aria-label={t(strings.next)}
         disabled={!can('next')}
         data-viewer-step='next'
-        data-autofocus
         {...sayName(strings.next)}
         onClick={() => dispatch({ type: 'command', windowId, command: 'next' })}
       >

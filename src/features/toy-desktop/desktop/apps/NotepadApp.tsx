@@ -6,7 +6,7 @@ import { ToyTextField } from '../ToyTextField.tsx';
 /** A page to type on. The text box is real; its text, caret, and undo live in the model. */
 export function NotepadApp({ windowId, app }: { readonly windowId: string; readonly app: NotepadState }) {
   return (
-    <div className='td-notepad' data-autofocus-within>
+    <div className='td-notepad'>
       <ToyTextField
         windowId={windowId}
         field='document'
