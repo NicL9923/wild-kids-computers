@@ -931,6 +931,7 @@ describe('app command events', () => {
     ['document', 'calculator'],
     ['search', 'notepad'],
     ['rename', 'file-explorer'],
+    ['rename', 'notepad'],
     ['computer-name', 'notepad'],
   ] as const)('refuses typing into %s in a %s that has no such field now', (field, app) => {
     const { act } = setup();

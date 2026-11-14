@@ -393,6 +393,7 @@ describe('window edges', () => {
     ['only the width is too small', 10, 300, true],
     ['only the height is too small', 500, 10, true],
     ['only the height changes', 500, 350, false],
+    ['only the width changes', 600, 300, false],
   ])('reports a resize when %s', (_label, width, height, clamped) => {
     const { events } = act(placed(), { type: 'resize-window', windowId: 'w1', width, height });
     expect(events[0]).toMatchObject({ type: 'window-resized', clamped });
