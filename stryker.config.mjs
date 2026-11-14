@@ -18,6 +18,7 @@ const config = {
     'src/core/paint/recolor.ts',
     'src/core/paint/warp.ts',
     'src/core/paint/scatter.ts',
+    'src/features/robot-painter/engine/!(*.test).ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],
