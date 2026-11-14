@@ -219,7 +219,7 @@ describe('undo and redo layout', () => {
   });
 
   it('describes the change of each app in the round, and only those', () => {
-    for (const [seed, difficulty] of SEEDS.slice(0, 40).map((seed, index) => [seed, (index % 6) + 1] as const)) {
+    for (const [seed, difficulty] of SEEDS.slice(0, 40).map((each, index) => [each, (index % 6) + 1] as const)) {
       const level = generateLevel(seed, difficulty, 'band-9-12');
       expect(level.sentence !== undefined).toBe(level.apps.includes('notepad'));
       expect(level.dot !== undefined).toBe(level.apps.includes('music-box'));
