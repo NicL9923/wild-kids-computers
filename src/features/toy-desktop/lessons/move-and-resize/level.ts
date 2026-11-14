@@ -7,7 +7,7 @@ import type { DesktopState } from '../../model/state.ts';
 import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 
 /** The picture the window shows, so it is easy to tell which window is the one to move. */
-export const WINDOW_PICTURE = 'Fox';
+const WINDOW_PICTURE = 'Fox';
 
 /** The window's size when the round starts, in desktop units. */
 export const START_SIZE = { width: 360, height: 260 } as const;
@@ -33,7 +33,7 @@ export interface MoveResizeLevel extends LessonLevel {
  * Closer fits at higher difficulty. 52 units at the easiest is about a fingertip on a trackpad;
  * 16 at the hardest is still more than half an arrow key step, so the keyboard can always fit it.
  */
-export function toleranceFor(difficulty: number): number {
+function toleranceFor(difficulty: number): number {
   return Math.max(16, 56 - 4 * difficulty);
 }
 

@@ -9,16 +9,16 @@ import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 export const APPS: readonly AppKind[] = ['notepad', 'picture-viewer', 'file-explorer', 'music-box', 'calculator'];
 
 /** The picture the picture viewer shows. */
-export const VIEWER_PICTURE = 'Fox';
+const VIEWER_PICTURE = 'Fox';
 
 /**
  * How the window to find is hidden. `behind`: other windows overlap it. `minimized`: it is down in
  * the task strip. `under-maximized`: a window in front fills the whole screen.
  */
-export type Hiding = 'behind' | 'minimized' | 'under-maximized';
+type Hiding = 'behind' | 'minimized' | 'under-maximized';
 
 /** What the child does once the window is in front. */
-export type FinishStep = 'maximize' | 'minimize';
+type FinishStep = 'maximize' | 'minimize';
 
 export interface SwitchLevel extends LessonLevel {
   /** The app whose window the child brings to the front. */
@@ -33,12 +33,12 @@ export interface SwitchLevel extends LessonLevel {
 /** Open windows at difficulty 1 to 7. Each step changes one thing: this, the hiding, or the finish. */
 const WINDOW_COUNTS = [2, 3, 3, 4, 4, 4, 5] as const;
 
-export function windowCount(difficulty: number): number {
+function windowCount(difficulty: number): number {
   return WINDOW_COUNTS[Math.min(Math.max(difficulty, 1), WINDOW_COUNTS.length) - 1] ?? APPS.length;
 }
 
 /** Overlapping at first, then down in the strip, then under a window that fills the screen. */
-export function hidingFor(difficulty: number): Hiding {
+function hidingFor(difficulty: number): Hiding {
   if (difficulty <= 2) return 'behind';
   if (difficulty <= 5) return 'minimized';
   return 'under-maximized';

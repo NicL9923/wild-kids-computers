@@ -5,7 +5,7 @@ import type { LessonStep } from '../harness/lesson.ts';
 import { isMatched, SETTING_OF, type ComputerName, type ControlsLevel, type ControlTarget } from './level.ts';
 import { strings } from './strings.ts';
 
-export const NAME_HANDLES: Readonly<Record<ComputerName, SpokenHandle>> = {
+const NAME_HANDLES: Readonly<Record<ComputerName, SpokenHandle>> = {
   Fox: strings.fox,
   Owl: strings.owl,
   Frog: strings.frog,

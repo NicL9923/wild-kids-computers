@@ -3,7 +3,7 @@ import type { Band } from '../../../../core/bands.ts';
 import type { EmojiId } from '../../../../core/strings/shared/emoji.ts';
 
 /** A piece the child clicks to add to the toy password. Never anything the child types. */
-export interface PasswordPiece {
+interface PasswordPiece {
   readonly id: string;
   readonly text: string;
 }
@@ -18,10 +18,10 @@ export type Strength = 'empty' | 'weak' | 'okay' | 'strong';
  * So 15 characters is strong on its own, and a mix of three kinds lets 12 be strong too. Under
  * 8 is weak.
  */
-export const STRONG_LENGTH = 15;
-export const STRONG_MIXED_LENGTH = 12;
-export const STRONG_MIXED_KINDS = 3;
-export const OKAY_LENGTH = 8;
+const STRONG_LENGTH = 15;
+const STRONG_MIXED_LENGTH = 12;
+const STRONG_MIXED_KINDS = 3;
+const OKAY_LENGTH = 8;
 
 export function kindOf(character: string): CharacterKind {
   if (/[a-z]/.test(character)) return 'lower';

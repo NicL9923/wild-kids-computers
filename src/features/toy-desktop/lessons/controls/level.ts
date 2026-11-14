@@ -17,7 +17,7 @@ import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 export type ControlKind = 'checkbox' | 'radio' | 'dropdown' | 'slider' | 'text' | 'list';
 
 /** Names a child can type and the card can show. */
-export const COMPUTER_NAMES = ['Fox', 'Owl', 'Frog', 'Bee'] as const;
+const COMPUTER_NAMES = ['Fox', 'Owl', 'Frog', 'Bee'] as const;
 export type ComputerName = (typeof COMPUTER_NAMES)[number];
 
 /** One setting to change, and the value to change it to. */
@@ -41,7 +41,7 @@ export const SETTING_OF: Readonly<Record<ControlKind, keyof ToySettings>> = {
 
 /** The middle of the brightness slider, and how far either side still counts as the middle. */
 export const BRIGHTNESS_MIDDLE = 60;
-export const MIDDLE_ROOM = 10;
+const MIDDLE_ROOM = 10;
 
 /** Alert sounds below the first rows the list shows: the child must scroll to reach them. */
 export const SOUNDS_OUT_OF_VIEW: readonly AlertSound[] = ALERT_SOUNDS.slice(LIST_VISIBLE_ROWS);

@@ -10,10 +10,10 @@ import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 /** The problems this lesson poses. A window pushed off to the right is left out: a wide screen shows it. */
 export type FaultKind = 'sound-muted' | 'window-minimized' | 'window-behind' | 'window-off-side';
 
-export const APPS: readonly AppKind[] = ['notepad', 'picture-viewer', 'file-explorer', 'music-box', 'calculator'];
+const APPS: readonly AppKind[] = ['notepad', 'picture-viewer', 'file-explorer', 'music-box', 'calculator'];
 
 /** The picture the picture viewer shows. */
-export const VIEWER_PICTURE = 'Fox';
+const VIEWER_PICTURE = 'Fox';
 
 /**
  * Places for windows that never overlap, so the one window hiding behind another is the only

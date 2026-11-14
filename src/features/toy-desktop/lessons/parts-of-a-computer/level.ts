@@ -32,7 +32,7 @@ export const LAYOUT: Readonly<Record<PartId, Box>> = {
 export type PartsMode = 'name' | 'clue';
 
 /** Parts whose job a young child knows from daily life: these are asked by what they do first. */
-export const EASY_CLUES: readonly PartId[] = ['screen', 'keyboard', 'speaker'];
+const EASY_CLUES: readonly PartId[] = ['screen', 'keyboard', 'speaker'];
 
 /** Per difficulty: how many parts are on the desk, and what the child hears. */
 export const DIFFICULTY: readonly {
