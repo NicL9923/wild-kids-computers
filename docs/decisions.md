@@ -122,6 +122,8 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **`check:voice` and `voice:generate` run as Vitest tasks under `tools/tasks/`**, not in `npm test`, because a feature branch adds strings before its clips exist.
 - **The content rules go beyond the spec's list** to pressure words (hurry, one more) and scolding words (wrong, oh no, sad). An honest use opts in per string.
 - **Sound effect names are one typed list** in `src/audio/sfx/sfxNames.ts`. A typo in `play('pop')` is then a compile error. The list is short and the audio layer owns it, so it is an exception to discovery by file.
+- **A voice clip that has not loaded within 5 seconds counts as missing.** Activities wait for speech before the next round, so a stuck load would hold a child on a finished round. A clip is a few kilobytes read from the app's own files, which takes milliseconds.
+- **Muting ends speech in progress, and speech asked for while muted plays nothing and resolves at once.** No one hears a muted voice, so waiting out its length before the next round would be a silent pause. The test log still records each string. After unmuting, the replay control speaks the instruction again.
 - **Generated clips are licensed MIT**, like the rest of the project's own work. The model's Apache-2.0 license covers the model, not its output.
 
 ### Emoji

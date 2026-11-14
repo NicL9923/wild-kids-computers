@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { defineStrings } from '../core/strings/defineStrings.ts';
 import { voiceClipName } from '../core/strings/voice.ts';
-import { createAudioEngine, type AudioEnvironment, type SfxLibrary, type VolumeSettings } from './audioEngine.ts';
+import {
+  CLIP_LOAD_DEADLINE_MS,
+  createAudioEngine,
+  type AudioEnvironment,
+  type SfxLibrary,
+  type VolumeSettings,
+} from './audioEngine.ts';
 import { CONTINUOUS } from './sfx/continuous.ts';
 import { ONE_SHOTS } from './sfx/oneShots.ts';
 import { FakeAudioContext, type FakeBufferSource } from './testing/fakeAudioContext.ts';
@@ -362,5 +368,156 @@ describe('test log', () => {
     const engine = createAudioEngine({ environment, sfx, testLog: false });
     engine.play('pop');
     expect(engine.testLog).toBeUndefined();
+  });
+});
+
+/** Tracks whether each promise settled. */
+function watch(promises: Record<string, Promise<unknown>>) {
+  const settled = new Set<string>();
+  for (const [name, promise] of Object.entries(promises)) void promise.finally(() => settled.add(name));
+  return () => [...settled].toSorted();
+}
+
+describe('speech whose clip never loads', () => {
+  const findClip = voiceClipName(strings.find.speech);
+
+  /** An engine whose "Find the letter." clip is stuck in fetch or in decode. Other clips load. */
+  function stuck(stage: 'fetch' | 'decode') {
+    const parts = harness(
+      stage === 'fetch'
+        ? {
+            fetchClip: (url) =>
+              url.endsWith(findClip)
+                ? new Promise<never>(() => undefined)
+                : Promise.resolve(new TextEncoder().encode(url).buffer),
+          }
+        : {},
+    );
+    if (stage === 'decode') {
+      const decode = parts.context.decodeAudioData.bind(parts.context);
+      parts.context.decodeAudioData = (bytes) =>
+        new TextDecoder().decode(bytes).endsWith(findClip) ? new Promise<never>(() => undefined) : decode(bytes);
+    }
+    const engine = createAudioEngine({ environment: parts.environment, sfx, testLog: true });
+    return { ...parts, engine };
+  }
+
+  const ALL = ['sequence', 'settled', 'speak'];
+
+  it.each(['fetch', 'decode'] as const)(
+    'settles speak, speakSequence, and speechSettled at once on each way speech stops, with the clip stuck in %s',
+    async (stage) => {
+      vi.useFakeTimers();
+      try {
+        const ways: Record<string, (engine: ReturnType<typeof stuck>['engine']) => void> = {
+          'cancel, as leaving a screen does': (engine) => engine.cancelSpeech(),
+          'newer speech': (engine) => void engine.speak(strings.missing),
+          mute: (engine) => engine.setVolume({ muted: true }),
+          'the engine closing': (engine) => void engine.dispose(),
+        };
+        for (const [way, stop] of Object.entries(ways)) {
+          const { engine, context } = stuck(stage);
+          const settledNow = watch({
+            speak: engine.speak(strings.find),
+            sequence: engine.speakSequence([strings.find, strings.b]),
+            settled: engine.speechSettled(),
+          });
+          await settle();
+          expect(settledNow(), way).toEqual(['speak']);
+          stop(engine);
+          await settle();
+          expect(settledNow(), way).toEqual(ALL);
+          expect(playingClips(context), way).toEqual([]);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(['fetch', 'decode'] as const)(
+    'counts a clip stuck in %s as missing once the deadline passes, logs it, and goes on',
+    async (stage) => {
+      vi.useFakeTimers();
+      try {
+        const { engine, context } = stuck(stage);
+        const settledNow = watch({
+          sequence: engine.speakSequence([strings.find, strings.b]),
+          settled: engine.speechSettled(),
+        });
+        await settle();
+        vi.advanceTimersByTime(CLIP_LOAD_DEADLINE_MS - 1);
+        await settle();
+        expect(settledNow()).toEqual([]);
+        vi.advanceTimersByTime(1);
+        await settle();
+        // The stuck clip played nothing and the next one plays.
+        expect(playingClips(context)).toEqual([`app://bundle/assets/${voiceClipName('B.')}`]);
+        expect(engine.testLog?.map((entry) => [entry.name, entry.found])).toEqual([
+          ['audio-test.find', true],
+          ['audio-test.b', true],
+        ]);
+        finish(context.sources[0]);
+        await settle();
+        expect(settledNow()).toEqual(['sequence', 'settled']);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('tries a timed-out clip again, and never plays the stuck load if it finishes late', async () => {
+    vi.useFakeTimers();
+    try {
+      const late = Promise.withResolvers<ArrayBuffer>();
+      let calls = 0;
+      const { context, environment } = harness({
+        fetchClip: (url) => (calls++ === 0 ? late.promise : Promise.resolve(new TextEncoder().encode(url).buffer)),
+      });
+      const engine = createAudioEngine({ environment, sfx, testLog: false });
+      const first = engine.speak(strings.find);
+      await settle();
+      vi.advanceTimersByTime(CLIP_LOAD_DEADLINE_MS);
+      await first;
+      late.resolve(new TextEncoder().encode('late').buffer);
+      await settle();
+      expect(context.sources).toEqual([]);
+      void engine.speak(strings.find);
+      await settle();
+      expect(calls).toBe(2);
+      expect(playingClips(context)).toEqual([`app://bundle/assets/${findClip}`]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('speaks nothing while muted, so nothing waits for a voice no one hears, and logs it', async () => {
+    const { context, environment, fetched } = harness();
+    const engine = createAudioEngine({
+      environment,
+      sfx,
+      testLog: true,
+      volume: { voice: 1, effects: 1, muted: true },
+    });
+    await expect(engine.speakSequence([strings.find, strings.b])).resolves.toBeUndefined();
+    await expect(engine.speechSettled()).resolves.toBeUndefined();
+    expect(fetched).toEqual([]);
+    expect(context.sources).toEqual([]);
+    expect(engine.testLog?.map((entry) => entry.name)).toEqual(['audio-test.find', 'audio-test.b']);
+  });
+
+  it('stops a clip that is playing when sound is muted, and keeps speaking after unmute', async () => {
+    const { context, environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    const done = engine.speak(strings.find);
+    await settle();
+    expect(playingClips(context)).toHaveLength(1);
+    engine.setVolume({ muted: true });
+    await expect(done).resolves.toBeUndefined();
+    expect(playingClips(context)).toEqual([]);
+    engine.setVolume({ muted: false });
+    void engine.speak(strings.b);
+    await settle();
+    expect(playingClips(context)).toEqual([`app://bundle/assets/${voiceClipName('B.')}`]);
   });
 });
