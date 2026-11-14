@@ -32,7 +32,7 @@ async function acquire(): Promise<void> {
       await writeFile(OWNER, String(process.pid));
       return;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error;
     }
     const owner = Number(await readFile(OWNER, 'utf8').catch(() => ''));
     // An owner that is not running any more left the lock behind. A missing owner file is a

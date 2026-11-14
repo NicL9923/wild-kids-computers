@@ -146,10 +146,12 @@ describe('effect runner', () => {
   });
 });
 
+/** This thread's encoder, which marks its files so a test can tell them from the worker's. */
+const encodeHere = (): Promise<{ png: Uint8Array; thumbnail: Uint8Array }> =>
+  Promise.resolve({ png: new Uint8Array([7, 7]), thumbnail: new Uint8Array([7]) });
+
 describe('encoding a picture for the gallery', () => {
   const page = { width: 4, height: 2 };
-  const encodeHere = (): Promise<{ png: Uint8Array; thumbnail: Uint8Array }> =>
-    Promise.resolve({ png: new Uint8Array([7, 7]), thumbnail: new Uint8Array([7]) });
 
   it('encodes in the worker from a copy taken at once, so painting on afterwards changes nothing', async () => {
     const fake = fakeWorker(applyInFake);

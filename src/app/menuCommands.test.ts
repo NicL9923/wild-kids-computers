@@ -4,7 +4,7 @@ import { runMenuCommand } from './menuCommands.ts';
 
 /** The browser's own undo: the I/O edge this routing must not reach. jsdom has none, so each test adds one. */
 function nativeUndo(result = true) {
-  const native = vi.fn((_command: string) => result);
+  const native = vi.fn<(command: string) => boolean>(() => result);
   Object.defineProperty(document, 'execCommand', { configurable: true, value: native });
   return native;
 }

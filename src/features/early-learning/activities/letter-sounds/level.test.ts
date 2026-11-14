@@ -108,11 +108,11 @@ describe('generateLevel', () => {
   });
 
   it('offers look-alike letters together again from difficulty 6', () => {
-    const together = SEEDS.some((seed) => {
+    const met = SEEDS.some((seed) => {
       const { choices } = generateLevel(seed, 6, 'band-6-8');
       return choices.some((a, index) => choices.slice(index + 1).some((b) => lookAlike(a, b)));
     });
-    expect(together).toBe(true);
+    expect(met).toBe(true);
   });
 
   it('never offers c, k, and q together, because they share the sound "kuh"', () => {
