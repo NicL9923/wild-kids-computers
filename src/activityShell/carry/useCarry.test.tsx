@@ -165,6 +165,37 @@ describe('useCarry with drop targets', () => {
     expect(apple.dataset.carried).toBe('false');
   });
 
+  it('puts a clicked item down at the very spot it was picked up, with no move in between', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    expect(apple.dataset.carried).toBe('true');
+    // The carried item lets the pointer through, so the second press lands on what is under it.
+    down(apple.parentElement ?? document.body, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    expect(apple.dataset.carried).toBe('false');
+    expect(log.drops).toEqual([]);
+  });
+
+  it('puts the item back when the browser cancels the press', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    fireEvent.pointerCancel(window, { clientX: 50, clientY: 50 });
+    expect(apple.dataset.carried).toBe('false');
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it('treats a second press after a lost release as the placing click', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    // The release never arrived, so the item is still held when the next press comes.
+    down(apple.parentElement ?? document.body, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    expect(apple.dataset.carried).toBe('false');
+    expect(log.drops).toEqual([]);
+  });
+
   it('treats a wobble under the drag threshold as a click, not a drag', () => {
     const { log, apple } = renderPicnic();
     down(apple, { x: 50, y: 50 });
