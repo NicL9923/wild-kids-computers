@@ -21,12 +21,16 @@ const PRESSED_MS = 300;
  * and the keyboard with each finger's keys tinted and the next key lit. A key that is not the next
  * one types nothing: the line waits, and the key that was pressed lights on the picture. Nothing
  * on screen counts time or speed.
+ *
+ * Keys can come faster than the screen draws, so the key handler reads and writes the characters
+ * typed and the wrong count in one live record, never the values of the last render.
  */
 export default function TypingCourseActivity({ level, kit }: ActivityProps<TypingLevel>) {
   const [typed, setTyped] = useState(0);
   const [wrong, setWrong] = useState(0);
   const [pressed, setPressed] = useState<string | null>(null);
   const area = useRef<HTMLFieldSetElement>(null);
+  const live = useRef({ typed, wrong });
   const chars = Array.from(level.line);
   const want = chars[typed];
   const done = want === undefined;
@@ -43,21 +47,26 @@ export default function TypingCourseActivity({ level, kit }: ActivityProps<Typin
   }
 
   useActivityKeys(kit, (event) => {
-    if (done || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    const { typed: typedSoFar, wrong: wrongSoFar } = live.current;
+    const char = chars[typedSoFar];
+    if (char === undefined || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (Array.from(event.key).length !== 1) return;
     event.preventDefault();
     light(event.code);
-    if (event.key !== want) {
-      const count = wrong + 1;
+    if (event.key !== char) {
+      const count = wrongSoFar + 1;
+      live.current = { ...live.current, wrong: count };
       setWrong(count);
-      const needsShift = want !== want.toLowerCase() && event.key === want.toLowerCase();
-      if (needsShift && wrong === 0) kit.hint(strings.holdShift);
-      else if (count === WRONG_BEFORE_HELP) kit.hint(FINGER_NAMES[fingerFor(want)]);
+      const needsShift = char !== char.toLowerCase() && event.key === char.toLowerCase();
+      if (needsShift && wrongSoFar === 0) kit.hint(strings.holdShift);
+      else if (count === WRONG_BEFORE_HELP) kit.hint(FINGER_NAMES[fingerFor(char)]);
       return;
     }
+    const filled = typedSoFar + 1;
+    live.current = { typed: filled, wrong: 0 };
     setWrong(0);
-    setTyped(typed + 1);
-    if (typed + 1 < chars.length) return;
+    setTyped(filled);
+    if (filled < chars.length) return;
     kit.feedback.correct({ at: area.current ?? undefined, say: strings.lineDone });
     kit.scope.setTimeout(() => kit.roundComplete(), LINE_DONE_PAUSE_MS);
   });

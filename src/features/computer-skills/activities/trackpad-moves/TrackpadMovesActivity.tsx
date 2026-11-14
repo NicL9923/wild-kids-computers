@@ -30,6 +30,9 @@ function shareInside(inner: DOMRect, outer: DOMRect): number {
  * trackpad, the mouse wheel (with Shift for sideways), its scroll bars, or the arrow keys when
  * it has focus. A hidden thing can be tapped once most of it is in view. An arrow on the
  * window's edge and a picture of the gesture show which way to go.
+ *
+ * Scroll events can come faster than the screen draws, so the scroll check reads and writes
+ * whether the find was seen in a live record, and says "tap it" once.
  */
 export default function TrackpadMovesActivity({ level, kit }: ActivityProps<TrackpadLevel>) {
   const [index, setIndex] = useState(0);
@@ -37,6 +40,7 @@ export default function TrackpadMovesActivity({ level, kit }: ActivityProps<Trac
   const [tapped, setTapped] = useState<ReadonlySet<string>>(new Set());
   const viewport = useRef<HTMLElement>(null);
   const thing = useRef<HTMLButtonElement>(null);
+  const live = useRef({ seen });
   const find = level.finds[index];
   const finished = tapped.size === level.finds.length;
 
@@ -61,15 +65,18 @@ export default function TrackpadMovesActivity({ level, kit }: ActivityProps<Trac
   const check = useCallback(() => {
     const outer = viewport.current?.getBoundingClientRect();
     const inner = thing.current?.getBoundingClientRect();
-    if (outer === undefined || inner === undefined || seen) return;
+    if (outer === undefined || inner === undefined || live.current.seen) return;
     if (shareInside(inner, outer) < SEEN_SHARE) return;
+    live.current = { seen: true };
     setSeen(true);
     kit.play('sparkle');
     kit.setInstruction(strings.tapIt);
-  }, [kit, seen]);
+  }, [kit]);
 
   // A find may already be in view when it is named, after a short scroll past the last one.
-  useEffect(() => check(), [check]);
+  useEffect(() => {
+    if (find !== undefined) check();
+  }, [check, find]);
 
   function tap(target: Find, element: HTMLElement): void {
     if (!seen || tapped.has(target.id)) return;
@@ -80,6 +87,7 @@ export default function TrackpadMovesActivity({ level, kit }: ActivityProps<Trac
       kit.scope.setTimeout(() => kit.roundComplete(), LAST_TAP_MS);
       return;
     }
+    live.current = { seen: false };
     setIndex(index + 1);
     setSeen(false);
   }

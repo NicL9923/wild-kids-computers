@@ -5,7 +5,7 @@ import type { Band } from '../../src/core/bands.ts';
 import { documentNames } from '../../src/core/platform/names.ts';
 import { saveDocument } from '../../src/core/storage/document.ts';
 import { progressDocument } from '../../src/core/storage/schemas.ts';
-import { goToActivity, resizeWindow } from './activity.ts';
+import { goToActivity, kitTime, resizeWindow } from './activity.ts';
 import { FIXTURE_PROFILE, launchApp, type LaunchedApp } from './launchApp.ts';
 
 /**
@@ -35,6 +35,8 @@ export interface OpenStepOptions {
   /** The step to open. Above 0, the child has reached it before and picks it on the step picker. */
   readonly step: number;
   readonly size?: { readonly width: number; readonly height: number };
+  /** Pins the kit clock at this wall time before the step opens. Step it with `kitTime`. */
+  readonly pinClockAt?: number;
 }
 
 /** Launches the app with a ready profile that has reached `step`, and opens that step. */
@@ -46,6 +48,7 @@ export async function openSequenceStep(options: OpenStepOptions): Promise<Launch
   const launched = await launchApp({ band: options.band, seed: 7, activity: options.activity }, { documents });
   try {
     await resizeWindow(launched, options.size ?? { width: 1280, height: 800 });
+    if (options.pinClockAt !== undefined) await kitTime(launched.page).pin(options.pinClockAt);
     await goToActivity(launched.page, options.activity);
     if (options.step > 0) await launched.page.locator(`[data-step="${String(options.step)}"]`).click();
     await expect(launched.page.locator(`[data-activity="${options.activity}"] .wk-activity-stage`)).toBeVisible();

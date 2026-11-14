@@ -20,6 +20,9 @@ const PRESSED_MS = 300;
  * each letter the child types fills in. Another letter changes nothing in the word: a quiet nudge,
  * and the key that was pressed lights on the keyboard picture. After two, the right key lights up
  * and its name is said.
+ *
+ * Keys can come faster than the screen draws, so the key handler reads and writes the word, the
+ * letters typed, and the wrong count in one live record, never the values of the last render.
  */
 export default function TypeTheWordActivity({ level, kit }: ActivityProps<TypeWordLevel>) {
   const [index, setIndex] = useState(0);
@@ -27,6 +30,7 @@ export default function TypeTheWordActivity({ level, kit }: ActivityProps<TypeWo
   const [wrong, setWrong] = useState(0);
   const [pressed, setPressed] = useState<string | null>(null);
   const slots = useRef<HTMLOListElement>(null);
+  const live = useRef({ index, typed, wrong });
   const word = level.words[index];
   if (word === undefined) throw new RangeError('A type-the-word level has at least one word.');
   const name = emojiNames[word.id];
@@ -43,31 +47,38 @@ export default function TypeTheWordActivity({ level, kit }: ActivityProps<TypeWo
   }
 
   useActivityKeys(kit, (event) => {
-    if (done || next === undefined || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    const { index: at, typed: filledSoFar, wrong: wrongSoFar } = live.current;
+    const current = level.words[at];
+    const want = current?.letters[filledSoFar];
+    if (current === undefined || want === undefined) return;
+    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     const letter = event.key.toLowerCase();
     if (!/^[a-z]$/.test(letter)) return;
     event.preventDefault();
     light(event.code);
-    if (letter !== next) {
-      const count = wrong + 1;
+    if (letter !== want) {
+      const count = wrongSoFar + 1;
+      live.current = { ...live.current, wrong: count };
       setWrong(count);
-      kit.feedback.wrong({ at: slots.current?.children[typed] ?? undefined });
-      if (count === WRONG_BEFORE_HELP) kit.hint(letterNames[next]);
+      kit.feedback.wrong({ at: slots.current?.children[filledSoFar] ?? undefined });
+      if (count === WRONG_BEFORE_HELP) kit.hint(letterNames[want]);
       return;
     }
     kit.play('key-tap');
+    const filled = filledSoFar + 1;
+    live.current = { index: at, typed: filled, wrong: 0 };
     setWrong(0);
-    const filled = typed + 1;
     setTyped(filled);
-    if (filled < word.letters.length) return;
+    if (filled < current.letters.length) return;
     kit.feedback.correct({ at: slots.current ?? undefined });
-    void kit.speak(name);
+    void kit.speak(emojiNames[current.id]);
     kit.scope.setTimeout(() => {
-      if (index + 1 >= level.words.length) {
+      if (at + 1 >= level.words.length) {
         kit.roundComplete();
         return;
       }
-      setIndex(index + 1);
+      live.current = { index: at + 1, typed: 0, wrong: 0 };
+      setIndex(at + 1);
       setTyped(0);
       setWrong(0);
     }, NEXT_WORD_MS);

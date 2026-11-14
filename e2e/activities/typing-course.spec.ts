@@ -70,7 +70,8 @@ forEachBand(activity.bands, (band) => {
   });
 
   test('a key that is not next types nothing; after two, the finger is named', async () => {
-    launched = await openSequenceStep({ activity: activity.id, band, step: 0 });
+    // A pinned kit clock holds the pressed key's light on until the test has looked at it.
+    launched = await openSequenceStep({ activity: activity.id, band, step: 0, pinClockAt: Date.UTC(2026, 10, 14, 10) });
     const { page } = launched;
     const lesson = generateLevel(1, 0, band);
     const want = lesson.line.charAt(0);

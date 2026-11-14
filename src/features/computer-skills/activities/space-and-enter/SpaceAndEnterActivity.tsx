@@ -39,18 +39,23 @@ const percentX = (x: number) => `${String((x / PATH.width) * 100)}%`;
  * gates and the door of home. The right key lights up on the keyboard picture. The other key at a
  * stop gets a neutral nudge that says which key to use. Space anywhere else is a happy hop.
  * The path is the play area that keeps Space and Enter from the shell's buttons.
+ *
+ * Keys and frames can come faster than the screen draws, so the frame loop and the key handler
+ * read and write the walk and the other-key count in one live record, never the values of the
+ * last render.
  */
 export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<JumpLevel>) {
   const [walk, setWalk] = useState<WalkState>(() => startWalk(START_X));
   const [hops, setHops] = useState(0);
   const [wrongHere, setWrongHere] = useState(0);
-  const [otherKeys, setOtherKeys] = useState(0);
   const [pressedKey, setPressedKey] = useState<string | null>(null);
   const critter = useRef<HTMLDivElement>(null);
   const announced = useRef(-1);
   const missed = useRef(0);
   const wrongCount = useRef(0);
   const lastFrame = useRef<number | null>(null);
+  // The other keys pressed at this stop show nothing, so they live only here.
+  const live = useRef({ walk, otherKeys: 0 });
   const stop = level.stops[walk.stop];
   const near = isNear(walk, level);
 
@@ -60,7 +65,11 @@ export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<Jump
     const frame = (time: number) => {
       const before = lastFrame.current ?? time;
       lastFrame.current = time;
-      setWalk((current) => advance(current, level, time - before, kit.reducedMotion));
+      const next = advance(live.current.walk, level, time - before, kit.reducedMotion);
+      if (next !== live.current.walk) {
+        live.current = { ...live.current, walk: next };
+        setWalk(next);
+      }
       cancel = kit.scope.requestFrame(frame);
     };
     cancel = kit.scope.requestFrame(frame);
@@ -95,23 +104,25 @@ export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<Jump
   }
 
   useActivityKeys(kit, (event) => {
-    if (event.repeat || stop === undefined) return;
+    const { walk: now, otherKeys: others } = live.current;
+    const at = level.stops[now.stop];
+    if (event.repeat || at === undefined) return;
     const key = event.key === ' ' ? 'space' : event.key === 'Enter' ? 'enter' : null;
     if (key === null) {
-      if (event.key.length !== 1 || walk.phase !== 'waiting') return;
-      const count = otherKeys + 1;
-      setOtherKeys(count);
-      if (count === OTHER_KEYS_BEFORE_HELP) kit.hint(SAY_AT[stop.kind]);
+      if (event.key.length !== 1 || now.phase !== 'waiting') return;
+      const count = others + 1;
+      live.current = { ...live.current, otherKeys: count };
+      if (count === OTHER_KEYS_BEFORE_HELP) kit.hint(SAY_AT[at.kind]);
       return;
     }
     event.preventDefault();
     light(event.code);
-    const { state, result } = press(walk, level, key);
+    const { state, result } = press(now, level, key);
     if (result === 'go') {
+      live.current = { walk: state, otherKeys: 0 };
       setWalk(state);
       setWrongHere(0);
-      setOtherKeys(0);
-      kit.play(stop.kind === 'jump' ? 'whoosh' : 'open');
+      kit.play(at.kind === 'jump' ? 'whoosh' : 'open');
     } else if (result === 'hop') {
       setHops((count) => count + 1);
       kit.play('tap');

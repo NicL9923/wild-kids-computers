@@ -506,6 +506,29 @@ function renderDesk() {
   return { placed, item: screen.getByText('window'), loseArea };
 }
 
+describe('useCarry when input comes faster than the screen draws', () => {
+  it('reads every key from the newest pick-up and choice: three arrows go three places on', () => {
+    const { log } = renderPicnic();
+    const pear = screen.getByText('pear');
+    // The pear starts on the basket; three steps along basket and plate end on the plate.
+    act(() => {
+      for (const name of ['Enter', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'Enter']) key(pear, name);
+    });
+    expect(log.drops).toEqual(['pear -> plate']);
+  });
+
+  it('drops a quick drag whose release lands before the move is drawn', () => {
+    const { kit, log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    act(() => {
+      move({ x: 450, y: 50 });
+      up({ x: 450, y: 50 });
+    });
+    expect(log.drops).toEqual(['apple -> basket']);
+    expect(kit.sounds).toEqual(['pick-up', 'put-down']);
+  });
+});
+
 describe('useCarry with free positions', () => {
   it('places the item where it was dragged', () => {
     const { placed, item } = renderDesk();

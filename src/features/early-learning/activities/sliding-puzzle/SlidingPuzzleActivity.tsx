@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useActivityKeys } from '../../../../activityShell/activityKeys.ts';
 import type { ActivityProps } from '../../../../activityShell/kit.ts';
 import { t } from '../../../../core/strings/defineStrings.ts';
@@ -22,11 +22,15 @@ const KEY_OFFSETS: Readonly<Record<string, readonly [dx: number, dy: number]>> =
  * the arrow keys slide the tile on the far side of the space toward it. A tile that cannot slide
  * gives a little wobble. After two of those, the tiles that can slide glow. From band-6-8 up each
  * tile shows its number, and the finished picture stays small beside the board.
+ *
+ * Keys can come faster than the screen draws, so a move reads and writes the board and the stuck
+ * count in one live record, never the values of the last render.
  */
 export default function SlidingPuzzleActivity({ level, band, kit }: ActivityProps<SlidingLevel>) {
   const [board, setBoard] = useState<Board>(level.board);
   const [stuck, setStuck] = useState(0);
   const [wobble, setWobble] = useState<{ tile: number; count: number } | null>(null);
+  const live = useRef({ board, stuck });
   const done = isSolved(board);
   const space = board.indexOf(null);
   const movable = new Set(neighborsOf(space, level.columns, level.rows));
@@ -35,17 +39,20 @@ export default function SlidingPuzzleActivity({ level, band, kit }: ActivityProp
   const numbered = band !== 'band-3-5';
 
   function move(index: number, element: HTMLElement | undefined): void {
-    if (done) return;
-    const next = slide(board, index, level.columns, level.rows);
+    const { board: now, stuck: stuckSoFar } = live.current;
+    if (isSolved(now)) return;
+    const next = slide(now, index, level.columns, level.rows);
     if (next === null) {
-      const tile = board[index];
-      if (tile != null) setWobble({ tile, count: (wobble?.count ?? 0) + 1 });
+      const tile = now[index];
+      if (tile != null) setWobble((current) => ({ tile, count: (current?.count ?? 0) + 1 }));
       kit.feedback.wrong({ at: element, silent: true });
-      const count = stuck + 1;
+      const count = stuckSoFar + 1;
+      live.current = { ...live.current, stuck: count };
       setStuck(count);
       if (count === HINT_AFTER_TRIES) kit.hint(strings.canMove);
       return;
     }
+    live.current = { board: next, stuck: 0 };
     setBoard(next);
     setStuck(0);
     kit.play('tap');
@@ -58,10 +65,11 @@ export default function SlidingPuzzleActivity({ level, band, kit }: ActivityProp
 
   useActivityKeys(kit, (event) => {
     const offset = KEY_OFFSETS[event.key];
-    if (offset === undefined || done) return;
+    const gap = live.current.board.indexOf(null);
+    if (offset === undefined || isSolved(live.current.board)) return;
     event.preventDefault();
-    const x = (space % level.columns) + offset[0];
-    const y = Math.floor(space / level.columns) + offset[1];
+    const x = (gap % level.columns) + offset[0];
+    const y = Math.floor(gap / level.columns) + offset[1];
     if (x < 0 || y < 0 || x >= level.columns || y >= level.rows) {
       kit.feedback.wrong({ silent: true });
       return;

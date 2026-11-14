@@ -24,6 +24,10 @@ function startEditor(level: FixLevel): TextEditorState {
  * with one small slip in a real text field. Typing, Backspace, Delete, the arrows, Shift
  * selection, and undo all work as on a real computer. A change that takes the text further from
  * the sentence gets a quiet nudge and can be undone; after two, the slip is marked.
+ *
+ * Several edits can land before React draws, so the edit handler reads and writes the text, the
+ * wrong count, and whether the sentence is fixed in live records, never the values of the last
+ * render.
  */
 export default function FixTheSentenceActivity({ level, kit }: ActivityProps<FixLevel>) {
   const os = usePlatformOs();
@@ -34,6 +38,7 @@ export default function FixTheSentenceActivity({ level, kit }: ActivityProps<Fix
   const field = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
   const text = useRef(level.start);
+  const live = useRef({ wrong, fixed });
   const editorField = useRef<EditorFieldHandle>(null);
   const sentence = SENTENCE_SPEECH[level.sentence];
   const tip = tipFor(level, os);
@@ -71,20 +76,22 @@ export default function FixTheSentenceActivity({ level, kit }: ActivityProps<Fix
   });
 
   function onEdit(result: TextOpResult): void {
-    if (fixed) return;
+    if (live.current.fixed) return;
     setEditor(result.editor);
     if (!result.changed) return;
     const before = text.current;
     const after = result.editor.text;
     text.current = after;
     if (after === level.target) {
+      live.current = { ...live.current, fixed: true };
       setFixed(true);
       kit.feedback.correct({ at: field.current ?? undefined, say: strings.fixed });
       kit.scope.setTimeout(() => kit.roundComplete(), FIXED_PAUSE_MS);
       return;
     }
     if (editDistance(after, level.target) <= editDistance(before, level.target)) return;
-    const count = wrong + 1;
+    const count = live.current.wrong + 1;
+    live.current = { ...live.current, wrong: count };
     setWrong(count);
     kit.feedback.wrong({ at: field.current ?? undefined });
     if (count === WRONG_BEFORE_HELP) kit.hint(level.marked ? tip : strings.showMark);

@@ -34,6 +34,9 @@ function KeyCap({ main, under, shift }: { main: string; under?: string; shift?: 
  * One thing to type at a time that needs Shift: a capital, a sign, or a short word. The keys to
  * hold and press are drawn as key caps and lit on the keyboard picture. Pressing the key without
  * Shift says to keep Shift held down; a key that is not the one changes nothing but a quiet nudge.
+ *
+ * Keys can come faster than the screen draws, so the key handler reads and writes the item, the
+ * characters typed, and the wrong count in one live record, never the values of the last render.
  */
 export default function BigLettersActivity({ level, kit }: ActivityProps<ShiftLevel>) {
   const [index, setIndex] = useState(0);
@@ -42,6 +45,7 @@ export default function BigLettersActivity({ level, kit }: ActivityProps<ShiftLe
   const [capsLock, setCapsLock] = useState(false);
   const [pressed, setPressed] = useState<string | null>(null);
   const chars = useRef<HTMLSpanElement>(null);
+  const live = useRef({ index, typed, wrong });
   const item = level.items[index];
   if (item === undefined) throw new RangeError('A big-letters level has at least one item.');
   const want = item.chars[typed];
@@ -63,7 +67,11 @@ export default function BigLettersActivity({ level, kit }: ActivityProps<ShiftLe
   }
 
   useActivityKeys(kit, (event) => {
-    if (done || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    const { index: at, typed: filledSoFar, wrong: wrongSoFar } = live.current;
+    const current = level.items[at];
+    const char = current?.chars[filledSoFar];
+    if (current === undefined || char === undefined) return;
+    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === 'CapsLock') {
       setCapsLock(event.getModifierState('CapsLock'));
       return;
@@ -72,32 +80,38 @@ export default function BigLettersActivity({ level, kit }: ActivityProps<ShiftLe
     if (Array.from(event.key).length !== 1) return;
     event.preventDefault();
     light(event.code);
-    const kind = judge(event, want);
+    const kind = judge(event, char);
     setCapsLock(event.getModifierState('CapsLock'));
     if (kind === 'caps-lock') {
       kit.hint(strings.capsLock);
       return;
     }
     if (kind !== 'right') {
-      const count = wrong + 1;
+      const count = wrongSoFar + 1;
+      live.current = { ...live.current, wrong: count };
       setWrong(count);
       const say = kind === 'no-shift' ? strings.holdShift : kind === 'extra-shift' ? strings.letGo : undefined;
-      kit.feedback.wrong({ at: chars.current?.children[typed] ?? undefined, ...(say === undefined ? {} : { say }) });
-      if (count === WRONG_BEFORE_HELP && kind === 'other') kit.hint(charSpeech(want.char)[0]);
+      kit.feedback.wrong({
+        at: chars.current?.children[filledSoFar] ?? undefined,
+        ...(say === undefined ? {} : { say }),
+      });
+      if (count === WRONG_BEFORE_HELP && kind === 'other') kit.hint(charSpeech(char.char)[0]);
       return;
     }
     kit.play('key-tap');
+    const filled = filledSoFar + 1;
+    live.current = { index: at, typed: filled, wrong: 0 };
     setWrong(0);
-    const filled = typed + 1;
     setTyped(filled);
-    if (filled < item.chars.length) return;
+    if (filled < current.chars.length) return;
     kit.feedback.correct({ at: chars.current ?? undefined });
     kit.scope.setTimeout(() => {
-      if (index + 1 >= level.items.length) {
+      if (at + 1 >= level.items.length) {
         kit.roundComplete();
         return;
       }
-      setIndex(index + 1);
+      live.current = { index: at + 1, typed: 0, wrong: 0 };
+      setIndex(at + 1);
       setTyped(0);
       setWrong(0);
     }, NEXT_ITEM_MS);

@@ -39,12 +39,16 @@ function toMeadow(event: PointerEvent<HTMLDivElement>): Point {
  * A grassy meadow of sleeping buds. Wherever the pointer moves, a soft light follows it and every
  * bud within reach opens at once. There is nothing to click and nothing to get wrong. When three
  * quarters of the meadow is awake, the rest opens too and the round ends.
+ *
+ * Pointer moves can come faster than the screen draws, so the move handler reads and writes the
+ * awake buds in a live record, never the set of the last render.
  */
 export default function WakeTheMeadowActivity({ level, kit }: ActivityProps<MeadowLevel>) {
   const [awake, setAwake] = useState<ReadonlySet<string>>(new Set());
   const halo = useRef<HTMLDivElement>(null);
   const last = useRef<Point | null>(null);
   const lastSound = useRef(Number.NEGATIVE_INFINITY);
+  const live = useRef({ awake });
   const done = awake.size === level.buds.length;
 
   function moved(event: PointerEvent<HTMLDivElement>): void {
@@ -57,21 +61,25 @@ export default function WakeTheMeadowActivity({ level, kit }: ActivityProps<Mead
     }
     const from = last.current ?? at;
     last.current = at;
-    if (done) return;
-    const woken = budsWokenBy(level, from, at).filter((id) => !awake.has(id));
+    const before = live.current.awake;
+    if (before.size === level.buds.length) return;
+    const woken = budsWokenBy(level, from, at).filter((id) => !before.has(id));
     if (woken.length === 0) return;
-    const next = new Set([...awake, ...woken]);
+    const next = new Set([...before, ...woken]);
     const now = kit.clock.monotonic();
     if (now - lastSound.current >= BLOOM_SOUND_GAP_MS) {
       lastSound.current = now;
       kit.play('bloom');
     }
     if (next.size < level.needed) {
+      live.current = { awake: next };
       setAwake(next);
       return;
     }
     // Enough of the meadow is awake: the rest opens too, and the round ends after a look.
-    setAwake(new Set(level.buds.map((bud) => bud.id)));
+    const all = new Set(level.buds.map((bud) => bud.id));
+    live.current = { awake: all };
+    setAwake(all);
     kit.feedback.correct();
     kit.scope.setTimeout(() => kit.roundComplete(), AWAKE_PAUSE_MS);
   }

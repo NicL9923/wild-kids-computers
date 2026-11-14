@@ -17,6 +17,8 @@ import {
 import type { LaunchedApp } from '../support/launchApp.ts';
 
 const SEED = 20_261_114;
+/** A pinned kit clock holds the pressed key's light on until the test has looked at it. */
+const PINNED = Date.UTC(2026, 10, 14, 10);
 
 let launched: LaunchedApp | undefined;
 
@@ -67,7 +69,7 @@ forEachBand(activity.bands, (band) => {
 
   test('a different letter gets a gentle nudge, and after two the right key lights up', async () => {
     const { max } = rangeOf(band);
-    launched = await openActivity({ activity: activity.id, band, seed: SEED, difficulty: max });
+    launched = await openActivity({ activity: activity.id, band, seed: SEED, difficulty: max, pinClockAt: PINNED });
     const { page } = launched;
     const level = generateLevel(roundSeed(SEED, 0), max, band);
     const [first] = level.letters;

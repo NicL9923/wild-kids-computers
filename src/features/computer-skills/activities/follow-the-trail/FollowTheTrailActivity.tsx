@@ -43,6 +43,9 @@ function placeAt(point: Point, size: number) {
  * bug walks along with the pointer while the pointer is on the path beside it, leaving a trail of
  * footprints. When the pointer leaves, the bug waits with a soft ring around it, and nothing goes
  * back. The round ends when the bug reaches its flower.
+ *
+ * Pointer moves can come faster than the screen draws, so the handlers read and write the walk and
+ * the arrival in one live record, never the values of the last render.
  */
 export default function FollowTheTrailActivity({ level, kit }: ActivityProps<TrailLevel>) {
   const [walk, setWalk] = useState<Walk>({ progress: 0, with: false });
@@ -50,6 +53,7 @@ export default function FollowTheTrailActivity({ level, kit }: ActivityProps<Tra
   const last = useRef<Point | null>(null);
   const leaves = useRef(0);
   const home = useRef<HTMLDivElement>(null);
+  const live = useRef({ walk, done });
   const line = level.points.map((point) => `${String(point.x)},${String(point.y)}`).join(' ');
   const walked = [
     ...level.points.filter((_, index) => (level.along[index] ?? 0) <= walk.progress),
@@ -60,31 +64,37 @@ export default function FollowTheTrailActivity({ level, kit }: ActivityProps<Tra
   const bugSize = Math.max(level.width * 1.1, 96);
 
   function moveTo(next: Walk): void {
-    if (Math.floor(next.progress / STEP_SOUND_EVERY) > Math.floor(walk.progress / STEP_SOUND_EVERY)) kit.play('tap');
-    if (walk.with && !next.with) {
+    const before = live.current.walk;
+    if (Math.floor(next.progress / STEP_SOUND_EVERY) > Math.floor(before.progress / STEP_SOUND_EVERY)) kit.play('tap');
+    if (before.with && !next.with) {
       leaves.current += 1;
       if (leaves.current % LEAVES_PER_HINT === 0) kit.hint(strings.findTheBug);
     }
+    live.current = { walk: next, done: false };
     setWalk(next);
     if (!arrived(level, next.progress)) return;
+    const end = { progress: lengthOf(level), with: true };
+    live.current = { walk: end, done: true };
     setDone(true);
-    setWalk({ progress: lengthOf(level), with: true });
+    setWalk(end);
     kit.feedback.correct({ at: home.current ?? undefined });
     kit.scope.setTimeout(() => kit.roundComplete({ mistakes: leaves.current }), ARRIVE_PAUSE_MS);
   }
 
   function moved(event: PointerEvent<HTMLDivElement>): void {
-    if (done) return;
+    const { walk: now, done: over } = live.current;
+    if (over) return;
     const at = toField(event);
     const from = last.current ?? at;
     last.current = at;
-    const next = follow(level, walk.progress, from, at);
-    if (next.progress !== walk.progress || next.with !== walk.with) moveTo(next);
+    const next = follow(level, now.progress, from, at);
+    if (next.progress !== now.progress || next.with !== now.with) moveTo(next);
   }
 
   function left(): void {
     last.current = null;
-    if (!done && walk.with) moveTo({ progress: walk.progress, with: false });
+    const { walk: now, done: over } = live.current;
+    if (!over && now.with) moveTo({ progress: now.progress, with: false });
   }
 
   const bug = pointAt(level, walk.progress);

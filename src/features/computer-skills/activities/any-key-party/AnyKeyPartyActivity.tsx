@@ -19,11 +19,15 @@ const PRESSED_MS = 260;
  * letter or a digit says its name; any other key pops. There is no wrong key. Tab is a party key
  * too, so a child pressing keys at random never moves focus by accident. Escape hands the
  * keyboard back to the page: it moves focus to the replay control, and Tab goes on from there.
+ *
+ * Keys can come faster than the screen draws, so the key handler counts friends in a live record,
+ * never the count of the last render.
  */
 export default function AnyKeyPartyActivity({ level, kit }: ActivityProps<PartyLevel>) {
   const [arrived, setArrived] = useState(0);
   const [pressed, setPressed] = useState<string | null>(null);
   const reminded = useRef(false);
+  const live = useRef({ arrived });
   const full = arrived >= level.friends.length;
 
   function light(code: string): void {
@@ -45,8 +49,9 @@ export default function AnyKeyPartyActivity({ level, kit }: ActivityProps<PartyL
       if (isLetter(key)) void kit.speak(letterNames[key]);
       else if (/^[0-9]$/.test(key)) void kit.speak(numberHandle(Number(key)));
       else kit.play('pop');
-      if (full) return;
-      const next = arrived + 1;
+      if (live.current.arrived >= level.friends.length) return;
+      const next = live.current.arrived + 1;
+      live.current = { arrived: next };
       setArrived(next);
       if (next === level.friends.length) {
         kit.play('sparkle');

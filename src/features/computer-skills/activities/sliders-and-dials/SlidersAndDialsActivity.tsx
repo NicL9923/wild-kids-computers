@@ -17,6 +17,9 @@ const STEP_KEYS: Readonly<Record<string, number>> = { ArrowLeft: -1, ArrowDown: 
  * pointer, and clicks to put it down. A focused knob also moves with the arrow keys. Putting a
  * control down at its flag gives a check mark; elsewhere, a quiet ring. After two misses on one
  * control its flag grows and a faint knob shows the spot.
+ *
+ * Moves and keys can come faster than the screen draws, so the handlers read and write the
+ * values, the misses, and whether all are matched in one live record, never the last render's.
  */
 export default function SlidersAndDialsActivity({ level, kit }: ActivityProps<DialsLevel>) {
   const [values, setValues] = useState<Readonly<Record<string, number>>>(() =>
@@ -24,26 +27,33 @@ export default function SlidersAndDialsActivity({ level, kit }: ActivityProps<Di
   );
   const [misses, setMisses] = useState<Readonly<Record<string, number>>>({});
   const [finished, setFinished] = useState(false);
+  const live = useRef({ values, misses, finished });
 
   function change(control: Control, value: number): void {
-    setValues((current) => ({ ...current, [control.id]: value }));
+    if (live.current.finished) return;
+    const next = { ...live.current.values, [control.id]: value };
+    live.current = { ...live.current, values: next };
+    setValues(next);
   }
 
   /** The control was put down at `value`, by the pointer or the keyboard. */
   function settle(control: Control, value: number, at: HTMLElement | null): void {
-    if (finished) return;
-    const next = { ...values, [control.id]: value };
-    setValues(next);
+    if (live.current.finished) return;
+    change(control, value);
+    const next = live.current.values;
     if (value !== control.target) {
       kit.feedback.wrong({ at: at ?? undefined, silent: true });
-      const count = (misses[control.id] ?? 0) + 1;
-      setMisses({ ...misses, [control.id]: count });
+      const count = (live.current.misses[control.id] ?? 0) + 1;
+      const missed = { ...live.current.misses, [control.id]: count };
+      live.current = { ...live.current, misses: missed };
+      setMisses(missed);
       if (count === MISSES_BEFORE_HELP) kit.hint(strings.lookForFlag);
       return;
     }
     const all = level.controls.every((item) => next[item.id] === item.target);
     kit.feedback.correct({ at: at ?? undefined, ...(all ? { say: feedback.thatsIt } : {}) });
     if (!all) return;
+    live.current = { ...live.current, finished: true };
     setFinished(true);
     kit.scope.setTimeout(() => kit.roundComplete(), ALL_MATCHED_MS);
   }
@@ -54,6 +64,7 @@ export default function SlidersAndDialsActivity({ level, kit }: ActivityProps<Di
     control,
     kit,
     value: values[control.id] ?? control.start,
+    current: () => live.current.values[control.id] ?? control.start,
     helped: (misses[control.id] ?? 0) >= MISSES_BEFORE_HELP,
     locked: finished,
     onChange: (value: number) => change(control, value),
@@ -84,6 +95,8 @@ interface ControlProps {
   readonly control: Control;
   readonly kit: ActivityKit;
   readonly value: number;
+  /** The newest value, which a key or move that lands before the next render reads. */
+  readonly current: () => number;
   readonly helped: boolean;
   readonly locked: boolean;
   readonly onChange: (value: number) => void;
@@ -94,7 +107,7 @@ interface ControlProps {
  * The knob's move: useCarry along x over `track`, plus arrow keys on the focused knob when it is
  * not picked up, which move one stop and count only when they reach the flag.
  */
-function useKnob({ control, kit, value, locked, onChange, onSettle }: ControlProps) {
+function useKnob({ control, kit, current, locked, onChange, onSettle }: ControlProps) {
   const track = useRef<HTMLDivElement>(null);
   const knob = useRef<HTMLButtonElement | null>(null);
   const max = control.stops - 1;
@@ -105,7 +118,7 @@ function useKnob({ control, kit, value, locked, onChange, onSettle }: ControlPro
     min: 0,
     max,
     step: 1,
-    value: () => value,
+    value: current,
     onChange: (_id, next) => {
       if (!locked) onChange(next);
     },
@@ -126,7 +139,7 @@ function useKnob({ control, kit, value, locked, onChange, onSettle }: ControlPro
       const delta = STEP_KEYS[event.key];
       if (event.defaultPrevented || carry.carried !== null || delta === undefined) return;
       event.preventDefault();
-      const next = Math.min(max, Math.max(0, value + delta));
+      const next = Math.min(max, Math.max(0, current() + delta));
       onChange(next);
       if (next === control.target) onSettle(next, event.currentTarget);
     },

@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useCarry } from '../../../../activityShell/carry/useCarry.ts';
 import type { ActivityProps } from '../../../../activityShell/kit.ts';
 import { t } from '../../../../core/strings/defineStrings.ts';
@@ -28,6 +28,9 @@ function trayColumns(count: number): number {
  * its own place; anywhere else it goes back to the tray with the kit's neutral nudge. After two
  * misses with one piece, "Here it is" plays and that piece and its place glow until it lands.
  * While another piece that missed twice is carried, the glow follows the carried one.
+ *
+ * Drops can come faster than the screen draws, so the carry reads and writes the placed pieces and
+ * the misses in one live record, never the values of the last render.
  */
 export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel>) {
   const picture = useJigsawPicture(kit, level);
@@ -36,19 +39,31 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
   /** The last piece that missed twice. It and its place glow from the moment "Here it is" plays. */
   const [hinted, setHinted] = useState<number | null>(null);
   const tray = useRef<HTMLUListElement>(null);
+  const live = useRef({ placed, misses });
   const count = level.columns * level.rows;
   const done = placed.size === count;
 
+  // A placed piece leaves the tray. When it had focus, focus moves to the first piece left, as the
+  // screen draws it, so a keyboard player carries on from there with the very next key.
+  useEffect(() => {
+    if (placed.size === 0 || done) return;
+    if (document.activeElement === null || document.activeElement === document.body) {
+      tray.current?.querySelector<HTMLElement>('[data-carry-item]')?.focus();
+    }
+  }, [placed, done]);
+
   const carry = useCarry<string, string>(kit, {
     kind: 'targets',
-    accepts: (_piece, place) => !placed.has(indexOf(place)),
+    accepts: (_piece, place) => !live.current.placed.has(indexOf(place)),
     onDrop(piece, place) {
       const home = indexOf(piece);
       const where = indexOf(place);
       const at = document.querySelector(`[data-carry-target="${place}"]`) ?? undefined;
       if (home !== where) {
-        const tries = (misses.get(home) ?? 0) + 1;
-        setMisses(new Map(misses).set(home, tries));
+        const tries = (live.current.misses.get(home) ?? 0) + 1;
+        const missed = new Map(live.current.misses).set(home, tries);
+        live.current = { ...live.current, misses: missed };
+        setMisses(missed);
         kit.feedback.wrong({ at });
         if (tries === HINT_AFTER_TRIES) {
           setHinted(home);
@@ -58,13 +73,9 @@ export default function JigsawActivity({ level, kit }: ActivityProps<JigsawLevel
         }
         return;
       }
-      const next = new Set(placed).add(home);
+      const next = new Set(live.current.placed).add(home);
+      live.current = { ...live.current, placed: next };
       setPlaced(next);
-      // Focus goes on to the next piece in the tray, so a keyboard player carries on from there.
-      kit.scope.setTimeout(() => {
-        const lost = document.activeElement === null || document.activeElement === document.body;
-        if (lost) tray.current?.querySelector<HTMLElement>('[data-carry-item]')?.focus();
-      }, 0);
       if (next.size === count) {
         kit.feedback.correct({ at });
         void kit.speak(feedback.allDone);
