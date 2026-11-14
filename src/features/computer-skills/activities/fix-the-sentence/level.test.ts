@@ -3,6 +3,7 @@ import { createToyClipboard } from '../../../../app/inputGuards.ts';
 import { applyTextOp, createEditor } from '../../../toy-desktop/model/textEditor.ts';
 import activity from './activity.ts';
 import {
+  changedWord,
   differingRange,
   editDistance,
   generateLevel,
@@ -13,10 +14,20 @@ import {
   type FixLevel,
 } from './level.ts';
 import { strings } from './strings.ts';
-import { capLabel, SENTENCE_SPEECH, tipFor } from './tips.ts';
+import { CAP_KEYS, capLabel, SENTENCE_SPEECH, tipFor } from './tips.ts';
 
 const SEEDS = Array.from({ length: 400 }, (_, index) => index * 3571 + 9);
 const DIFFICULTIES = Array.from({ length: MAX_FIX_DIFFICULTY }, (_, index) => index + 1);
+
+/** Where the slips start, across the seeds, at one difficulty. */
+function slipPlaces(difficulty: number): Set<number | undefined> {
+  return new Set(
+    SEEDS.map((seed) => {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      return differingRange(level.start, level.target)?.start;
+    }),
+  );
+}
 
 /** Runs one key through the real text model from the level's start. */
 function press(level: FixLevel, op: 'backspace' | 'delete'): string {
@@ -58,6 +69,67 @@ describe('generateLevel', () => {
         const extra = wordsOf(level.start).filter((word) => !wordsOf(level.target).some((w) => w.text === word.text));
         expect(extra.length, level.start).toBeLessThanOrEqual(1);
       }
+    }
+  });
+
+  it('makes the slip its kind says: a letter more or less, a changed letter, or a word more', () => {
+    for (const difficulty of DIFFICULTIES) {
+      for (const seed of SEEDS) {
+        const level = generateLevel(seed, difficulty, 'band-9-12');
+        const range = differingRange(level.start, level.target);
+        const swap = SENTENCES.find((sentence) => sentence.id === level.sentence)?.swap ?? ['', ''];
+        const expected = {
+          'extra-letter': 1,
+          'missing-letter': -1,
+          'changed-letter': 0,
+          // A doubled word and its space: the whole part that differs.
+          'extra-word': (range?.end ?? 0) - (range?.start ?? 0),
+          'changed-word': swap[1].length - swap[0].length,
+        }[level.kind];
+        // How much longer the field's text is than the sentence.
+        expect(level.start.length - level.target.length, level.start).toBe(expected);
+        expect(wordsOf(level.start).length - wordsOf(level.target).length, level.start).toBe(
+          level.kind === 'extra-word' ? 1 : 0,
+        );
+      }
+    }
+  });
+
+  it('never doubles the last word, so the extra word never sits against the full stop', () => {
+    for (const seed of SEEDS) {
+      const words = wordsOf(generateLevel(seed, 6, 'band-9-12').start).map((word) => word.text);
+      expect(words.at(-1)).not.toBe(words.at(-2));
+    }
+  });
+
+  it('changes one thing at a time: the slip, where the caret starts, the mark, and the keys shown', () => {
+    // The steps are the design: one key beside the caret first, then the arrows, then a word and
+    // Shift for selecting, then no mark.
+    expect(
+      STEPS.map((step) => `${step.kinds.join(',')} | ${step.caret} ${String(step.marked)} | ${step.keys.join(' ')}`),
+    ).toEqual([
+      'extra-letter | after true | backspace',
+      'extra-letter | before true | delete',
+      'extra-letter | end true | left right backspace delete',
+      'missing-letter | end true | left right',
+      'changed-letter | end true | left right backspace',
+      'extra-word | end true | shift left right backspace',
+      'changed-word | end false | shift left right backspace',
+      'missing-letter,changed-letter,extra-word,changed-word | start false | shift left right backspace delete',
+    ]);
+  });
+
+  it('doubles letters and words from all over the sentence', () => {
+    expect(slipPlaces(1).size).toBeGreaterThan(15);
+    expect(slipPlaces(6).size).toBeGreaterThan(5);
+  });
+
+  it('marks the extra letter of a run, such as a third "e" in "sleeps", right beside the caret', () => {
+    for (const seed of SEEDS) {
+      const level = generateLevel(seed, 1, 'band-6-8');
+      const range = differingRange(level.start, level.target);
+      expect(range?.end).toBe(level.caret);
+      expect(level.start.charAt(level.caret - 1)).toMatch(/[A-Za-z]/);
     }
   });
 
@@ -156,6 +228,16 @@ describe('sentences', () => {
   });
 });
 
+describe('changedWord', () => {
+  it('changes the swap word', () => {
+    expect(changedWord({ text: 'A red hat.', swap: ['red', 'blue'] })).toBe('A blue hat.');
+  });
+
+  it('rejects a sentence that does not hold its swap word', () => {
+    expect(() => changedWord({ text: 'A red hat.', swap: ['green', 'blue'] })).toThrow(/has no word "green"/);
+  });
+});
+
 describe('differingRange', () => {
   it.each([
     ['The caat naps.', 'The cat naps.', { start: 6, end: 7 }],
@@ -197,10 +279,26 @@ describe('tips', () => {
     expect(tipFor({ kind, caretStart, mixed }, os)).toBe(tip);
   });
 
-  it('names Backspace and Delete as the keyboard prints them', () => {
-    expect(capLabel('backspace', 'windows')).toBe(strings.capBackspace);
-    expect(capLabel('backspace', 'mac')).toBe(strings.capBackspaceMac);
-    expect(capLabel('delete', 'linux')).toBe(strings.capDelete);
-    expect(capLabel('delete', 'mac')).toBe(strings.capDeleteMac);
+  it.each([
+    ['left', 'linux', strings.capLeft],
+    ['right', 'mac', strings.capRight],
+    ['shift', 'windows', strings.capShift],
+    ['backspace', 'windows', strings.capBackspace],
+    ['backspace', 'mac', strings.capBackspaceMac],
+    ['delete', 'linux', strings.capDelete],
+    ['delete', 'mac', strings.capDeleteMac],
+  ] as const)('labels the %s key on %s as the keyboard prints it', (key, os, label) => {
+    expect(capLabel(key, os)).toBe(label);
+  });
+
+  it('lights each key cap for the KeyboardEvent key it stands for', () => {
+    // These are the browser's own key names; a cap lights only when they match.
+    expect(CAP_KEYS).toEqual({
+      left: 'ArrowLeft',
+      right: 'ArrowRight',
+      shift: 'Shift',
+      backspace: 'Backspace',
+      delete: 'Delete',
+    });
   });
 });

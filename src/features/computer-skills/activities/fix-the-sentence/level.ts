@@ -109,38 +109,24 @@ export function wordsOf(text: string): Word[] {
   return Array.from(text.matchAll(/[A-Za-z]+/g), (match) => ({ text: match[0], at: match.index }));
 }
 
-interface Slip {
-  readonly start: string;
-  /** Offsets in `start` just before and just after the slip. */
-  readonly before: number;
-  readonly after: number;
-}
-
 function splice(text: string, at: number, remove: number, insert: string): string {
   return text.slice(0, at) + insert + text.slice(at + remove);
 }
 
-function extraLetter(sentence: Sentence, random: Random): Slip {
-  // A letter with no twin beside it, so the doubled pair is the only run of that letter and the
-  // caret lands right beside the extra one.
-  const places = wordsOf(sentence.text).flatMap((word) =>
-    Array.from(word.text, (letter, index) => ({ word, index, letter })).filter(
-      ({ word: { text }, index, letter }) => index > 0 && text[index - 1] !== letter && text[index + 1] !== letter,
-    ),
-  );
-  const { word, index } = random.pick(places);
-  const at = word.at + index + 1;
-  return { start: splice(sentence.text, at - 1, 0, word.text.charAt(index)), before: at, after: at + 1 };
+function extraLetter(sentence: Sentence, random: Random): string {
+  // A letter typed twice. In a run such as the "ee" of "sleeps", the extra one is the last of the
+  // run, which is where the caret starts.
+  const letter = random.pick(Array.from(sentence.text.matchAll(/[A-Za-z]/g)));
+  return splice(sentence.text, letter.index, 0, letter[0]);
 }
 
-function missingLetter(sentence: Sentence, random: Random): Slip {
+function missingLetter(sentence: Sentence, random: Random): string {
   // Keep the first and last letters, so the word still looks like itself.
   const word = random.pick(wordsOf(sentence.text).filter((entry) => entry.text.length >= 4));
-  const at = word.at + random.int(1, word.text.length - 2);
-  return { start: splice(sentence.text, at, 1, ''), before: at, after: at };
+  return splice(sentence.text, word.at + random.int(1, word.text.length - 2), 1, '');
 }
 
-function changedLetter(sentence: Sentence, random: Random): Slip {
+function changedLetter(sentence: Sentence, random: Random): string {
   const vowels = wordsOf(sentence.text).flatMap((word) =>
     Array.from(word.text, (letter, index) => ({ letter, at: word.at + index })).filter((entry) =>
       (VOWELS as readonly string[]).includes(entry.letter),
@@ -148,25 +134,25 @@ function changedLetter(sentence: Sentence, random: Random): Slip {
   );
   const { letter, at } = random.pick(vowels);
   const other = random.pick(VOWELS.filter((vowel) => vowel !== letter));
-  return { start: splice(sentence.text, at, 1, other), before: at, after: at + 1 };
+  return splice(sentence.text, at, 1, other);
 }
 
-function extraWord(sentence: Sentence, random: Random): Slip {
+function extraWord(sentence: Sentence, random: Random): string {
   // Not the last word, so the doubled word never sits against the full stop.
-  const words = wordsOf(sentence.text).slice(0, -1);
-  const word = random.pick(words);
-  const at = word.at + word.text.length;
-  return { start: splice(sentence.text, at, 0, ` ${word.text}`), before: at, after: at + word.text.length + 1 };
+  const word = random.pick(wordsOf(sentence.text).slice(0, -1));
+  return splice(sentence.text, word.at + word.text.length, 0, ` ${word.text}`);
 }
 
-function changedWord(sentence: Sentence): Slip {
+/** The sentence with its swap word changed. Throws when the word is not in the sentence. */
+export function changedWord(sentence: Pick<Sentence, 'text' | 'swap'>): string {
   const [from, to] = sentence.swap;
   const word = wordsOf(sentence.text).find((entry) => entry.text === from);
   if (word === undefined) throw new RangeError(`"${sentence.text}" has no word "${from}" to change.`);
-  return { start: splice(sentence.text, word.at, from.length, to), before: word.at, after: word.at + to.length };
+  return splice(sentence.text, word.at, from.length, to);
 }
 
-function slipFor(kind: SlipKind, sentence: Sentence, random: Random): Slip {
+/** The sentence with one slip of the kind. */
+function slipFor(kind: SlipKind, sentence: Sentence, random: Random): string {
   switch (kind) {
     case 'extra-letter':
       return extraLetter(sentence, random);
@@ -192,17 +178,19 @@ function stepFor(difficulty: number): Step {
   return step;
 }
 
-function caretAt(start: CaretStart, slip: Slip): number {
+/** Where the caret starts: beside the slip, which is the part that differs, or at one end. */
+function caretAt(start: CaretStart, text: string, target: string): number {
+  const slip = slipRange(text, target);
   switch (start) {
     case 'after':
-      return slip.after;
+      return slip.end;
     case 'before':
-      return slip.before;
+      return slip.start;
     case 'start':
       return 0;
     // 'end', the last case.
     default:
-      return slip.start.length;
+      return text.length;
   }
 }
 
@@ -212,12 +200,12 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
   const random = createRandom(seed);
   const sentence: Sentence = random.pick(SENTENCES);
   const kind = random.pick(step.kinds);
-  const slip = slipFor(kind, sentence, random);
+  const start = slipFor(kind, sentence, random);
   return {
     sentence: sentence.id,
     target: sentence.text,
-    start: slip.start,
-    caret: caretAt(step.caret, slip),
+    start,
+    caret: caretAt(step.caret, start, sentence.text),
     kind,
     mixed: step.kinds.length > 1,
     caretStart: step.caret,
@@ -231,10 +219,15 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
  * missing part gives a range of no width where it belongs.
  */
 export function differingRange(text: string, target: string): { start: number; end: number } | null {
-  if (text === target) return null;
+  return text === target ? null : slipRange(text, target);
+}
+
+/** The part of `text` that differs from `target`, which must differ. */
+function slipRange(text: string, target: string): { start: number; end: number } {
   let start = 0;
   const shortest = Math.min(text.length, target.length);
-  while (start < shortest && text[start] === target[start]) start += 1;
+  // The texts differ, so this stops at the first difference or at the end of the shorter one.
+  while (text[start] === target[start]) start += 1;
   let tail = 0;
   while (tail < shortest - start && text[text.length - 1 - tail] === target[target.length - 1 - tail]) tail += 1;
   return { start, end: text.length - tail };

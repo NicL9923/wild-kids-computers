@@ -5,7 +5,8 @@ import { t } from '../../../../core/strings/defineStrings.ts';
 import { emojiNames } from '../../../../core/strings/shared/index.ts';
 import { KeyboardPicture, type KeyMark } from '../../shared/KeyboardPicture.tsx';
 import './bigLetters.css';
-import { NEXT_ITEM_MS, shiftFor, UNSHIFTED, type ShiftLevel, type TypedChar } from './level.ts';
+import { judge } from './judge.ts';
+import { NEXT_ITEM_MS, shiftFor, UNSHIFTED, type ShiftLevel } from './level.ts';
 import { charSpeech, itemSpeech } from './speech.ts';
 import { strings } from './strings.ts';
 
@@ -13,19 +14,6 @@ import { strings } from './strings.ts';
 const WRONG_BEFORE_HELP = 2;
 /** How long a pressed key stays lit on the picture. */
 const PRESSED_MS = 300;
-
-/** What a press was, against the character the child should type. */
-type PressKind = 'right' | 'no-shift' | 'extra-shift' | 'caps-lock' | 'other';
-
-function judge(event: KeyboardEvent, want: TypedChar): PressKind {
-  if (event.key === want.char) return 'right';
-  const capsLock = event.getModifierState('CapsLock');
-  if (event.code === want.code) {
-    if (capsLock && want.char.toLowerCase() !== want.char.toUpperCase()) return 'caps-lock';
-    return want.shift ? 'no-shift' : 'extra-shift';
-  }
-  return 'other';
-}
 
 /** A key cap drawn for the combination to press: Shift, the key, or both. */
 function KeyCap({ main, under, shift }: { main: string; under?: string; shift?: boolean }) {

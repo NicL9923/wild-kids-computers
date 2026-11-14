@@ -56,7 +56,7 @@ export function editorKeyAction(press: KeyPress, os: OsFamily, multiline: boolea
   if (modified) {
     const commands = commandsForKey(press, os);
     if (commands.includes('save')) return { kind: 'save' };
-    const op = commands.map((command) => COMMAND_OPS[command]).find((found) => found !== undefined);
+    const [op] = commands.flatMap((command) => COMMAND_OPS[command] ?? []);
     return op === undefined ? null : { kind: 'op', op };
   }
   if (press.key === 'Backspace') return { kind: 'op', op: { type: 'backspace' } };

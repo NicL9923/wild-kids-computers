@@ -56,7 +56,7 @@ const says =
     tidyLines(state.text).join('\n') === lines.join('\n');
 
 /** The offsets of `part` in `text`, as a selection. Throws when it is not there. */
-function select(text: string, part: string): [number, number] {
+export function selectPart(text: string, part: string): [number, number] {
   const at = text.indexOf(part);
   if (at === -1) throw new RangeError(`"${part}" is not in the note.`);
   return [at, at + part.length];
@@ -88,7 +88,7 @@ export const STEPS = [
     id: 'copy',
     teach: ['copy'],
     text: GARDEN,
-    selection: select(GARDEN, 'sunflower'),
+    selection: selectPart(GARDEN, 'sunflower'),
     clipboard: null,
     history: [],
     saved: true,
@@ -108,7 +108,7 @@ export const STEPS = [
     id: 'cut',
     teach: ['cut'],
     text: SOCK,
-    selection: select(SOCK, 'my sock\n'),
+    selection: selectPart(SOCK, 'my sock\n'),
     clipboard: null,
     history: [],
     saved: true,
@@ -139,7 +139,7 @@ export const STEPS = [
     id: 'copy-and-paste',
     teach: ['copy', 'paste'],
     text: ROWS,
-    selection: select(ROWS, 'beans'),
+    selection: selectPart(ROWS, 'beans'),
     clipboard: null,
     history: [],
     saved: true,
@@ -149,7 +149,7 @@ export const STEPS = [
     id: 'cut-and-paste',
     teach: ['cut', 'paste'],
     text: ORDER,
-    selection: select(ORDER, '1. Dig a hole.\n'),
+    selection: selectPart(ORDER, '1. Dig a hole.\n'),
     clipboard: null,
     history: [],
     saved: true,

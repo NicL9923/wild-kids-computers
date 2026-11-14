@@ -4,7 +4,7 @@ import { applyTextOp, createEditor, type TextOp } from '../../../toy-desktop/mod
 import activity from './activity.ts';
 import { generateLevel } from './level.ts';
 import { howToPress, SHORTCUT_TEXT, stepInstruction } from './speech.ts';
-import { STEPS, tidyLines, type NoteState, type StepId, type WorkshopStep } from './steps.ts';
+import { selectPart, STEPS, tidyLines, type NoteState, type StepId, type WorkshopStep } from './steps.ts';
 import { strings } from './strings.ts';
 
 /** A child's keys for a step, as editing operations, with 'save' for the save shortcut. */
@@ -91,6 +91,31 @@ describe('the steps', () => {
     ['all-together', [{ type: 'move', move: 'line-end', extend: true }, { type: 'copy' }, toEnd, { type: 'paste' }]],
   ] as const)('%s is not done by a near miss', (id, moves) => {
     expect(step(id).done(play(step(id), moves))).toBe(false);
+  });
+
+  it('leaves each note saying what the step asked for', () => {
+    // The notes are the lesson's content: what the child sees change, step by step.
+    const after = Object.fromEntries(
+      STEPS.map((entry) => [entry.id, tidyLines(play(entry, SOLUTIONS[entry.id]).text)]),
+    );
+    expect(after).toEqual({
+      'select-all': ['Garden list', 'sunflower seeds', 'a watering can', 'gloves'],
+      copy: ['Garden list', 'sunflower seeds', 'a watering can', 'gloves'],
+      paste: ['Flowers to plant:', 'sunflower', 'daisy', 'tulip'],
+      cut: ['Garden list', 'seeds', 'gloves'],
+      undo: ['Bring a hat and a snack.'],
+      save: ['Plant the beans on Monday.'],
+      'copy-and-paste': ['Row 1: beans', 'Row 2: beans'],
+      'cut-and-paste': ['1. Dig a hole.', '2. Water them.'],
+      'undo-twice': ['Pack the big red blanket.'],
+      'all-together': ['Seed packets', 'keep them dry', 'Seed packets'],
+    });
+  });
+
+  it('selects a part of the note by its text, and rejects a part that is not there', () => {
+    expect(selectPart('a red hat', 'red')).toEqual([2, 5]);
+    expect(selectPart('red hat', 'red')).toEqual([0, 3]);
+    expect(() => selectPart('a red hat', 'blue')).toThrow(/"blue" is not in the note/);
   });
 
   it('counts a pasted line with or without its line break, and tidy spaces', () => {

@@ -66,6 +66,17 @@ describe('generateLevel', () => {
     }
   });
 
+  it('marks every item by what it is: a capital, a sign, or a word', () => {
+    for (const difficulty of DIFFICULTIES) {
+      for (const seed of SEEDS) {
+        for (const item of generateLevel(seed, difficulty, 'band-9-12').items) {
+          const kind = item.text.length > 1 ? 'word' : /^[A-Z]$/.test(item.text) ? 'capital' : 'sign';
+          expect(item.kind, item.text).toBe(kind);
+        }
+      }
+    }
+  });
+
   it('keeps punctuation signs out until difficulty 5, and reaches every sign there', () => {
     const punctuation = Object.keys(PUNCTUATION_SIGNS);
     const early = new Set(SEEDS.flatMap((seed) => generateLevel(seed, 4, 'band-6-8').items.map((item) => item.text)));
@@ -107,15 +118,15 @@ describe('typedChar', () => {
 });
 
 describe('shiftFor', () => {
-  it.each([
-    ['KeyA', 'ShiftRight'],
-    ['Digit5', 'ShiftRight'],
-    ['KeyB', 'ShiftRight'],
-    ['KeyY', 'ShiftLeft'],
-    ['Digit6', 'ShiftLeft'],
-    ['Slash', 'ShiftLeft'],
-  ])('holds Shift with the other hand from %s', (code, shift) => {
-    expect(shiftFor(code)).toBe(shift);
+  it('holds Shift with the other hand from every key on the picture', () => {
+    // The left hand's keys in touch typing: the number row to 5, and the letters left of Y, H, and N.
+    const left = new Set(['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']);
+    for (const letter of 'qwertasdfgzxcvb') left.add(`Key${letter.toUpperCase()}`);
+    const typed = PICTURE_KEYS.filter((key) => key.face.kind === 'letter' || key.face.kind === 'digit');
+    expect(typed.length).toBeGreaterThan(30);
+    for (const key of [...typed.map((entry) => entry.code), 'Backquote', 'Slash', 'Semicolon']) {
+      expect(shiftFor(key), key).toBe(left.has(key) ? 'ShiftRight' : 'ShiftLeft');
+    }
   });
 });
 

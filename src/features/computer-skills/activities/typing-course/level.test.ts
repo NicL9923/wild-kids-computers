@@ -3,7 +3,7 @@ import { PICTURE_KEYS } from '../../shared/keyboardLayout.ts';
 import activity from './activity.ts';
 import { codeFor, fingerFor, LESSONS, SHIFT, shiftFingerFor } from './lessons.ts';
 import { generateLevel } from './level.ts';
-import { keyName, lessonIntro } from './speech.ts';
+import { FINGER_NAMES, keyName, lessonIntro } from './speech.ts';
 import { strings } from './strings.ts';
 
 const PICTURE_CODES = new Set(PICTURE_KEYS.map((key) => key.code));
@@ -101,6 +101,13 @@ describe('fingers', () => {
     expect(() => fingerFor(char)).toThrow(/no finger for/);
     expect(() => codeFor(char)).toThrow(/no key for/);
   });
+
+  it('finds the key of one character only', () => {
+    expect(codeFor('q')).toBe('KeyQ');
+    expect(codeFor('Q')).toBe('KeyQ');
+    expect(() => codeFor('qa')).toThrow(/no key for/);
+    expect(() => codeFor('1a')).toThrow(/no key for/);
+  });
 });
 
 describe('speech', () => {
@@ -115,6 +122,20 @@ describe('speech', () => {
     expect(practice && lessonIntro(practice)).toEqual([strings.practice]);
     const shift = LESSONS.find((lesson) => lesson.newKeys.includes(SHIFT));
     expect(shift && lessonIntro(shift)).toEqual([strings.newKeyShift]);
+  });
+
+  it('names each finger by its hand and its name', () => {
+    expect(Object.entries(FINGER_NAMES).map(([finger, handle]) => `${finger}: ${handle.text}`)).toEqual([
+      'left-little: left little finger',
+      'left-ring: left ring finger',
+      'left-middle: left middle finger',
+      'left-pointer: left pointer finger',
+      'right-pointer: right pointer finger',
+      'right-middle: right middle finger',
+      'right-ring: right ring finger',
+      'right-little: right little finger',
+      'thumb: thumb',
+    ]);
   });
 
   it('can name every key a lesson brings in', () => {
