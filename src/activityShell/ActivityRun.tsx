@@ -172,11 +172,11 @@ function ActivityRunWithState({
   }, [audio, mainInstruction]);
   const afterRest = useCallback(
     (next: () => void) => {
-      visit.setTimeout(() => {
-        void audio.speechSettled().then(() => {
-          if (!visit.disposed) next();
-        });
-      }, BETWEEN_ROUNDS_MS);
+      const goOn = async (): Promise<void> => {
+        await audio.speechSettled();
+        if (!visit.disposed) next();
+      };
+      visit.setTimeout(() => void goOn(), BETWEEN_ROUNDS_MS);
     },
     [audio, visit],
   );
