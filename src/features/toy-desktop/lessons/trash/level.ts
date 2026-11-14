@@ -80,7 +80,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Tr
     files,
     trash,
     windows: [{ app: 'file-explorer', folder, ...EXPLORER }],
-    settings: { iconSize: 'medium' },
   });
   return {
     pictureId: target.id,

@@ -85,7 +85,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Sa
     size: LESSON_DESKTOP_SIZE,
     files,
     windows: [{ app: 'notepad', text, ...NOTEPAD }],
-    settings: { iconSize: 'medium' },
   });
   return {
     text,

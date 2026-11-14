@@ -99,7 +99,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Co
     ],
     // The child starts where the number is.
     focus: fromCalculator ? 1 : 0,
-    settings: { iconSize: 'medium' },
   });
   // Working out the sum never touches the clipboard; a fresh one keeps the generator pure.
   const desktop = fromCalculator ? reduceAll(built, sumKeys(a, b), { clipboard: createToyClipboard() }).state : built;

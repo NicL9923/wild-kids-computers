@@ -3,6 +3,7 @@ import type { Band } from '../../../../core/bands.ts';
 import type { DesktopAction, DialogAction } from '../../model/desktop.ts';
 import { HOME_ID, listFolder, nodeAtPath } from '../../model/fileSystem.ts';
 import { hasUnsavedChanges, type DesktopState } from '../../model/state.ts';
+import { withDefaults } from '../../desktop/parts.ts';
 import { LESSON_DESKTOP_SIZE } from '../harness/lesson.ts';
 import { playSteps } from '../harness/playSteps.ts';
 import activity from './activity.ts';
@@ -189,5 +190,26 @@ describe('save and open steps', () => {
       dialog('w1', { type: 'confirm' }),
     ]);
     expect(played).toMatchObject({ done: 2, wrong: 0, rejected: [] });
+  });
+});
+
+// The layout is the design reviewed in the screenshots.
+describe('save and open layout', () => {
+  it('opens one notepad beside a notepad icon, with the menu bar and a close button', () => {
+    const level = generateLevel(1, 8, 'band-9-12');
+    expect(level.desktop.windows.map((window) => window.rect)).toEqual([{ x: 24, y: 24, width: 600, height: 420 }]);
+    const { icons, ...parts } = withDefaults(level.parts);
+    expect(icons).toEqual([{ app: 'notepad' }]);
+    expect(parts).toEqual({
+      menuBar: true,
+      taskStrip: false,
+      launcher: [],
+      windowControls: ['close'],
+      move: false,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+      hiddenCommands: [],
+    });
   });
 });

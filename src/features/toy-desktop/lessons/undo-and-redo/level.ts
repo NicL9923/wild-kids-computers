@@ -110,33 +110,29 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Un
     windows: specs,
     // The first app to undo in starts in front.
     focus: 0,
-    settings: { iconSize: 'medium' },
   });
   const windows: Partial<Record<UndoApp, string>> = Object.fromEntries(
     shape.apps.map((app, index) => [app, `w${String(index + 1)}`]),
   );
-  const changes: DesktopAction[] = [];
-  if (windows.notepad !== undefined) {
-    for (const letter of word) {
-      changes.push({
-        type: 'text',
-        windowId: windows.notepad,
-        field: 'document',
-        op: { type: 'insert', text: letter },
-      });
-    }
-  }
-  if (windows['music-box'] !== undefined) {
-    changes.push({ type: 'music-box', windowId: windows['music-box'], action: { type: 'toggle', ...dot } });
-  }
+  // The last change in each app: the word typed a letter at a time, or the dot clicked on.
+  const changes = shape.apps.flatMap((app, index): DesktopAction[] => {
+    const windowId = `w${String(index + 1)}`;
+    if (app === 'music-box') return [{ type: 'music-box', windowId, action: { type: 'toggle', ...dot } }];
+    return word.split('').map((letter) => ({
+      type: 'text',
+      windowId,
+      field: 'document',
+      op: { type: 'insert', text: letter },
+    }));
+  });
   // Typing and a click on the grid never touch the clipboard; a fresh one keeps this pure.
   const desktop = reduceAll(built, changes, { clipboard: createToyClipboard() }).state;
   return {
     apps: shape.apps,
     route: shape.route,
     windows,
-    ...(windows.notepad === undefined ? {} : { sentence: { before, after: `${before}${word}` } }),
-    ...(windows['music-box'] === undefined ? {} : { dot }),
+    ...(shape.apps.includes('notepad') ? { sentence: { before, after: `${before}${word}` } } : {}),
+    ...(shape.apps.includes('music-box') ? { dot } : {}),
     parts: parts(shape.route),
     desktop,
   };

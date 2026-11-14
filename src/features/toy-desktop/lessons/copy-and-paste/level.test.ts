@@ -212,3 +212,25 @@ describe('copy and paste steps', () => {
     expect(steps[1]?.hint?.(level.desktop)).toEqual({ kind: 'title-bar', windowId: NOTEPAD_WINDOW });
   });
 });
+
+// The layout is the design reviewed in the screenshots: the calculator is big enough for the
+// band-6-8 keys on the smallest screen, and nothing but the two apps is on the desktop.
+describe('copy and paste layout', () => {
+  it.each([1, 3])('puts the note and the calculator side by side at difficulty %i', (difficulty) => {
+    const level = generateLevel(1, difficulty, 'band-6-8');
+    expect(findWindow(level.desktop, NOTEPAD_WINDOW)?.rect).toEqual({ x: 24, y: 24, width: 340, height: 360 });
+    expect(findWindow(level.desktop, CALCULATOR_WINDOW)?.rect).toEqual({ x: 388, y: 24, width: 316, height: 540 });
+    expect(withDefaults(level.parts)).toEqual({
+      icons: [],
+      menuBar: difficulty === 1,
+      taskStrip: false,
+      launcher: [],
+      windowControls: [],
+      move: false,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+      hiddenCommands: [],
+    });
+  });
+});

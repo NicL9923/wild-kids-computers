@@ -158,3 +158,24 @@ describe('trash steps', () => {
     expect(steps[2]?.hint?.(level.desktop)).toEqual({ kind: 'key', key: `place:${TRASH_ID}` });
   });
 });
+
+// The layout is the design reviewed in the screenshots.
+describe('trash layout', () => {
+  it('opens one big explorer beside the explorer and trash icons', () => {
+    const level = generateLevel(1, 8, 'band-9-12');
+    expect(level.desktop.windows.map((window) => window.rect)).toEqual([{ x: 24, y: 24, width: 680, height: 592 }]);
+    const { icons, ...parts } = withDefaults(level.parts);
+    expect(icons).toEqual([{ app: 'file-explorer' }, { trash: true }]);
+    expect(parts).toEqual({
+      menuBar: true,
+      taskStrip: false,
+      launcher: [],
+      windowControls: ['close'],
+      move: false,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+      hiddenCommands: ['empty-trash'],
+    });
+  });
+});

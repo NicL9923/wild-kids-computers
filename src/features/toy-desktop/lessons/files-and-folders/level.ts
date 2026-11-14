@@ -102,7 +102,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
     size: LESSON_DESKTOP_SIZE,
     files,
     windows: [{ app: 'file-explorer', folder: away?.folder ?? '', ...EXPLORER }],
-    settings: { iconSize: 'medium' },
   });
   return {
     kind: target.kind,

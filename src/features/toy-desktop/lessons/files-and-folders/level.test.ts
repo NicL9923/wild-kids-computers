@@ -199,3 +199,25 @@ describe('files and folders steps', () => {
     expect(awaySteps[0]?.hint?.(away.desktop)).toEqual({ kind: 'key', key: `place:${HOME_ID}` });
   });
 });
+
+// The layout is the design reviewed in the screenshots: one explorer, as big as the lesson
+// desktop allows beside the icon, and only the parts sorting files needs.
+describe('files and folders layout', () => {
+  it('opens one big explorer beside a single explorer icon', () => {
+    const level = generateLevel(1, 8, 'band-9-12');
+    expect(level.desktop.windows.map((window) => window.rect)).toEqual([{ x: 24, y: 24, width: 680, height: 592 }]);
+    const { icons, ...parts } = withDefaults(level.parts);
+    expect(icons).toEqual([{ app: 'file-explorer' }]);
+    expect(parts).toEqual({
+      menuBar: true,
+      taskStrip: false,
+      launcher: [],
+      windowControls: ['close'],
+      move: false,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+      hiddenCommands: ['empty-trash'],
+    });
+  });
+});

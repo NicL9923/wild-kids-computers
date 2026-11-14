@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { DesktopAction } from '../../model/desktop.ts';
 import { ancestry, HOME_ID, isFile, listFolder, searchByName } from '../../model/fileSystem.ts';
+import { pictureSource } from '../../desktop/labels.ts';
 import { withDefaults } from '../../desktop/parts.ts';
 import { LESSON_DESKTOP_SIZE } from '../harness/lesson.ts';
 import { playSteps } from '../harness/playSteps.ts';
 import activity from './activity.ts';
-import { generateLevel, TARGETS, type FindItLevel } from './level.ts';
+import { generateLevel, type FindItLevel } from './level.ts';
+import { TARGETS } from './targets.ts';
 import { FIND, findItSteps } from './steps.ts';
 import { strings } from './strings.ts';
 
@@ -172,5 +174,47 @@ describe('find it steps', () => {
   it('says to open it once it shows', () => {
     expect(steps[1]?.instruction).toBe(strings.openIt);
     expect(listFolder(level.desktop.fs, HOME_ID).length).toBeGreaterThan(0);
+  });
+});
+
+describe('find it layout and files', () => {
+  it('opens one big explorer at home beside an explorer icon', () => {
+    const level = generateLevel(1, 6, 'band-9-12');
+    expect(level.desktop.windows.map((window) => window.rect)).toEqual([{ x: 24, y: 24, width: 680, height: 592 }]);
+    expect(withDefaults(level.parts)).toEqual({
+      icons: [{ app: 'file-explorer' }],
+      menuBar: true,
+      taskStrip: true,
+      launcher: [],
+      windowControls: ['close'],
+      move: true,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+      hiddenCommands: ['empty-trash'],
+    });
+  });
+
+  it('hides no folder deeper than the file’s own folder', () => {
+    for (const seed of SEEDS) {
+      for (const difficulty of [1, 6]) {
+        const level = generateLevel(seed, difficulty, 'band-9-12');
+        const fileDepth = ancestry(level.desktop.fs, level.fileId).length;
+        for (const node of items(level).filter((entry) => entry.kind === 'folder')) {
+          expect(ancestry(level.desktop.fs, node.id).length, `seed ${seed}`).toBeLessThanOrEqual(fileDepth);
+        }
+      }
+    }
+  });
+
+  it('names each file in its instruction, with look-alikes that share a word of its name', () => {
+    for (const [index, target] of TARGETS.entries()) {
+      expect(FIND[index]?.text).toContain(`called ${target.name}.`);
+      for (const decoy of target.decoys) {
+        expect(decoy.name).not.toBe(target.name);
+        expect(words(decoy.name).some((word) => words(target.name).includes(word))).toBe(true);
+      }
+      if (target.spec.kind === 'picture') expect(pictureSource(target.spec.pictureId).kind).toBe('emoji');
+    }
   });
 });

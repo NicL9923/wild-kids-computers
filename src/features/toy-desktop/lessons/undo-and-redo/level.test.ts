@@ -186,3 +186,45 @@ describe('undo and redo steps', () => {
     expect(undoRedoSay('redo', route, os)).toBe(handle);
   });
 });
+
+// The layout is the design reviewed in the screenshots: one app gets the room, two stack with
+// the note above the music box, and nothing else is on the desktop.
+describe('undo and redo layout', () => {
+  it.each([
+    [1, [{ x: 24, y: 24, width: 600, height: 360 }]],
+    [2, [{ x: 24, y: 24, width: 680, height: 480 }]],
+    [
+      3,
+      [
+        { x: 24, y: 24, width: 680, height: 200 },
+        { x: 24, y: 240, width: 680, height: 376 },
+      ],
+    ],
+  ])('places the windows of difficulty %i', (difficulty, rects) => {
+    const level = generateLevel(1, difficulty, 'band-6-8');
+    const ids = level.apps.map((app) => level.windows[app]);
+    expect(ids.map((id) => findWindow(level.desktop, id ?? '')?.rect)).toEqual(rects);
+    expect(withDefaults(level.parts)).toEqual({
+      icons: [],
+      menuBar: true,
+      taskStrip: false,
+      launcher: [],
+      windowControls: [],
+      move: false,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+      hiddenCommands: ['clear'],
+    });
+  });
+
+  it('describes the change of each app in the round, and only those', () => {
+    for (let difficulty = 1; difficulty <= 6; difficulty += 1) {
+      const level = generateLevel(3, difficulty, 'band-9-12');
+      expect(level.sentence !== undefined).toBe(level.apps.includes('notepad'));
+      expect(level.dot !== undefined).toBe(level.apps.includes('music-box'));
+      // The word comes after the start of a sentence, so taking it back leaves words behind.
+      if (level.sentence !== undefined) expect(level.sentence.before.trim()).not.toBe('');
+    }
+  });
+});

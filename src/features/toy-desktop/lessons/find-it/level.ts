@@ -1,90 +1,10 @@
 import { createRandom } from '../../../../core/activityKit/random.ts';
 import type { Band } from '../../../../core/bands.ts';
 import type { DesktopParts } from '../../desktop/parts.ts';
-import { buildDesktop, note, pathId, picture, tune, type FileSpec, type TreeSpec } from '../../model/build.ts';
+import { buildDesktop, pathId, type FileSpec, type TreeSpec } from '../../model/build.ts';
 import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 import { filesOfKind } from '../harness/lessonFiles.ts';
-
-/** A file to find, and files whose names start the same way, to pick it out from. */
-interface Target {
-  readonly name: string;
-  readonly spec: FileSpec;
-  readonly decoys: readonly { readonly name: string; readonly spec: FileSpec }[];
-}
-
-/** Every file a round can ask for. Each has its own spoken instruction. */
-export const TARGETS: readonly Target[] = [
-  {
-    name: 'Kite plan',
-    spec: note('a long tail\nred and blue'),
-    decoys: [
-      { name: 'Kite colors', spec: note('red, blue, green') },
-      { name: 'Kite song', spec: tune([[0, 2]]) },
-    ],
-  },
-  {
-    name: 'Owl facts',
-    spec: note('Owls hunt at night.'),
-    decoys: [
-      { name: 'Owl story', spec: note('An owl found a hat.') },
-      { name: 'Owl hoot', spec: tune([[1, 1]]) },
-    ],
-  },
-  {
-    name: 'Cake recipe',
-    spec: note('flour\neggs\nsugar'),
-    decoys: [
-      { name: 'Cake list', spec: note('candles\nplates') },
-      { name: 'Cake song', spec: tune([[2, 3]]) },
-    ],
-  },
-  {
-    name: 'Frog song',
-    spec: tune([
-      [0, 1],
-      [2, 3],
-    ]),
-    decoys: [
-      { name: 'Frog facts', spec: note('Frogs can jump far.') },
-      { name: 'Frog jump', spec: tune([[3, 4]]) },
-    ],
-  },
-  {
-    name: 'Moon dance',
-    spec: tune([
-      [1, 4],
-      [4, 2],
-    ]),
-    decoys: [
-      { name: 'Moon facts', spec: note('The moon goes round us.') },
-      { name: 'Moon map', spec: note('craters') },
-    ],
-  },
-  {
-    name: 'Boat trip',
-    spec: picture('sailboat'),
-    decoys: [
-      { name: 'Boat list', spec: note('life jackets\nsnacks') },
-      { name: 'Boat song', spec: tune([[0, 0]]) },
-    ],
-  },
-  {
-    name: 'Red tractor',
-    spec: picture('tractor'),
-    decoys: [
-      { name: 'Tractor facts', spec: note('Tractors pull heavy things.') },
-      { name: 'Red kite', spec: note('a red kite') },
-    ],
-  },
-  {
-    name: 'Fox den',
-    spec: picture('fox'),
-    decoys: [
-      { name: 'Fox facts', spec: note('Foxes have bushy tails.') },
-      { name: 'Fox song', spec: tune([[5, 2]]) },
-    ],
-  },
-];
+import { TARGETS } from './targets.ts';
 
 const FOLDER_NAMES = [
   'School',
@@ -190,7 +110,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
     size: LESSON_DESKTOP_SIZE,
     files: home,
     windows: [{ app: 'file-explorer', ...EXPLORER }],
-    settings: { iconSize: 'medium' },
   });
   return { target, fileId: pathId(desktop, path), parts: PARTS, desktop };
 }
