@@ -15,7 +15,7 @@ const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
 
 /** True when the bytes start with the PNG signature. The bridge stores nothing else. */
 export function hasPngSignature(bytes: Uint8Array): boolean {
-  if (bytes.length < PNG_SIGNATURE.length) return false;
+  // A shorter array reads undefined past its end, which matches no signature byte.
   return PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
 }
 

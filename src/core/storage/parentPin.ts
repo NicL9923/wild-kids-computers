@@ -41,11 +41,10 @@ export async function hashParentPin(pin: string, iterations = PIN_ITERATIONS): P
 
 /** True when the PIN matches the record. Compares every byte, whatever the first mismatch. */
 export async function verifyParentPin(pin: string, record: ParentPinRecord): Promise<boolean> {
-  if (!isValidPin(pin)) return false;
   const expected = fromBase64(record.hash);
   const actual = await derive(pin, fromBase64(record.salt), record.iterations);
   if (actual.length !== expected.length) return false;
   let difference = 0;
-  for (let index = 0; index < actual.length; index += 1) difference |= (actual[index] ?? 0) ^ (expected[index] ?? 0);
+  for (const [index, byte] of actual.entries()) difference |= byte ^ (expected[index] ?? 0);
   return difference === 0;
 }

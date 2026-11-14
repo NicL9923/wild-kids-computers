@@ -4,7 +4,7 @@ import { BridgeError, type DocumentStore } from '../platform/bridge.ts';
 import { MAX_DOCUMENT_BYTES } from '../platform/limits.ts';
 import type { DocumentName } from '../platform/names.ts';
 import { defineDocument, loadDocument, parseDocument, saveDocument } from './document.ts';
-import { appDocument } from './schemas.ts';
+import { appDocument, progressDocument } from './schemas.ts';
 
 const NAME: DocumentName = 'app';
 
@@ -49,21 +49,42 @@ describe('parseDocument', () => {
     expect(parseDocument(JSON.stringify({ version: 0, name: 'Hill' }), spec)).toMatchObject({ ok: true });
   });
 
+  // The detail is what a developer reads in the load result, so each case pins it.
   it.each([
-    ['invalid JSON', '{"version":1,', 'invalid-json'],
-    ['null', 'null', 'not-an-object'],
-    ['an array', '[1]', 'not-an-object'],
-    ['a number', '42', 'not-an-object'],
-    ['a missing version', '{"kioskLock":false}', 'bad-version'],
-    ['a string version', '{"version":"1"}', 'bad-version'],
-    ['a fractional version', '{"version":1.5}', 'bad-version'],
-    ['a negative version', '{"version":-1}', 'bad-version'],
-    ['an unknown future version', '{"version":2}', 'future-version'],
-    ['a version with no migration', '{"version":0}', 'no-migration'],
-    ['a wrong field type', JSON.stringify({ ...appDocument.defaults(), kioskLock: 'yes' }), 'invalid'],
-    ['a missing field', JSON.stringify({ version: 1, kioskLock: false }), 'invalid'],
-  ])('rejects %s', (_label, text, reason) => {
-    expect(parseDocument(text, appDocument)).toMatchObject({ ok: false, reason });
+    ['invalid JSON', '{"version":1,', 'invalid-json', expect.stringMatching(/JSON/)],
+    ['null', 'null', 'not-an-object', 'expected an object, got null'],
+    ['an array', '[1]', 'not-an-object', 'expected an object, got an array'],
+    ['a number', '42', 'not-an-object', 'expected an object, got number'],
+    ['a missing version', '{"kioskLock":false}', 'bad-version', 'version is undefined'],
+    ['a string version', '{"version":"1"}', 'bad-version', 'version is the string "1"'],
+    ['a fractional version', '{"version":1.5}', 'bad-version', 'version is number'],
+    ['a negative version', '{"version":-1}', 'bad-version', 'version is number'],
+    ['an unsafe integer version', '{"version":9007199254740993}', 'bad-version', 'version is number'],
+    ['an unknown future version', '{"version":2}', 'future-version', 'version 2 is newer than 1'],
+    ['a version with no migration', '{"version":0}', 'no-migration', 'no migration from version 0'],
+    [
+      'a wrong field type',
+      JSON.stringify({ ...appDocument.defaults(), kioskLock: 'yes' }),
+      'invalid',
+      'kioskLock: Invalid input: expected boolean, received string',
+    ],
+    [
+      'two bad fields',
+      JSON.stringify({ ...appDocument.defaults(), kioskLock: 1, firstLaunchDone: 2 }),
+      'invalid',
+      'firstLaunchDone: Invalid input: expected boolean, received number; kioskLock: Invalid input: expected boolean, received number',
+    ],
+  ])('rejects %s', (_label, text, reason, detail) => {
+    expect(parseDocument(text, appDocument)).toEqual({ ok: false, reason, detail });
+  });
+
+  it('labels a failure of the whole document as the root', () => {
+    const spec = defineDocument({
+      ...appDocument,
+      schema: appDocument.schema.refine((app) => !app.kioskLock || app.firstLaunchDone, 'lock needs setup'),
+    });
+    const text = JSON.stringify({ ...appDocument.defaults(), kioskLock: true });
+    expect(parseDocument(text, spec)).toEqual({ ok: false, reason: 'invalid', detail: '(root): lock needs setup' });
   });
 
   it('names the failing field', () => {
@@ -92,7 +113,11 @@ describe('parseDocument', () => {
     const padTo = (bytes: number) => `${base},"pad":"${'x'.repeat(bytes - base.length - 10)}"}`;
     expect(new TextEncoder().encode(padTo(MAX_DOCUMENT_BYTES)).length).toBe(MAX_DOCUMENT_BYTES);
     expect(parseDocument(padTo(MAX_DOCUMENT_BYTES), appDocument)).toMatchObject({ ok: true });
-    expect(parseDocument(padTo(MAX_DOCUMENT_BYTES + 1), appDocument)).toMatchObject({ ok: false, reason: 'too-large' });
+    expect(parseDocument(padTo(MAX_DOCUMENT_BYTES + 1), appDocument)).toEqual({
+      ok: false,
+      reason: 'too-large',
+      detail: `${MAX_DOCUMENT_BYTES + 1} bytes is over ${MAX_DOCUMENT_BYTES}`,
+    });
     // Two bytes per character: under the cap in characters, over it in bytes.
     const wide = `${base},"pad":"${'é'.repeat(MAX_DOCUMENT_BYTES / 2)}"}`;
     expect(wide.length).toBeLessThan(MAX_DOCUMENT_BYTES);
@@ -202,5 +227,17 @@ describe('saveDocument', () => {
     const bad = { ...appDocument.defaults(), lastActiveProfileId: '../escape' };
     await expect(saveDocument(store, NAME, appDocument, bad)).rejects.toThrow(/lastActiveProfileId/);
     expect(files.size).toBe(0);
+  });
+});
+
+describe('loadDocument with a hostile value', () => {
+  it('sets aside a practice date that would make date parsing throw', async () => {
+    const text = JSON.stringify({
+      version: 1,
+      activities: { 'find-the-key': { recentRounds: [], daysPracticed: ['x2026-11-13'] } },
+    });
+    const { store, setAside } = memoryStore({ 'profile/p1/progress': text });
+    expect(await loadDocument(store, 'profile/p1/progress', progressDocument)).toMatchObject({ status: 'reset' });
+    expect(setAside).toEqual(['profile/p1/progress']);
   });
 });

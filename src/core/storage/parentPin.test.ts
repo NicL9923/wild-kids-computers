@@ -46,7 +46,7 @@ describe('parent PIN hashing', () => {
   });
 
   it('refuses to hash a PIN that is not 4 to 8 digits', async () => {
-    await expect(hashParentPin('12', FAST)).rejects.toThrow(RangeError);
+    await expect(hashParentPin('12', FAST)).rejects.toThrow(new RangeError('A parent PIN is 4 to 8 digits.'));
   });
 
   it('rejects a malformed PIN without deriving anything', async () => {

@@ -56,6 +56,7 @@ describe('parseDocumentName', () => {
     ['a missing activity id', 'profile/p1/activity'],
     ['an empty activity id', 'profile/p1/activity/'],
     ['an extra segment', 'profile/p1/settings/x'],
+    ['an extra segment after progress', 'profile/p1/progress/x'],
     ['an activity with an extra segment', 'profile/p1/activity/a/b'],
     ['a settings document with an id', 'profile/p1/settings'.replace('settings', 'settings.json')],
     ['another root', 'profiles/p1/settings'],
@@ -79,11 +80,11 @@ describe('documentNames', () => {
   });
 
   it.each([
-    ['settings', () => documentNames.settings('../x')],
-    ['progress', () => documentNames.progress('A')],
-    ['activity id', () => documentNames.activity('p1', 'a/b')],
-  ])('throws on an unsafe id in %s', (_label, build) => {
-    expect(build).toThrow(TypeError);
+    ['settings', () => documentNames.settings('../x'), '"../x"'],
+    ['progress', () => documentNames.progress('A'), '"A"'],
+    ['activity id', () => documentNames.activity('p1', 'a/b'), '"a/b"'],
+  ])('throws on an unsafe id in %s and names it', (_label, build, shown) => {
+    expect(build).toThrow(new TypeError(`Not a safe id: ${shown}`));
   });
 });
 

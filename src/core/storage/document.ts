@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { isBridgeError, type DocumentStore } from '../platform/bridge.ts';
 import { MAX_DOCUMENT_BYTES, utf8ByteLength } from '../platform/limits.ts';
 import type { DocumentName } from '../platform/names.ts';
@@ -40,6 +40,8 @@ function fail<T>(reason: ParseFailureReason, detail: string): ParseResult<T> {
   return { ok: false, reason, detail };
 }
 
+const versionSchema = z.int().min(0);
+
 function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -57,10 +59,9 @@ export function parseDocument<T>(text: string, spec: DocumentSpec<T>): ParseResu
   }
   if (!isJsonObject(parsed)) return fail('not-an-object', `expected an object, got ${describe(parsed)}`);
 
-  const version = parsed.version;
-  if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 0) {
-    return fail('bad-version', `version is ${describe(version)}`);
-  }
+  const versionCheck = versionSchema.safeParse(parsed.version);
+  if (!versionCheck.success) return fail('bad-version', `version is ${describe(parsed.version)}`);
+  const version = versionCheck.data;
   if (version > spec.version) return fail('future-version', `version ${version} is newer than ${spec.version}`);
 
   let document: JsonObject = parsed;

@@ -140,16 +140,17 @@ export const MIN_DIFFICULTY = 1;
 /** @public */
 export const MAX_DIFFICULTY = 10;
 
-/** A local calendar date, YYYY-MM-DD, that exists. */
-const localDateSchema = z.string().refine((value) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (match === null) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}, 'must be a real date as YYYY-MM-DD');
+/** A local calendar date, YYYY-MM-DD, that exists. A day past the end of a month rolls over and fails. */
+const localDateSchema = z
+  .string()
+  // abort stops the refinement below from seeing a malformed value.
+  .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'must be YYYY-MM-DD', abort: true })
+  .refine((value) => {
+    const [year = 0, month = 0, day = 0] = value.split('-').map(Number);
+    const date = new Date(0);
+    date.setUTCFullYear(year, month - 1, day);
+    return date.toISOString().slice(0, 10) === value;
+  }, 'must be a date that exists');
 
 const roundOutcomeSchema = z.object({
   mistakes: z.int().min(0),

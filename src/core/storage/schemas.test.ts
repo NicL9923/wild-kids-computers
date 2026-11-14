@@ -44,16 +44,30 @@ describe('defaults', () => {
     expect(spec.schema.safeParse(spec.defaults()).success).toBe(true);
   });
 
-  it('puts export and print behind the parent gate by default', () => {
-    expect(settingsDocument.defaults().outputNeedsParentGate).toBe(true);
+  // docs/decisions.md lists these. The spec requires no session limit and export and print
+  // behind the parent gate by default.
+  it('gives a new profile the documented settings', () => {
+    expect(settingsDocument.defaults()).toEqual({
+      version: 1,
+      voiceVolume: 1,
+      effectsVolume: 0.6,
+      muted: false,
+      textSize: 'standard',
+      letterSpacing: 'standard',
+      reducedMotion: 'system',
+      sessionLengthMinutes: null,
+      outputNeedsParentGate: true,
+    });
   });
 
-  it('starts with no session limit, as the spec requires', () => {
-    expect(settingsDocument.defaults().sessionLengthMinutes).toBeNull();
-  });
-
-  it('starts at first launch', () => {
-    expect(appDocument.defaults()).toMatchObject({ firstLaunchDone: false, parentPin: null });
+  it('starts at first launch with no lock, PIN, or profile', () => {
+    expect(appDocument.defaults()).toEqual({
+      version: 1,
+      firstLaunchDone: false,
+      kioskLock: false,
+      parentPin: null,
+      lastActiveProfileId: null,
+    });
   });
 });
 
@@ -67,6 +81,7 @@ describe('app schema', () => {
   it.each([
     ['a plain PIN instead of a record', { parentPin: '1234' }, 'parentPin'],
     ['a salt that is not base64', { parentPin: { ...pin, salt: 'not base64!' } }, 'parentPin.salt'],
+    ['a hash with a bad prefix', { parentPin: { ...pin, hash: '!!aGFzaA==' } }, 'parentPin.hash'],
     ['too few iterations', { parentPin: { ...pin, iterations: 99_999 } }, 'parentPin.iterations'],
     ['another algorithm', { parentPin: { ...pin, algorithm: 'MD5' } }, 'parentPin.algorithm'],
     ['an unsafe profile id', { lastActiveProfileId: 'A/B' }, 'lastActiveProfileId'],
@@ -152,6 +167,10 @@ describe('progress schema', () => {
     ['a date that does not exist', { daysPracticed: ['2026-02-30'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
     ['a date without padding', { daysPracticed: ['2026-1-05'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
     ['month 13', { daysPracticed: ['2026-13-01'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
+    ['April 31', { daysPracticed: ['2026-04-31'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
+    ['day 0', { daysPracticed: ['2026-04-00'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
+    ['text after the date', { daysPracticed: ['2026-11-13x'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
+    ['text before the date', { daysPracticed: ['x2026-11-13'] }, 'activities.pop-the-seed-pods.daysPracticed.0'],
   ])('rejects %s', (_label, activity, path) => {
     expect(issuePaths(progressDocument.schema, progress(activity))).toEqual([path]);
   });
@@ -180,6 +199,38 @@ describe('progress schema', () => {
     const shuffled = [days[5], ...days.toReversed()];
     const parsed = progressDocument.schema.parse(progress({ daysPracticed: shuffled }));
     expect(parsed.activities['pop-the-seed-pods']?.daysPracticed).toEqual(days.slice(2));
+  });
+});
+
+describe('validation messages', () => {
+  // These reach the load result's problem text, which is what a developer reads.
+  it.each([
+    ['an unsafe id', profilesDocument.schema, profiles([profile('A')]), 'must be a lowercase id'],
+    [
+      'duplicate profiles',
+      profilesDocument.schema,
+      profiles([profile('a'), profile('a')]),
+      'profile ids must be unique',
+    ],
+    ['a malformed date', progressDocument.schema, progress({ daysPracticed: ['2026-1-1'] }), 'must be YYYY-MM-DD'],
+    [
+      'a date that does not exist',
+      progressDocument.schema,
+      progress({ daysPracticed: ['2026-02-29'] }),
+      'must be a date that exists',
+    ],
+    [
+      'a salt that is not base64',
+      appDocument.schema,
+      {
+        ...appDocument.defaults(),
+        parentPin: { algorithm: 'PBKDF2-SHA256', iterations: 600_000, salt: '*', hash: 'aA==' },
+      },
+      'must be base64',
+    ],
+  ])('explains %s', (_label, schema, value, message) => {
+    const result = schema.safeParse(value);
+    expect(result.success ? [] : result.error.issues.map((issue) => issue.message)).toEqual([message]);
   });
 });
 
@@ -217,6 +268,19 @@ describe('activity state documents', () => {
       ok: true,
       value: { version: 2, state: { furthestLesson: 3 } },
       migrated: true,
+    });
+  });
+
+  it('treats a migration left undefined as a missing link in the chain', () => {
+    const spec = activityStateDocument({
+      version: 2,
+      schema: lessonState,
+      defaults: () => ({ furthestLesson: 0 }),
+      migrations: { 1: undefined },
+    });
+    expect(parseDocument('{"version":1,"state":{"furthestLesson":3}}', spec)).toMatchObject({
+      ok: false,
+      reason: 'no-migration',
     });
   });
 });

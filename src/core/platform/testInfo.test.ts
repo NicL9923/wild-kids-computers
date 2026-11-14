@@ -7,6 +7,13 @@ function failingPaths(value: unknown): string[] {
 }
 
 describe('testInfoSchema', () => {
+  it('says why an activity id is rejected', () => {
+    const result = testInfoSchema.safeParse({ activity: 'Find Key' });
+    expect(result.success ? [] : result.error.issues.map((issue) => issue.message)).toEqual([
+      'activity must be a kebab-case id',
+    ]);
+  });
+
   it('accepts every option at its limits', () => {
     expect(failingPaths({ band: 'band-9-12', seed: 0, difficulty: 1, activity: 'find-the-key' })).toEqual([]);
     expect(failingPaths({ seed: 2 ** 32 - 1, difficulty: 10 })).toEqual([]);
