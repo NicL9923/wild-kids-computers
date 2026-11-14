@@ -14,7 +14,7 @@
   ],
   "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "tools/**/*.ts", "e2e/**/*.ts"],
   // tools/voice and tools/emoji have their own package.json, so their packages stay out of the
-  // app. ffmpeg comes from PATH and only the voice generator runs it.
+  // app. ffmpeg and ffprobe come from PATH and only the voice tools run them.
   "ignoreDependencies": ["svgo", "@resvg/resvg-js"],
-  "ignoreBinaries": ["ffmpeg"],
+  "ignoreBinaries": ["ffmpeg", "ffprobe"],
 }

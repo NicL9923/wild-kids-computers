@@ -5,6 +5,7 @@ import {
   DEFAULT_PROCESS_OPTIONS,
   dbToGain,
   fadeEdges,
+  findPauses,
   normalizeLoudness,
   processSpeech,
   trimSilence,
@@ -91,9 +92,46 @@ describe('cutAfterLead', () => {
     expect(out.at(-1)).toBeCloseTo(-0.4, 6);
   });
 
-  it('ignores a gap too short to be the break, such as a stop consonant', () => {
-    const clip = samples(segment(300, 0.5), segment(60, 0), segment(300, 0.5), segment(200, 0), segment(100, 0.4));
+  it('ignores a gap before the window or too short to be the break, such as a stop consonant', () => {
+    const clip = samples(
+      segment(300, 0.5),
+      segment(60, 0),
+      segment(300, 0.5),
+      segment(20, 0),
+      segment(100, 0.5),
+      segment(200, 0),
+      segment(100, 0.4),
+    );
     expect(cutAfterLead(clip, lead).length).toBe(100 + lead.keepBeforeMs);
+  });
+
+  it('cuts at the earliest pause even when a longer pause between words follows it', () => {
+    // The break after "Ready?" is 200 ms; the 300 ms pause between two later words must not win.
+    const clip = samples(segment(800, 0.5), segment(200, 0), segment(250, 0.4), segment(300, 0), segment(250, 0.3));
+    expect(cutAfterLead(clip, lead).length).toBe(250 + 300 + 250 + lead.keepBeforeMs);
+  });
+
+  it('takes the earlier of two short pauses of the same length', () => {
+    // As in "Help the animal get home.": a 50 ms break, then a 50 ms gap inside the speech.
+    const clip = samples(segment(860, 0.5), segment(50, 0), segment(170, 0.4), segment(50, 0), segment(300, 0.3));
+    expect(cutAfterLead(clip, lead).length).toBe(170 + 50 + 300 + lead.keepBeforeMs);
+  });
+
+  it('takes a break shorter than 120 ms when only shorter gaps follow it', () => {
+    // As in "What number comes next? Click it.": a 110 ms break, then a 30 ms stop closure.
+    const clip = samples(segment(860, 0.5), segment(110, 0), segment(270, 0.4), segment(30, 0), segment(300, 0.3));
+    expect(cutAfterLead(clip, lead).length).toBe(270 + 30 + 300 + lead.keepBeforeMs);
+  });
+
+  it('counts a click after a short dip as part of the break that follows', () => {
+    // The letter sound "/ks/": a 30 ms dip, a 20 ms click, then the 370 ms break.
+    const clip = samples(segment(950, 0.5), segment(30, 0), segment(20, 0.5), segment(370, 0), segment(200, 0.4));
+    expect(cutAfterLead(clip, lead).length).toBe(200 + lead.keepBeforeMs);
+  });
+
+  it('keeps a short burst that starts the first word, such as the h of horse', () => {
+    const clip = samples(segment(860, 0.5), segment(200, 0), segment(20, 0.3), segment(40, 0), segment(300, 0.4));
+    expect(cutAfterLead(clip, lead).length).toBe(20 + 40 + 300 + lead.keepBeforeMs);
   });
 
   it.each([
@@ -101,7 +139,25 @@ describe('cutAfterLead', () => {
     ['the pause comes too early', samples(segment(100, 0.5), segment(300, 0), segment(500, 0.5))],
     ['the pause comes too late', samples(segment(2000, 0.5), segment(300, 0), segment(300, 0.5))],
   ])('refuses to write a clip when %s', (_label, clip) => {
-    expect(() => cutAfterLead(clip, lead)).toThrow(/No pause of 120 ms between 400 and 1600 ms/);
+    expect(() => cutAfterLead(clip, lead)).toThrow(/No pause of 30 ms or more starts between 400 and 1600 ms/);
+  });
+
+  it('refuses a short first pause with a longer one after it, rather than guess and lose a word', () => {
+    // A 90 ms break after the lead-in, then a 150 ms pause after the first word. Trying 120 ms
+    // first used to cut at the second pause and drop the first word without a sound.
+    const clip = samples(segment(800, 0.5), segment(90, 0), segment(300, 0.4), segment(150, 0), segment(300, 0.3));
+    expect(() => cutAfterLead(clip, lead)).toThrow(
+      /ambiguous: the first one, at 800 ms, lasts only 90 ms, and one of 150 ms follows at 1190 ms/,
+    );
+  });
+});
+
+describe('findPauses', () => {
+  it('lists each quiet stretch between sounds, but not the silence before the first or after the last', () => {
+    const clip = samples(segment(50, 0), segment(100, 0.5), segment(40, 0), segment(100, 0.5), segment(80, 0));
+    expect(findPauses(clip, { sampleRate: RATE, silenceThresholdDb: -40 })).toEqual([
+      { startMs: 150, lengthMs: 40, resumeAt: 190 },
+    ]);
   });
 });
 

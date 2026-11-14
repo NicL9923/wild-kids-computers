@@ -142,6 +142,8 @@ export interface SessionStore {
   readonly start: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
   readonly flush: () => Promise<void>;
+  /** Whether a read or write is queued or running, so quitting now could drop a write. */
+  readonly hasPendingWork: () => boolean;
 
   readonly updateApp: (update: Update<AppDocument>) => void;
   /** Saves kiosk lock and turns it on or off for the window. */
@@ -198,11 +200,18 @@ const systemClock: SessionClock = {
   monotonic: () => performance.now(),
 };
 
+/** An update waiting for its document to load. A method, so a cell of a narrower type still fits a wider one. */
+interface EarlyUpdate<T> {
+  apply(current: T): T;
+}
+
 /** One saved document held in memory. */
 class Cell<T> {
   value: T;
   loaded = false;
   writeQueued = false;
+  /** Updates made before the load finished, oldest first. They apply in one queued task. */
+  readonly early: EarlyUpdate<T>[] = [];
   readonly ready: Promise<void>;
   private markReady: () => void = () => {};
 
@@ -374,29 +383,45 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     void queues.run(cell.name, async () => {
       // Writes the newest value when the turn comes, so a burst of updates costs one write.
       cell.writeQueued = false;
-      try {
-        await saveDocument(bridge.documents, cell.name, cell.spec, cell.value);
-        clearProblem(cell.name);
-      } catch (error) {
-        reportProblem(cell.name, 'write', error);
-      }
+      await writeNow(cell);
     });
   }
 
+  async function writeNow<T>(cell: Cell<T>): Promise<void> {
+    try {
+      await saveDocument(bridge.documents, cell.name, cell.spec, cell.value);
+      clearProblem(cell.name);
+    } catch (error) {
+      reportProblem(cell.name, 'write', error);
+    }
+  }
+
   function change<T>(cell: Cell<T>, update: Update<T>): void {
-    const commit = () => {
+    if (cell.loaded && cell.early.length === 0) {
       // Parsing first throws on a bad value before anything changes, and applies the schema's trims.
       cell.value = cell.spec.schema.parse(applyUpdate(cell.value, update));
       queueWrite(cell);
       emit();
-    };
-    if (cell.loaded) {
-      commit();
       return;
     }
-    // An update before the load finishes applies to the loaded value, not to the defaults. A bad
-    // value can no longer throw to the caller, so it is logged as the bug it is.
-    void cell.ready.then(commit).catch((error: unknown) => console.error(error));
+    // An update before the load finishes applies to the loaded value, not to the defaults. It
+    // joins the document's queue now, right behind the read, so a later read of the same
+    // document, such as when the profile is chosen again, waits until this update is on disk.
+    cell.early.push({ apply: (current) => applyUpdate(current, update) });
+    if (cell.early.length > 1) return;
+    void queues.run(cell.name, async () => {
+      await cell.ready;
+      for (const early of cell.early.splice(0)) {
+        try {
+          cell.value = cell.spec.schema.parse(early.apply(cell.value));
+        } catch (error) {
+          // A bad value can no longer throw to the caller, so it is logged as the bug it is.
+          console.error(error);
+        }
+      }
+      emit();
+      await writeNow(cell);
+    });
   }
 
   function reportProblem(target: string, operation: SaveProblem['operation'], error: unknown): BridgeError {
@@ -570,6 +595,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     },
 
     flush: () => queues.settled(),
+    hasPendingWork: () => queues.busy(),
 
     updateApp: (update) => change(app, update),
 

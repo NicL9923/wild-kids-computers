@@ -43,6 +43,10 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 
 ### Paint
 
+- **The studio never lets go of a picture it has not saved.** Every way out, a route change, new paper, a coloring page, or quitting, saves first, the stroke in progress included. When the save fails, the picture stays on screen and the studio says, in speech and on screen, that it could not be saved yet and to get a grown-up. The child stays in the studio until it saves, even past the session length, because a child's picture is worth more than leaving on time. Quitting is different: it stays open once to say so, and the next close goes through, so a full disk never traps the app.
+- **Quitting waits at most 5 seconds for unsaved work.** Encoding and saving a picture takes well under a second, so the wait covers a slow machine, and a hung save cannot keep the app open.
+- **Undo, redo, start over, and painting wait while a whole-picture effect works,** and the picture dims under a sparkles picture that pulses unless motion is reduced. A result for a picture that changed meanwhile is dropped.
+
 - **The paint engine is a software rasterizer in TypeScript over typed arrays.** It removes the GPU and the font stack from image tests, so the same pixels come out on every machine and tests compare exactly.
 - **The engine has its own trigonometry and power functions.** The built-in ones can differ in the last bit between builds of V8.
 - **The canvas is 1600 by 1000 pixels.**
@@ -100,7 +104,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 ### Strings, voice, and audio
 
 - **The voice is Kokoro `af_bella` at speed 0.9.** On short words `af_heart` added a trailing vowel that two recognizers heard ("bee" as "B.A.", "cat" as "hot"). `af_bella` decoded the same words cleanly. 0.9 is unhurried without sounding slowed.
-- **Every clip is generated after a lead-in and cut at the pause.** Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" came out "lag", "eight" "wait"). After a lead-in it does not. "Ready?" gave the longest, steadiest pause of six leads tried before words. "Say." and an empty sentence gave cleaner onsets before bare sounds. The cut fails loudly when the pause is missing.
+- **Every clip is generated after a lead-in and cut at the earliest pause.** Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" came out "lag", "eight" "wait"). After a lead-in it does not. "Ready?" gave the longest, steadiest pause of six leads tried before words. "Say." and an empty sentence gave cleaner onsets before bare sounds. The cut takes the earliest pause of 30 ms or more in the window, never a later one, and fails loudly when the pause is missing or when a first pause under 120 ms has a longer pause after it. A click under 30 ms after a short dip joins the break that follows. Trying a 120 ms pause first could skip a shorter break and cut after the first word. An audit of all 1,630 clips on 2026-11-14 found the break 810 to 1300 ms in, at least 50 ms long, and no clip cut anywhere else.
 - **The generator phonemizes text itself and maps espeak phonemes to misaki's.** Kokoro v1.0 was trained on misaki phonemes, which write each diphthong and affricate as one symbol. kokoro-js passes espeak's two-symbol forms, and the model said "boy" as "bye" and "eighty" as "eirei". The mapping matches Kokoro's own Python pipeline and fixed those words with no regression in a control set.
 - **Every speech is synthesized with end punctuation.** Without a final period, Kokoro clipped the last sound of short words: "bed" was heard as "bad", "worm" as "wham".
 - **Letter sounds are Kokoro phonemes between slashes.** As text, "mmm" reaches the model as "em em em". Stops carry a light schwa ("buh"), because the model cannot release a stop alone. A person should still listen to them; see docs/voice-round-trip.md.

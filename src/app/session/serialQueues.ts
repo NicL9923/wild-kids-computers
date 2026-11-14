@@ -8,6 +8,8 @@ export interface SerialQueues {
   run<T>(key: string, task: () => Promise<T>): Promise<T>;
   /** Resolves once every task queued so far on keys that start with `prefix` has settled. */
   settled(prefix?: string): Promise<void>;
+  /** Whether a task on a key that starts with `prefix` is queued or running. */
+  busy(prefix?: string): boolean;
 }
 
 export function createSerialQueues(): SerialQueues {
@@ -29,6 +31,9 @@ export function createSerialQueues(): SerialQueues {
       };
       void forget();
       return result;
+    },
+    busy(prefix = '') {
+      return [...tails.keys()].some((key) => key.startsWith(prefix));
     },
     async settled(prefix = '') {
       const pending = [...tails].filter(([key]) => key.startsWith(prefix)).map(([, tail]) => tail);

@@ -1,5 +1,5 @@
 import { createDocument, PAPER } from '../../../core/paint/document.ts';
-import { History } from '../../../core/paint/history.ts';
+import { History, type HistoryOptions } from '../../../core/paint/history.ts';
 import { EMPTY_RECT, unionRect, type Rect } from '../../../core/paint/rect.ts';
 import { startStroke, type StrokePainter } from '../../../core/paint/session.ts';
 import { createSurface, type Surface } from '../../../core/paint/surface.ts';
@@ -19,16 +19,20 @@ export class StudioDocument {
   private readonly listeners = new Set<() => void>();
   /** Coloring page ids by mask, so undo and redo bring the right page id back with the mask. */
   private readonly pageIds = new WeakMap<Surface, string>();
-  private versionCount = 0;
 
-  constructor(width?: number, height?: number) {
+  constructor(width?: number, height?: number, history?: HistoryOptions) {
     this.doc = createDocument(width, height);
-    this.history = new History(this.doc);
+    this.history = new History(this.doc, history);
   }
 
-  /** Changes whenever the picture changes: a stroke ends, undo, redo, or a whole-picture change. */
+  /**
+   * Counts the changes committed to the picture: every stroke that changed a pixel, undo, redo,
+   * and whole-picture change. A picture saved at one version has unsaved changes when this
+   * differs. It counts commits, so it moves even when the history drops old steps to fit its caps.
+   * A stroke still open has not counted yet; see `stroking`.
+   */
   get version(): number {
-    return this.versionCount;
+    return this.history.revision;
   }
 
   get canUndo(): boolean {
@@ -86,9 +90,7 @@ export class StudioDocument {
     const stroke = this.stroke;
     if (stroke === null) return;
     this.stroke = null;
-    const before = this.stepCounts();
     this.paint(stroke.end());
-    this.countIfChanged(before);
     this.emit();
   }
 
@@ -104,7 +106,6 @@ export class StudioDocument {
     this.end();
     if (!this.history.canUndo) return;
     this.paint(this.history.undo());
-    this.versionCount++;
     this.emit();
   }
 
@@ -112,7 +113,6 @@ export class StudioDocument {
     this.end();
     if (!this.history.canRedo) return;
     this.paint(this.history.redo());
-    this.versionCount++;
     this.emit();
   }
 
@@ -145,38 +145,32 @@ export class StudioDocument {
   replace(paint: Surface, mask: Surface | null, pageId: string | null): void {
     this.end();
     if (mask !== null && pageId !== null) this.pageIds.set(mask, pageId);
-    const before = this.stepCounts();
     this.paint(this.history.replaceDocument(paint, mask));
-    this.countIfChanged(before);
     this.emit();
   }
 
   /** Replaces the paint layer as one undoable step: the result of a whole-picture effect. */
   replacePaint(pixels: Uint8ClampedArray): void {
     this.end();
-    const before = this.stepCounts();
     this.paint(this.history.replacePaint(pixels));
-    this.countIfChanged(before);
     this.emit();
+  }
+
+  /**
+   * Lands a whole-picture effect that was worked out from the picture at `version`, as one
+   * undoable step. A worker takes a while, and the picture may have changed meanwhile, such as by
+   * an undo. Applying the old result then would wipe that change and its redo, so it is refused.
+   * Returns whether it landed.
+   */
+  replacePaintFrom(version: number, pixels: Uint8ClampedArray): boolean {
+    if (this.stroke !== null || this.version !== version) return false;
+    this.replacePaint(pixels);
+    return true;
   }
 
   /** Marks everything for repainting, such as after the canvas element is replaced. */
   invalidate(): void {
     this.paint({ x: 0, y: 0, width: this.doc.width, height: this.doc.height });
-  }
-
-  private stepCounts(): string {
-    return `${this.history.undoSteps}/${this.history.redoSteps}`;
-  }
-
-  /**
-   * Counts a new version when the history gained a step. A full history drops its oldest step as
-   * it adds one, so the counts stay the same; then it counts anyway, because an extra save is
-   * harmless and a missed one loses paint.
-   */
-  private countIfChanged(before: string): void {
-    const full = this.history.undoSteps >= this.history.maxSteps;
-    if (full || this.stepCounts() !== before) this.versionCount++;
   }
 
   private paint(rect: Rect): void {
