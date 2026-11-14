@@ -1,0 +1,76 @@
+/*
+ * The meadow on top keeps its 5:3 shape; the keyboard picture sits below it. Friends grow in
+ * with a short bounce, which reduced motion turns into a plain appearance.
+ */
+
+.party-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-container);
+}
+
+.party-meadow-area {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.party-meadow {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  overflow: hidden;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-meadow-sky);
+}
+
+.party-ground {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.party-hill {
+  fill: var(--wk-color-meadow-grass);
+}
+
+.party-friend {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  animation: party-arrive var(--wk-duration-calm) var(--wk-ease-out);
+}
+
+.party-friend img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes party-arrive {
+  from {
+    opacity: 0;
+    scale: calc(1 - 0.6 * var(--wk-motion-scale));
+  }
+
+  60% {
+    opacity: 1;
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+
+  to {
+    scale: 1;
+  }
+}
+
+.party-keyboard {
+  width: min(100%, calc(var(--wk-target-min) * 9));
+}

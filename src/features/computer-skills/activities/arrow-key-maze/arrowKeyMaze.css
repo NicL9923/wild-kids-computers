@@ -1,0 +1,114 @@
+/*
+ * The maze fills the space beside the picture of the arrow keys. Cells are square: the board's
+ * shape is the maze's columns by rows. The critter moves cell to cell with a short glide; reduced
+ * motion makes the move instant.
+ */
+
+.maze-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--wk-space-section);
+  padding: var(--wk-space-container);
+}
+
+.maze-board-area {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.maze-board {
+  position: relative;
+  border-radius: var(--wk-radius-small);
+}
+
+.maze-walls {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.maze-floor {
+  fill: var(--wk-color-surface-sunken);
+}
+
+.maze-wall {
+  fill: none;
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.maze-piece {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  transition:
+    left calc(var(--wk-duration-base) * var(--wk-motion-scale)) var(--wk-ease-out),
+    top calc(var(--wk-duration-base) * var(--wk-motion-scale)) var(--wk-ease-out);
+}
+
+.maze-piece img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.maze-snack {
+  outline: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  outline-offset: calc(var(--wk-border-width) * 2);
+  border-radius: var(--wk-radius-round);
+}
+
+.maze-snack img {
+  scale: 0.8;
+}
+
+.maze-snack[data-arrived='true'] {
+  opacity: 0;
+}
+
+.maze-critter {
+  z-index: 1;
+}
+
+/* A bump: a small shake that the motion scale turns off. */
+.maze-critter[data-wobble='1'] img {
+  animation: maze-wobble-a var(--wk-duration-base) var(--wk-ease-out);
+}
+
+.maze-critter[data-wobble='0'] img {
+  animation: maze-wobble-b var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes maze-wobble-a {
+  30% {
+    rotate: calc(-8deg * var(--wk-motion-scale));
+  }
+
+  70% {
+    rotate: calc(6deg * var(--wk-motion-scale));
+  }
+}
+
+@keyframes maze-wobble-b {
+  30% {
+    rotate: calc(8deg * var(--wk-motion-scale));
+  }
+
+  70% {
+    rotate: calc(-6deg * var(--wk-motion-scale));
+  }
+}
+
+.maze-keys {
+  width: calc(var(--wk-target-min) * 5);
+}

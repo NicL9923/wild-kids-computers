@@ -1,0 +1,236 @@
+/*
+ * Sliders run across the stage, one per row. Dials sit side by side below them. Each control has
+ * its own color, and its flag shows the spot to reach. A knob at its flag shows a check mark, so
+ * a match is never told by color alone.
+ */
+
+.dials-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--wk-space-section);
+  padding: var(--wk-space-container) var(--wk-space-section);
+  container-type: size;
+}
+
+.dials-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wk-space-section);
+  width: min(100%, calc(var(--wk-target-min) * 16));
+}
+
+.dials-dials {
+  display: flex;
+  justify-content: center;
+  gap: var(--wk-space-section);
+  width: 100%;
+}
+
+.dials-control {
+  --dials-color: var(--wk-profile-lake);
+}
+
+.dials-control[data-color='orange'] {
+  --dials-color: var(--wk-profile-marigold);
+}
+
+.dials-control[data-color='pink'] {
+  --dials-color: var(--wk-profile-clover);
+}
+
+/* ---- slider ---- */
+
+.dials-slider {
+  padding-top: calc(var(--wk-target-min) * 0.9);
+}
+
+.dials-track {
+  position: relative;
+  height: calc(var(--wk-target-min) * 0.32);
+  margin: 0 calc(var(--wk-target-min) * 0.6);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-surface);
+}
+
+.dials-tick {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: calc(var(--wk-target-min) * 0.62);
+  border-radius: 2px;
+  background: var(--wk-color-border);
+  translate: -50% -50%;
+}
+
+.dials-flag {
+  position: absolute;
+  bottom: 100%;
+  width: calc(var(--wk-target-min) * 0.7);
+  translate: -12% 0;
+  pointer-events: none;
+}
+
+.dials-flag-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dials-flag-pole {
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.dials-flag-cloth {
+  fill: var(--dials-color);
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* Help after misses: a bigger flag, and a dashed knob where the real one should go. */
+.dials-control[data-helped='true'] .dials-flag {
+  scale: 1.35;
+  transform-origin: bottom left;
+}
+
+.dials-ghost {
+  position: absolute;
+  top: 50%;
+  width: calc(var(--wk-target-min) * 1.1);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-round);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.dials-knob {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: calc(var(--wk-target-min) * 1.1);
+  aspect-ratio: 1;
+  padding: 0;
+  border: calc(var(--wk-border-width) * 2) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-round);
+  background: var(--dials-color);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: grab;
+  translate: -50% -50%;
+  transition: left calc(var(--wk-duration-quick) * var(--wk-motion-scale)) var(--wk-ease-out);
+}
+
+.dials-knob[data-carried='true'] {
+  cursor: grabbing;
+  outline: var(--wk-focus-width) solid var(--wk-color-focus);
+  outline-offset: var(--wk-focus-offset);
+}
+
+.dials-check {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dials-control[data-matched='true'] .dials-knob {
+  background-color: var(--wk-color-surface);
+}
+
+/* ---- dial ---- */
+
+.dials-face {
+  position: relative;
+  width: min(38cqw, calc(var(--wk-target-min) * 7.5), calc((100cqh - var(--wk-target-min) * 5) * 200 / 118));
+  min-width: calc(var(--wk-target-min) * 4);
+  aspect-ratio: 200 / 118;
+}
+
+.dials-face-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dials-arc {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 2.5;
+}
+
+.dials-dial-tick {
+  stroke: var(--wk-color-border);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.dials-dial-tick[data-flag='true'] {
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 4;
+}
+
+.dials-arm {
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.dials-ghost-arm {
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 3;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+}
+
+.dials-hub {
+  fill: var(--wk-color-primary-base);
+}
+
+.dials-tip {
+  fill: var(--dials-color);
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 2.5;
+}
+
+.dials-dial-flag {
+  bottom: auto;
+  width: calc(var(--wk-target-min) * 0.55);
+  translate: -12% -96%;
+}
+
+/* The whole face is the button: a big target, turned by moving across it. */
+.dials-dial-button {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding: 0 0 4% 0;
+  border: 0;
+  border-radius: 50% 50% var(--wk-radius-small) var(--wk-radius-small) / 100% 100% var(--wk-radius-small)
+    var(--wk-radius-small);
+  background: transparent;
+  cursor: grab;
+}
+
+.dials-dial-button .dials-check {
+  width: calc(var(--wk-target-min) * 0.5);
+  height: auto;
+}
+
+.dials-dial-button[data-carried='true'] {
+  cursor: grabbing;
+  outline: var(--wk-focus-width) solid var(--wk-color-focus);
+  outline-offset: var(--wk-focus-offset);
+}

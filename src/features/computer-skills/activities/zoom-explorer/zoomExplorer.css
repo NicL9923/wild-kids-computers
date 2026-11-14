@@ -1,0 +1,158 @@
+/*
+ * The picture's viewport keeps a 5:3 shape and fills the stage beside a narrow panel: what to
+ * look for, then the zoom in and zoom out buttons. The scene inside grows with the zoom; the
+ * viewport scrolls. Everything in the scene is sized in the scene's width, so it zooms together.
+ */
+
+.zoom-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-item) var(--wk-space-container) var(--wk-space-container);
+}
+
+.zoom-viewport-area {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  container-type: size;
+}
+
+.zoom-viewport {
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  overflow: auto;
+  overscroll-behavior: contain;
+  /* An outline, not a border, so the picture fills the viewport exactly and nothing scrolls at zoom 1. */
+  outline: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-meadow-sky);
+}
+
+.zoom-scene {
+  position: relative;
+  aspect-ratio: 5 / 3;
+  container-type: inline-size;
+}
+
+.zoom-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.zoom-sky {
+  fill: var(--wk-color-meadow-sky);
+}
+
+.zoom-hill-far {
+  fill: var(--wk-profile-fern);
+  opacity: 0.45;
+}
+
+.zoom-hill-near {
+  fill: var(--wk-color-meadow-grass);
+}
+
+.zoom-path {
+  fill: none;
+  stroke: var(--wk-color-surface-sunken);
+  stroke-width: 26;
+  stroke-linecap: round;
+}
+
+.zoom-piece,
+.zoom-thing,
+.zoom-help-ring {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+}
+
+.zoom-piece img,
+.zoom-thing img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.zoom-thing {
+  padding: 0;
+  border: 0;
+  border-radius: var(--wk-radius-round);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* A found thing gets a ring and a light disc, so it is not marked by color alone. */
+.zoom-thing[data-found='true'] {
+  outline: calc(var(--wk-border-width) * 1.5) solid var(--wk-color-success);
+  outline-offset: 1px;
+  background: var(--wk-color-surface);
+}
+
+.zoom-help-ring {
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-round);
+  pointer-events: none;
+}
+
+.zoom-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-container);
+}
+
+.zoom-look-for {
+  margin: 0 0 var(--wk-space-item);
+  padding: var(--wk-space-item);
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+}
+
+.zoom-look-for-picture {
+  display: block;
+  width: calc(var(--wk-target-min) * 1.3);
+  height: calc(var(--wk-target-min) * 1.3);
+}
+
+.zoom-button {
+  display: grid;
+  place-items: center;
+  width: calc(var(--wk-target-min) * 1.4);
+  aspect-ratio: 1;
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  color: var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.zoom-button:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+.zoom-button:disabled {
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.45;
+}
+
+.zoom-glyph {
+  width: 66%;
+  height: 66%;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}

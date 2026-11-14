@@ -1,0 +1,185 @@
+/*
+ * The scene's window keeps a 5:3 shape beside a panel with a picture of the gesture. The scene
+ * is a grid of screens, each the window's own size. An arrow on the window's edge points the
+ * way to scroll.
+ */
+
+.trackpad-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-item) var(--wk-space-container) var(--wk-space-container);
+}
+
+.trackpad-window-area {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  container-type: size;
+}
+
+.trackpad-frame {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+}
+
+.trackpad-window {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  /* An outline, not a border, so each screen of the scene is exactly the window's size. */
+  outline: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  /* Faint dots show the scene moving even where it is empty. */
+  background-color: var(--wk-color-meadow-sky);
+  background-image: radial-gradient(var(--wk-color-surface) 12%, transparent 13%);
+  background-size: 64px 64px;
+  background-attachment: local;
+}
+
+.trackpad-scene {
+  position: relative;
+}
+
+.trackpad-decor,
+.trackpad-thing {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+}
+
+.trackpad-decor img,
+.trackpad-thing img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.trackpad-thing {
+  padding: 0;
+  border: 0;
+  outline: calc(var(--wk-border-width) * 2) solid transparent;
+  outline-offset: calc(var(--wk-border-width) * 2);
+  border-radius: var(--wk-radius-round);
+  background: transparent;
+  cursor: pointer;
+}
+
+.trackpad-thing:disabled {
+  cursor: default;
+}
+
+/* Ready to tap: a white disc and a dashed ring. Tapped: a solid ring. */
+.trackpad-thing[data-ready='true'] {
+  outline-style: dashed;
+  outline-color: var(--wk-color-primary-base);
+  background: var(--wk-color-surface);
+}
+
+.trackpad-thing[data-tapped='true'] {
+  outline-color: var(--wk-color-success);
+  background: var(--wk-color-surface);
+}
+
+.trackpad-thing[data-ready='true'] img,
+.trackpad-thing[data-tapped='true'] img {
+  scale: 0.86;
+}
+
+.trackpad-edge-arrow {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: calc(var(--wk-target-min) * 1.2);
+  aspect-ratio: 1;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-accent);
+  box-shadow: var(--wk-shadow-raised);
+  pointer-events: none;
+}
+
+.trackpad-edge-arrow svg {
+  width: 70%;
+  height: 70%;
+  fill: var(--wk-color-on-accent);
+}
+
+.trackpad-edge-arrow[data-direction='down'] {
+  bottom: var(--wk-space-item);
+  left: 50%;
+  translate: -50% 0;
+}
+
+.trackpad-edge-arrow[data-direction='up'] {
+  top: var(--wk-space-item);
+  left: 50%;
+  translate: -50% 0;
+}
+
+.trackpad-edge-arrow[data-direction='right'] {
+  right: var(--wk-space-container);
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.trackpad-edge-arrow[data-direction='left'] {
+  left: var(--wk-space-item);
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.trackpad-panel {
+  display: grid;
+  align-content: center;
+}
+
+.trackpad-gesture {
+  display: grid;
+  justify-items: center;
+  gap: var(--wk-space-item);
+  width: calc(var(--wk-target-min) * 3.6);
+  margin: 0;
+}
+
+.trackpad-gesture svg {
+  width: 100%;
+  height: auto;
+}
+
+.trackpad-pad {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 3;
+}
+
+.trackpad-finger {
+  fill: var(--wk-profile-marigold);
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 2.5;
+}
+
+.trackpad-motion,
+.trackpad-ring {
+  fill: none;
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trackpad-ring {
+  stroke-width: 2.5;
+  stroke-dasharray: 5 5;
+}
+
+.trackpad-gesture-caption {
+  font-size: var(--wk-text-body);
+  font-weight: var(--wk-font-weight-bold);
+  text-align: center;
+}
