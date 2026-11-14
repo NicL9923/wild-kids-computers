@@ -26,7 +26,7 @@ export const VOICE_PROFILE: VoiceProfile = Object.freeze({
   model: 'kokoro-82m-v1.0',
   voice: 'af_bella',
   speed: 0.9,
-  revision: 1,
+  revision: 2,
 });
 
 export const VOICE_CLIP_EXTENSION = '.ogg';

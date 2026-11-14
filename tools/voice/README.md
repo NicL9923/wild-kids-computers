@@ -14,10 +14,11 @@ npm run check:voice           # every spoken string has a clip, and no clip is s
 
 Each clip goes through these steps:
 
-1. Kokoro says `Ready? ` and then the speech, at the voice and speed in `VOICE_PROFILE` (`src/core/strings/voice.ts`).
-2. `cutAfterLead` keeps only what follows the pause after "Ready?". Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" comes out "lag"). After a lead-in it does not. The cut fails loudly if the pause is not where it should be.
-3. Silence is trimmed to a 40 ms lead and 80 ms tail, the voiced part is evened out to -20 dBFS RMS under a -1.5 dBFS peak, and the edges fade over 8 ms.
-4. ffmpeg (on PATH) encodes mono Opus in Ogg at 24 kbit/s, voice mode, with no metadata.
+1. espeak-ng (through the `phonemizer` package) turns the text into phonemes, and `toKokoroPhonemes` maps them to the alphabet Kokoro was trained on, with one symbol per diphthong and affricate. kokoro-js skips that mapping, and the model then says "boy" as "bye". A speech with no end punctuation gets a period, or Kokoro clips the last sound of a short word ("bed" came out "bad").
+2. Kokoro says a lead-in and then the speech, at the voice and speed in `VOICE_PROFILE` (`src/core/strings/voice.ts`). The lead-in is "Ready?" before words and "Say." plus an empty sentence before a bare sound.
+3. `cutAfterLead` keeps only what follows the pause after the lead-in. Kokoro adds a false consonant to a short utterance that starts with a vowel ("egg" comes out "lag"). After a lead-in it does not. The cut fails loudly if the pause is not where it should be.
+4. Silence is trimmed to a 40 ms lead and 80 ms tail, the voiced part is evened out to -20 dBFS RMS under a -1.5 dBFS peak, and the edges fade over 8 ms.
+5. ffmpeg (on PATH) encodes mono Opus in Ogg at 24 kbit/s, voice mode, with no metadata.
 
 A speech wrapped in slashes, such as `/bə/`, is read as Kokoro phonemes. The letter sounds use it.
 
