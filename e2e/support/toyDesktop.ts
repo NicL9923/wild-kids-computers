@@ -48,9 +48,25 @@ export function titleBar(window: Locator): Locator {
  * @public
  */
 export async function centerOfLocator(locator: Locator): Promise<{ x: number; y: number }> {
-  const box = await locator.boundingBox();
-  if (box === null) throw new Error('The element is not on screen.');
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  // The toy desktop measures its space and scales its windows and icons to fit. A position read
+  // while that layout is still settling sends the click to where the element used to be, so wait
+  // until two readings a frame apart agree.
+  const deadline = Date.now() + 5_000;
+  let last = await locator.boundingBox();
+  for (;;) {
+    await locator.page().evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    const box = await locator.boundingBox();
+    const settled =
+      box !== null &&
+      last !== null &&
+      box.x === last.x &&
+      box.y === last.y &&
+      box.width === last.width &&
+      box.height === last.height;
+    if (settled && box !== null) return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    if (Date.now() > deadline) throw new Error('The element is not on screen, or never stopped moving.');
+    last = box;
+  }
 }
 
 /** Clicks with the real mouse at the center of an element. */
