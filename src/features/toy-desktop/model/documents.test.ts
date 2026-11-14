@@ -2,8 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { createToyClipboard, type ToyClipboard } from '../../../app/inputGuards.ts';
 import { buildDesktop, note, pathId, picture, tune } from './build.ts';
 import { reduceAll, type DesktopAction, type DesktopEnv, type Transition } from './desktop.ts';
-import { getNode, nodeAtPath, TRASH_ID } from './fileSystem.ts';
-import { findWindow, hasUnsavedChanges, type DesktopState, type NotepadState, type WindowState } from './state.ts';
+import { getNode, MAX_NODES, nodeAtPath, TRASH_ID } from './fileSystem.ts';
+import {
+  findWindow,
+  hasUnsavedChanges,
+  MAX_WINDOWS,
+  type DesktopState,
+  type NotepadState,
+  type WindowState,
+} from './state.ts';
 
 function setup(clipboard: ToyClipboard = createToyClipboard()) {
   const env: DesktopEnv = { clipboard };
@@ -421,7 +428,7 @@ describe('commands and the toy clipboard', () => {
     const { act, clipboard } = setup();
     clipboard.write({ kind: 'text', text: 'fox' });
     expect(act(buildDesktop({ windows: [{ app: 'calculator' }] }), command('w1', 'paste')).events).toEqual([
-      { type: 'rejected', action: 'command', reason: 'command-disabled' },
+      { type: 'rejected', action: 'command', reason: 'not-a-number' },
     ]);
   });
 
@@ -656,3 +663,298 @@ describe('the calculator and settings through the desktop', () => {
     expect(events.at(-1)).toEqual({ type: 'setting-changed', setting: 'computerName', value: 'Z' });
   });
 });
+
+/** Save as with a name, from the notepad in w1. */
+const saveAs = (name: string): DesktopAction[] => [
+  command('w1', 'save-as'),
+  ...typing('w1', name, 'file-name'),
+  dialog('w1', { type: 'confirm' }),
+];
+
+describe('document edges', () => {
+  it('opens a fresh notepad with nothing unsaved that takes line breaks', () => {
+    const { act } = setup();
+    const { state } = act(buildDesktop(), { type: 'open-app', app: 'notepad' }, ...typing('w1', 'a\nb'));
+    expect(notepad(state, 'w1').editor.text).toBe('a\nb');
+    expect(hasUnsavedChanges(createdNotepad())).toBe(false);
+  });
+
+  it('keeps the line breaks of an opened note', () => {
+    const state = buildDesktop({ files: { List: note('a\nb') }, windows: [{ file: 'List' }] });
+    expect(notepad(state, 'w1').editor.text).toBe('a\nb');
+  });
+
+  it.each<[string, DesktopAction[], string[]]>([
+    ['typing', typing('w1', 'a'), ['text-changed']],
+    [
+      'undo from the menu',
+      [...typing('w1', 'a'), command('w1', 'undo')],
+      ['text-changed', 'command-run', 'undone', 'text-changed'],
+    ],
+    [
+      'redo from the menu',
+      [...typing('w1', 'a'), command('w1', 'undo'), command('w1', 'redo')],
+      ['text-changed', 'command-run', 'undone', 'text-changed', 'command-run', 'redone', 'text-changed'],
+    ],
+    [
+      'a caret move',
+      [{ type: 'text', windowId: 'w1', field: 'document', op: { type: 'move', move: 'left', extend: false } }],
+      [],
+    ],
+  ])('reports exactly what %s did', (_label, actions, types) => {
+    const { act } = setup();
+    const { events } = act(buildDesktop({ windows: [{ app: 'notepad' }] }), ...actions);
+    expect(events.map((event) => event.type)).toEqual(types);
+  });
+
+  it('reports a paste into a note', () => {
+    const { act, clipboard } = setup();
+    clipboard.write({ kind: 'text', text: 'hay' });
+    const { events } = act(buildDesktop({ windows: [{ app: 'notepad' }] }), command('w1', 'paste'));
+    expect(events).toEqual([
+      { type: 'command-run', windowId: 'w1', app: 'notepad', command: 'paste' },
+      { type: 'pasted', windowId: 'w1', text: 'hay' },
+      { type: 'text-changed', windowId: 'w1', field: 'document', text: 'hay' },
+    ]);
+  });
+
+  it('reports the folder of a note saved in place', () => {
+    const { act } = setup();
+    const start = buildDesktop({ files, windows: [{ file: 'Notes/Shopping list' }] });
+    const { events } = act(start, ...typing('w1', '!'), command('w1', 'save'));
+    expect(events.at(-1)).toMatchObject({ type: 'file-saved', folderId: pathId(start, 'Notes') });
+  });
+
+  it('saves two new notes as two files', () => {
+    const { act } = setup();
+    const { state } = act(
+      buildDesktop({ windows: [{ app: 'notepad', text: 'x' }] }),
+      ...saveAs('One'),
+      ...saveAs('Two'),
+    );
+    expect(nodeAtPath(state.fs, 'One')?.kind).toBe('note');
+    expect(nodeAtPath(state.fs, 'Two')?.kind).toBe('note');
+    expect(nodeAtPath(state.fs, 'One')?.id).not.toBe(nodeAtPath(state.fs, 'Two')?.id);
+  });
+
+  it('refuses to save over a picture with the same name', () => {
+    const { act } = setup();
+    const start = buildDesktop({ files: { Sun: picture('sun') }, windows: [{ app: 'notepad', text: 'x' }] });
+    const named = act(start, command('w1', 'save-as'), ...typing('w1', 'sun', 'file-name')).state;
+    expect(act(named, dialog('w1', { type: 'confirm' })).events).toEqual([
+      { type: 'rejected', action: 'dialog', reason: 'duplicate' },
+    ]);
+  });
+
+  it('refuses to save a new note when the file system is full', () => {
+    const { act } = setup();
+    const many = Object.fromEntries(Array.from({ length: MAX_NODES - 2 }, (_, index) => [`F${index}`, note()]));
+    const start = buildDesktop({ files: many, windows: [{ app: 'notepad', text: 'x' }] });
+    const named = act(start, command('w1', 'save-as'), ...typing('w1', 'One more', 'file-name')).state;
+    expect(act(named, dialog('w1', { type: 'confirm' })).events).toEqual([
+      { type: 'rejected', action: 'dialog', reason: 'full' },
+    ]);
+  });
+
+  it('does not take the name of a picture picked in a note save dialog', () => {
+    const { act } = setup();
+    const start = buildDesktop({ files: { Sun: picture('sun') }, windows: [{ app: 'notepad', text: 'x' }] });
+    const { state, events } = act(
+      start,
+      command('w1', 'save-as'),
+      dialog('w1', { type: 'select', nodeId: pathId(start, 'Sun') }),
+    );
+    expect(notepad(state, 'w1').dialog?.name.text).toBe('');
+    expect(events.at(-1)).toEqual({ type: 'selection-changed', windowId: 'w1', nodeId: pathId(start, 'Sun') });
+  });
+
+  it('opens a note in a new window when this one shows another saved note, even an empty one', () => {
+    const { act } = setup();
+    const start = buildDesktop({ files: { Empty: note(''), List: note('milk') }, windows: [{ file: 'Empty' }] });
+    const { state } = act(
+      start,
+      command('w1', 'open'),
+      dialog('w1', { type: 'select', nodeId: pathId(start, 'List') }),
+      dialog('w1', { type: 'confirm' }),
+    );
+    expect(state.windows).toHaveLength(2);
+    expect(notepad(state, 'w1').fileId).toBe(pathId(start, 'Empty'));
+  });
+
+  it('refuses to open into a new window once the desktop holds the most windows', () => {
+    const { act } = setup();
+    const start = buildDesktop({
+      files,
+      windows: [
+        { app: 'notepad', text: 'mine' },
+        ...Array.from({ length: MAX_WINDOWS - 1 }, () => ({ app: 'calculator' as const })),
+      ],
+      focus: 0,
+    });
+    const chosen = act(
+      start,
+      command('w1', 'open'),
+      dialog('w1', { type: 'open-folder', folderId: pathId(start, 'Notes') }),
+      dialog('w1', { type: 'select', nodeId: pathId(start, 'Notes/Shopping list') }),
+    ).state;
+    expect(act(chosen, dialog('w1', { type: 'confirm' })).events).toEqual([
+      { type: 'rejected', action: 'dialog', reason: 'too-many-windows' },
+    ]);
+  });
+
+  it.each([
+    ['a picture into a blank viewer', 'picture-viewer', 'Pictures', 'Pictures/Fox', 'picture-viewer'],
+    ['a tune into a blank music box', 'music-box', '', 'Song', 'music-box'],
+  ] as const)('opens %s from its open dialog', (_label, app, folder, path, kind) => {
+    const { act } = setup();
+    const start = buildDesktop({ files: { ...files, Song: tune([[1, 1]]) }, windows: [{ app }] });
+    const steps: DesktopAction[] = [command('w1', 'open')];
+    if (folder !== '') steps.push(dialog('w1', { type: 'open-folder', folderId: pathId(start, folder) }));
+    steps.push(dialog('w1', { type: 'select', nodeId: pathId(start, path) }), dialog('w1', { type: 'confirm' }));
+    const { state } = act(start, ...steps);
+    expect(state.windows).toHaveLength(1);
+    expect(win(state, 'w1').app).toMatchObject({ kind, fileId: pathId(start, path), dialog: null });
+  });
+
+  it('refuses a note in the music box open dialog', () => {
+    const { act } = setup();
+    const start = buildDesktop({ files: { List: note() }, windows: [{ app: 'music-box' }] });
+    const chosen = act(
+      start,
+      command('w1', 'open'),
+      dialog('w1', { type: 'select', nodeId: pathId(start, 'List') }),
+    ).state;
+    expect(act(chosen, dialog('w1', { type: 'confirm' })).events).toEqual([
+      { type: 'rejected', action: 'dialog', reason: 'not-a-file' },
+    ]);
+  });
+
+  it('sends a dialog home when its folder goes to the trash, and drops its choices', () => {
+    const { act } = setup();
+    const start = buildDesktop({
+      files: { Notes: { A: note('a') } },
+      windows: [{ app: 'notepad', text: 'x' }, { app: 'file-explorer' }],
+    });
+    const asked = act(
+      start,
+      command('w1', 'save-as'),
+      dialog('w1', { type: 'open-folder', folderId: pathId(start, 'Notes') }),
+      ...typing('w1', 'A', 'file-name'),
+      dialog('w1', { type: 'confirm' }),
+      dialog('w1', { type: 'select', nodeId: pathId(start, 'Notes/A') }),
+      dialog('w1', { type: 'confirm' }),
+    ).state;
+    expect(notepad(asked, 'w1').dialog).toMatchObject({
+      selectedId: pathId(start, 'Notes/A'),
+      replaceId: pathId(start, 'Notes/A'),
+    });
+    const { state } = act(asked, {
+      type: 'explorer',
+      windowId: 'w2',
+      action: { type: 'move', nodeId: pathId(start, 'Notes'), toId: TRASH_ID },
+    });
+    expect(notepad(state, 'w1').dialog).toMatchObject({ folderId: pathId(start, ''), selectedId: null });
+  });
+
+  it('forgets a replace question when the file goes away for good', () => {
+    const { act } = setup();
+    const start = buildDesktop({
+      files: { A: note('a') },
+      windows: [{ app: 'notepad', text: 'x' }, { app: 'file-explorer' }],
+    });
+    const asked = act(
+      start,
+      command('w1', 'save-as'),
+      ...typing('w1', 'A', 'file-name'),
+      dialog('w1', { type: 'confirm' }),
+    ).state;
+    const { state } = act(
+      asked,
+      { type: 'explorer', windowId: 'w2', action: { type: 'move', nodeId: pathId(start, 'A'), toId: TRASH_ID } },
+      command('w2', 'empty-trash'),
+    );
+    expect(notepad(state, 'w1').dialog?.replaceId).toBeNull();
+  });
+});
+
+describe('app command events', () => {
+  it('reports the calculator copying its display and clearing from the menu', () => {
+    const { act, clipboard } = setup();
+    const start = buildDesktop({ windows: [{ app: 'calculator' }] });
+    const typed = act(
+      start,
+      { type: 'calculator', windowId: 'w1', key: { type: 'digit', digit: 5 } },
+      command('w1', 'copy'),
+    );
+    expect(typed.events.at(-1)).toEqual({ type: 'copied', windowId: 'w1', text: '5' });
+    expect(clipboard.read()?.text).toBe('5');
+    const cleared = act(typed.state, command('w1', 'clear'));
+    expect(cleared.events.at(-1)).toEqual({ type: 'calculator-changed', windowId: 'w1', display: '0', problem: null });
+  });
+
+  it('reports an operator key even though the display stays the same', () => {
+    const { act } = setup();
+    const start = buildDesktop({ windows: [{ app: 'calculator' }] });
+    const { events } = act(
+      start,
+      { type: 'calculator', windowId: 'w1', key: { type: 'digit', digit: 5 } },
+      { type: 'calculator', windowId: 'w1', key: { type: 'operator', operator: 'add' } },
+    );
+    expect(events.at(-1)).toEqual({ type: 'calculator-changed', windowId: 'w1', display: '5', problem: null });
+  });
+
+  it('reports undo and redo in the music box', () => {
+    const { act } = setup();
+    const { events } = act(
+      buildDesktop({ windows: [{ app: 'music-box' }] }),
+      { type: 'music-box', windowId: 'w1', action: { type: 'toggle', step: 0, note: 0 } },
+      command('w1', 'undo'),
+      command('w1', 'redo'),
+    );
+    expect(events.slice(1).map((event) => event.type)).toEqual(['command-run', 'undone', 'command-run', 'redone']);
+  });
+
+  it('reports nothing for a settings action that changes no setting', () => {
+    const { act } = setup();
+    expect(
+      act(buildDesktop({ windows: [{ app: 'settings' }] }), {
+        type: 'settings',
+        windowId: 'w1',
+        action: { type: 'open-dropdown' },
+      }).events,
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['file-name', 'notepad'],
+    ['document', 'calculator'],
+    ['search', 'notepad'],
+    ['rename', 'file-explorer'],
+    ['computer-name', 'notepad'],
+  ] as const)('refuses typing into %s in a %s that has no such field now', (field, app) => {
+    const { act } = setup();
+    expect(
+      act(buildDesktop({ windows: [{ app }] }), {
+        type: 'text',
+        windowId: 'w1',
+        field,
+        op: { type: 'insert', text: 'a' },
+      }).events,
+    ).toEqual([{ type: 'rejected', action: 'text', reason: 'no-text-field' }]);
+  });
+
+  it('refuses typing into the name of an open dialog, which has none', () => {
+    const { act } = setup();
+    const opened = act(buildDesktop({ windows: [{ app: 'notepad' }] }), command('w1', 'open')).state;
+    expect(
+      act(opened, { type: 'text', windowId: 'w1', field: 'file-name', op: { type: 'insert', text: 'a' } }).events[0],
+    ).toMatchObject({
+      reason: 'no-text-field',
+    });
+  });
+});
+
+function createdNotepad(): NotepadState {
+  const state = buildDesktop({ windows: [{ app: 'notepad' }] });
+  return notepad(state, 'w1');
+}

@@ -3,7 +3,7 @@ import { createToyClipboard } from '../../../app/inputGuards.ts';
 import { buildDesktop } from './build.ts';
 import { reduceAll, type DesktopAction } from './desktop.ts';
 import { applyFault, isFaultFixed, MOSTLY_VISIBLE, type Fault } from './faults.ts';
-import { visibleFraction } from './geometry.ts';
+import { MIN_VISIBLE_TITLE_BAR, visibleFraction } from './geometry.ts';
 import type { DesktopState } from './state.ts';
 
 function desktop(): DesktopState {
@@ -148,5 +148,44 @@ describe('faults for the Fix it lesson', () => {
     expect(() => applyFault(alone, { kind: 'wrong-app-in-front', windowId: 'w1' })).toThrow(
       'needs another visible window',
     );
+  });
+});
+
+describe('fault details', () => {
+  it('keeps every other window in order when it sends one to the back', () => {
+    const broken = applyFault(desktop(), { kind: 'wrong-app-in-front', windowId: 'w2' });
+    expect(broken.windows.map((window) => window.id)).toEqual(['w2', 'w1', 'w3']);
+  });
+
+  it('brings a minimized or maximized cover back to cover the window', () => {
+    const start = buildDesktop({
+      windows: [
+        { app: 'notepad', at: { x: 200, y: 100 } },
+        { app: 'calculator', minimized: true },
+        { app: 'music-box', maximized: true },
+      ],
+    });
+    const broken = applyFault(start, { kind: 'window-behind', windowId: 'w1', coveredBy: 'w3' });
+    expect(broken.windows.at(-1)).toMatchObject({
+      id: 'w3',
+      minimized: false,
+      maximized: false,
+      rect: broken.windows[0]?.rect,
+    });
+  });
+
+  it('pushes a window off to the right with a grab-sized part showing', () => {
+    const broken = applyFault(desktop(), { kind: 'window-off-side', windowId: 'w1', side: 'right' });
+    expect(broken.windows[0]?.rect.x).toBe(broken.size.width - MIN_VISIBLE_TITLE_BAR);
+  });
+
+  it('counts a minimized window as fixed once restored, even behind another', () => {
+    const fault: Fault = { kind: 'window-minimized', windowId: 'w1' };
+    const fixed = act(
+      applyFault(desktop(), fault),
+      { type: 'activate-window', windowId: 'w1' },
+      { type: 'focus-window', windowId: 'w3' },
+    );
+    expect(isFaultFixed(fixed, fault)).toBe(true);
   });
 });

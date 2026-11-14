@@ -77,6 +77,7 @@ describe('visibleFraction', () => {
     ['a quarter on, at the bottom right corner', { x: 950, y: 950, width: 100, height: 100 }, 0.25],
     ['fully off', { x: 2000, y: 0, width: 100, height: 100 }, 0],
     ['touching the edge from outside', { x: -100, y: 0, width: 100, height: 100 }, 0],
+    ['off past the top left corner', { x: -300, y: -300, width: 100, height: 100 }, 0],
   ])('is right for a window %s', (_label, rect, fraction) => {
     expect(visibleFraction(rect, desktop)).toBe(fraction);
   });
@@ -116,5 +117,29 @@ describe('cascadeRect', () => {
     expect(rect.width).toBe(MIN_DESKTOP_SIZE.width);
     expect(rect.height).toBe(MIN_DESKTOP_SIZE.height);
     expect(titleBarReachable(rect, MIN_DESKTOP_SIZE)).toBe(true);
+  });
+});
+
+describe('cascadeRect places', () => {
+  const desktop = { width: 1280, height: 800 };
+
+  it('does not count a window with the same left edge but another top as taken', () => {
+    const size = { width: 560, height: 400 };
+    const first = cascadeRect(size, desktop, []);
+    expect(cascadeRect(size, desktop, [{ ...first, y: first.y + 200 }])).toEqual(first);
+  });
+
+  it.each([
+    ['a wide window, limited by the width', { width: 1000, height: 300 }],
+    ['a tall window, limited by the height', { width: 400, height: 600 }],
+  ])('uses every place that fits for %s', (_label, size) => {
+    const taken: Rect[] = [];
+    for (let index = 0; index < 40; index += 1) taken.push(cascadeRect(size, desktop, taken));
+    const right = Math.max(...taken.map((rect) => rect.x + rect.width));
+    const bottom = Math.max(...taken.map((rect) => rect.y + rect.height));
+    // The last place leaves less than one step of room on the limiting side.
+    expect(Math.max(desktop.width - right, 0) < CASCADE_STEP || desktop.height - bottom < CASCADE_STEP).toBe(true);
+    expect(right).toBeLessThanOrEqual(desktop.width);
+    expect(bottom).toBeLessThanOrEqual(desktop.height);
   });
 });

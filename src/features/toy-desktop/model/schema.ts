@@ -21,7 +21,16 @@ import {
 import { TUNE_NOTES, TUNE_STEPS, type Tune } from './apps/tune.ts';
 import { COMMAND_IDS } from './commands.ts';
 import { repairWindows } from './desktop.ts';
-import { ancestry, HOME_ID, MAX_NODES, MAX_NOTE_LENGTH, TRASH_ID, type FileSystem, type FsNode } from './fileSystem.ts';
+import {
+  ancestry,
+  getNode,
+  HOME_ID,
+  MAX_NODES,
+  MAX_NOTE_LENGTH,
+  TRASH_ID,
+  type FileSystem,
+  type FsNode,
+} from './fileSystem.ts';
 import { clampDesktopSize, clampWindowRect } from './geometry.ts';
 import { checkName, sameName } from './names.ts';
 import { sampleDesktop } from './sampleContent.ts';
@@ -59,7 +68,14 @@ const editorSchema = z
   .refine((editor) => editor.anchor <= editor.text.length && editor.caret <= editor.text.length, {
     message: 'selection must be inside the text',
   })
-  .transform((editor): TextEditorState => ({ ...editor, undo: [], redo: [], run: null }));
+  // A lone surrogate becomes U+FFFD, the same length, so the editor's caret rules hold.
+  .transform((editor): TextEditorState => ({
+    ...editor,
+    text: editor.text.toWellFormed(),
+    undo: [],
+    redo: [],
+    run: null,
+  }));
 
 const tuneSchema = z.object({
   steps: z.array(z.array(z.boolean()).length(TUNE_NOTES)).length(TUNE_STEPS),
@@ -90,10 +106,8 @@ function fileSystemProblem(fs: FileSystem): string | null {
   for (const [key, node] of nodes) {
     if (key !== node.id) return `item ${key} has id ${node.id}`;
     if (node.id === HOME_ID || node.id === TRASH_ID) continue;
-    const parent = node.parentId === null ? undefined : fs.nodes[node.parentId];
-    if (parent?.kind !== 'folder') return `item ${key} is not in a folder`;
-    if (ancestry(fs, key)[0]?.parentId !== null || ancestry(fs, key).length > MAX_NODES)
-      return `item ${key} is in a loop`;
+    if (getNode(fs, node.parentId)?.kind !== 'folder') return `item ${key} is not in a folder`;
+    if (ancestry(fs, key)[0]?.parentId !== null) return `item ${key} is in a loop`;
     if (node.trashedFrom !== null && node.parentId !== TRASH_ID)
       return `item ${key} remembers a trash place outside the trash`;
   }
@@ -126,8 +140,7 @@ const calculatorSchema = z.object({
     .string()
     .regex(/^-?\d+(\.\d*)?$/)
     .refine((display) => display.replace(/\D/g, '').length <= CALCULATOR_MAX_DIGITS, 'too many digits'),
-  stored: z.number().finite().nullable(),
-  pending: z.enum(OPERATORS).nullable(),
+  pending: z.object({ operator: z.enum(OPERATORS), left: z.number().finite() }).nullable(),
   fresh: z.boolean(),
   repeat: z.object({ operator: z.enum(OPERATORS), operand: z.number().finite() }).nullable(),
   problem: z.enum(['divide-by-zero', 'too-big']).nullable(),
@@ -209,9 +222,8 @@ function repairLoaded(state: DesktopState): DesktopState {
     nextId: Math.max(state.nextId, highestIdNumber(Object.keys(state.fs.nodes)) + 1),
     nextWindowId: Math.max(state.nextWindowId, highestIdNumber(state.windows.map((window) => window.id)) + 1),
   };
-  const focused = placed.windows.find((window) => window.id === placed.focusedWindowId && !window.minimized);
-  const focusedWindowId = focused?.id ?? topVisibleWindow(placed)?.id ?? null;
-  return repairWindows({ ...placed, focusedWindowId });
+  // Focus always sits on the front window that is not minimized.
+  return repairWindows({ ...placed, focusedWindowId: topVisibleWindow(placed)?.id ?? null });
 }
 
 /** @public */

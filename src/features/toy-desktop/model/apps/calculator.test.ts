@@ -159,3 +159,41 @@ describe('copy and paste', () => {
     expect(press('3', pasted).display).toBe('123');
   });
 });
+
+describe('calculator edges', () => {
+  it('starts a new number after equals with nothing to repeat', () => {
+    expect(press('5=7').display).toBe('7');
+  });
+
+  it('leaves no lone minus when backspace removes the last digit of a negative number', () => {
+    const pasted = pasteNumber(createCalculator(), '-7');
+    if (pasted === null) throw new Error('paste failed');
+    expect(press('<', pasted).display).toBe('0');
+  });
+
+  it('keeps a waiting operation when a number is pasted', () => {
+    const pasted = pasteNumber(press('5+'), '3');
+    if (pasted === null) throw new Error('paste failed');
+    expect(press('=', pasted).display).toBe('8');
+  });
+
+  it('pastes a decimal of several digits without a leading zero', () => {
+    expect(pasteNumber(createCalculator(), '.25')?.display).toBe('0.25');
+  });
+
+  it('forgets the waiting and repeated operations after a problem', () => {
+    expect(press('8/0=')).toMatchObject({ problem: 'divide-by-zero', pending: null, repeat: null });
+    expect(press('8/0+')).toMatchObject({ problem: 'divide-by-zero', pending: null });
+  });
+
+  it.each([
+    ['the first number too big', 1e10],
+    ['a number far too big', 1e21],
+  ])('gives null for %s', (_label, value) => {
+    expect(formatNumber(value)).toBeNull();
+  });
+
+  it('shows the largest whole number', () => {
+    expect(formatNumber(9999999999)).toBe('9999999999');
+  });
+});

@@ -21,7 +21,9 @@ const LAST_SCROLL = ALERT_SOUNDS.length - LIST_VISIBLE_ROWS;
 
 describe('the settings panel', () => {
   it('starts with the name field holding the computer name', () => {
-    expect(createSettingsPanel({ ...defaultSettings(), computerName: 'Rocket' }).nameField.text).toBe('Rocket');
+    const panel = createSettingsPanel({ ...defaultSettings(), computerName: 'Rocket' });
+    expect(panel.nameField.text).toBe('Rocket');
+    expect(panel.dropdownOpen).toBe(false);
   });
 
   it.each([

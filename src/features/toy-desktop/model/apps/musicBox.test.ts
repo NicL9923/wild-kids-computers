@@ -95,3 +95,32 @@ describe('the music box grid', () => {
     expect(tick(stopped)).toBeNull();
   });
 });
+
+describe('music box history', () => {
+  it('finds no notes on a step outside the grid', () => {
+    expect(notesAt(tuneFrom([[0, 0]]), TUNE_STEPS)).toEqual([]);
+  });
+
+  it('undoes and redoes several steps in order', () => {
+    const grid = toggleCell(toggleCell(createGrid(), 0, 0), 1, 1);
+    const undone = undoGrid(undoGrid(grid));
+    expect(isEmptyTune(undone.tune)).toBe(true);
+    expect(undone.undo).toEqual([]);
+    const redone = redoGrid(redoGrid(undone));
+    expect(sameTune(redone.tune, grid.tune)).toBe(true);
+    expect(redone.redo).toEqual([]);
+  });
+
+  it('forgets redo when the grid is cleared', () => {
+    const undone = undoGrid(toggleCell(toggleCell(createGrid(), 0, 0), 1, 1));
+    expect(clearGrid(undone).redo).toEqual([]);
+  });
+
+  it('drops the oldest changes once history is full, so undo cannot reach the start', () => {
+    let grid = createGrid();
+    for (let index = 0; index < 60; index += 1)
+      grid = toggleCell(grid, index % TUNE_STEPS, Math.floor(index / TUNE_STEPS) % TUNE_NOTES);
+    while (grid.undo.length > 0) grid = undoGrid(grid);
+    expect(isEmptyTune(grid.tune)).toBe(false);
+  });
+});

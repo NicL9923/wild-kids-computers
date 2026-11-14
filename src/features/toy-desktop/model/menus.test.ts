@@ -192,3 +192,37 @@ describe('menu bars', () => {
     expect(checked).toBeGreaterThan(30);
   });
 });
+
+describe('the conventional shortcuts', () => {
+  // These are the keys real computers use. The shortcut lessons teach them, and nothing else pins them.
+  it.each<[CommandId, string, boolean]>([
+    ['new', 'N', false],
+    ['open', 'O', false],
+    ['save', 'S', false],
+    ['save-as', 'S', true],
+    ['close', 'W', false],
+    ['undo', 'Z', false],
+    ['redo', 'Z', true],
+    ['cut', 'X', false],
+    ['copy', 'C', false],
+    ['paste', 'V', false],
+    ['select-all', 'A', false],
+    ['new-folder', 'N', true],
+    ['go-up', 'ArrowUp', false],
+  ])('runs %s with the primary modifier and %s', (command, pressed, shift) => {
+    expect(
+      commandsForKey(
+        key(pressed.length === 1 ? pressed.toLowerCase() : pressed, { ctrlKey: true, shiftKey: shift }),
+        'windows',
+      ),
+    ).toEqual([command]);
+  });
+
+  it.each<[CommandId, string]>([
+    ['delete', 'Delete'],
+    ['previous', 'ArrowLeft'],
+    ['next', 'ArrowRight'],
+  ])('runs %s with %s alone', (command, pressed) => {
+    expect(commandsForKey(key(pressed), 'linux')).toEqual([command]);
+  });
+});

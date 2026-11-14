@@ -49,7 +49,8 @@ export function windowWithFile(state: DesktopState, path: string): WindowState |
 /** True when the folder at `folderPath` holds an item named `name`. "" is home. */
 export function isInFolder(state: DesktopState, name: string, folderPath: string): boolean {
   const folder = nodeAtPath(state.fs, folderPath);
-  if (folder?.kind !== 'folder') return false;
+  // A file at that path lists nothing.
+  if (folder === undefined) return false;
   return listFolder(state.fs, folder.id).some((node) => sameName(node.name, name));
 }
 

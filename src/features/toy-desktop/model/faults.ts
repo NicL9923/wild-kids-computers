@@ -45,9 +45,8 @@ export function applyFault(state: DesktopState, fault: Fault): DesktopState {
     case 'window-minimized': {
       const window = windowOrThrow(state, fault.windowId);
       const next = replace(state, { ...window, minimized: true });
-      const focusedWindowId =
-        state.focusedWindowId === window.id ? (topVisibleWindow(next)?.id ?? null) : state.focusedWindowId;
-      return { ...next, focusedWindowId };
+      // Focus always sits on the front window that is not minimized.
+      return { ...next, focusedWindowId: topVisibleWindow(next)?.id ?? null };
     }
     case 'window-behind': {
       const window = windowOrThrow(state, fault.windowId);
@@ -84,11 +83,10 @@ export function isFaultFixed(state: DesktopState, fault: Fault): boolean {
   switch (fault.kind) {
     case 'window-minimized':
       return !window.minimized;
-    case 'window-behind':
-      return !window.minimized && topVisibleWindow(state)?.id === window.id;
     case 'window-off-side':
       return !window.minimized && (window.maximized || visibleFraction(window.rect, state.size) >= MOSTLY_VISIBLE);
-    // 'wrong-app-in-front', the last case.
+    // 'window-behind' and 'wrong-app-in-front'. Focus always sits on the front window that is not
+    // minimized, so a focused window is in front and not covered.
     default:
       return state.focusedWindowId === window.id;
   }

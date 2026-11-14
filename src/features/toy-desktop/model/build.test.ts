@@ -216,3 +216,37 @@ describe('goal checks', () => {
     expect(hasEvent(events, 'window-closed')).toBe(false);
   });
 });
+
+describe('builder details', () => {
+  it('makes an empty note and an empty tune by default', () => {
+    expect(note()).toEqual({ kind: 'note', text: '' });
+    const empty = tune();
+    expect(empty.kind === 'tune' && empty.tune.steps.flat().some(Boolean)).toBe(false);
+  });
+
+  it('keeps line breaks in a builder notepad', () => {
+    const state = buildDesktop({ windows: [{ app: 'notepad', text: 'one\ntwo' }] });
+    expect(state.windows[0]?.app).toMatchObject({ editor: { text: 'one\ntwo' } });
+  });
+
+  it('treats a folder holding an item named "kind" as a folder', () => {
+    const state = buildDesktop({ files: { Box: { kind: note('x') } } });
+    expect(getNode(state.fs, pathId(state, 'Box'))?.kind).toBe('folder');
+    expect(getNode(state.fs, pathId(state, 'Box/kind'))?.kind).toBe('note');
+  });
+});
+
+describe('more goal checks', () => {
+  it('finds a name among several items in the trash', () => {
+    const state = buildDesktop({ trash: { A: { from: '', item: note() }, B: { from: '', item: note() } } });
+    expect(isInTrash(state, 'b')).toBe(true);
+    expect(isInTrash(state, 'C')).toBe(false);
+  });
+
+  it('ignores spaces around the text a note should contain, and a missing note', () => {
+    const state = buildDesktop({ files: { List: note('big tree') }, windows: [{ app: 'notepad', text: 'red fox' }] });
+    expect(noteContains(state, '  red fox ')).toBe(true);
+    expect(noteContains(state, ' tree ', { file: 'List' })).toBe(true);
+    expect(noteContains(state, 'tree', { file: 'Nowhere' })).toBe(false);
+  });
+});

@@ -378,3 +378,32 @@ describe('searchByName', () => {
     expect(searchByName(trashed, 'owl')).toEqual([]);
   });
 });
+
+describe('file system edges', () => {
+  it('finds nothing past a missing folder, and trims spaces around each part', () => {
+    const fs = sample();
+    expect(nodeAtPath(fs, 'Nope/Deeper/Still')).toBeUndefined();
+    expect(nodeAtPath(fs, ' Pictures / Fox ')?.name).toBe('Fox');
+  });
+
+  it('checks a rename against the names in the item’s own folder', () => {
+    const fs = buildDesktop({ files: { Notes: { A: note(), B: note() }, C: note() } }).fs;
+    expect(renameNode(fs, id(fs, 'Notes/A'), 'b')).toEqual({ ok: false, problem: 'duplicate' });
+    expect(renameNode(fs, id(fs, 'Notes/A'), 'C')).toMatchObject({ ok: true, node: { name: 'C' } });
+  });
+
+  it('restores an item that remembers no folder to home', () => {
+    const fs = sample();
+    const facts = id(fs, 'fox facts');
+    const trashed = ok(trashNode(fs, facts));
+    const node = getNode(trashed, facts);
+    if (node === undefined) throw new Error('missing');
+    const forgetful: FileSystem = { nodes: { ...trashed.nodes, [facts]: { ...node, trashedFrom: null } } };
+    expect(restoreNode(forgetful, facts)).toMatchObject({ ok: true, toId: HOME_ID, node: { parentId: HOME_ID } });
+  });
+
+  it('sorts search results by place with numbers in order, ignoring case', () => {
+    const fs = buildDesktop({ files: { 'item 10': note(), 'Item 9': note(), b: { 'Item 1': note() } } }).fs;
+    expect(searchByName(fs, 'item').map((node) => pathOf(fs, node.id))).toEqual(['b/Item 1', 'Item 9', 'item 10']);
+  });
+});

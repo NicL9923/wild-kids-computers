@@ -9,7 +9,8 @@ import {
   type ExplorerAction,
   type Transition,
 } from './desktop.ts';
-import { getNode, HOME_ID, nodeAtPath, TRASH_ID } from './fileSystem.ts';
+import { getNode, HOME_ID, MAX_NODES, nodeAtPath, TRASH_ID } from './fileSystem.ts';
+import { MAX_NAME_LENGTH } from './names.ts';
 import { findWindow, type DesktopState, type FileExplorerState } from './state.ts';
 
 const act = (state: DesktopState, ...actions: DesktopAction[]): Transition =>
@@ -308,7 +309,7 @@ describe('moving, deleting, and restoring', () => {
     expect(
       act(state, ex({ type: 'select', nodeId: pathId(state, 'Toys') }), run('restore')).events.at(-1),
     ).toMatchObject({
-      reason: 'command-disabled',
+      reason: 'not-in-trash',
     });
   });
 
@@ -339,3 +340,53 @@ describe('moving, deleting, and restoring', () => {
     expect(explorer(emptied, 'w1').selectedId).toBeNull();
   });
 });
+
+describe('explorer edges', () => {
+  it('stops the search field at the longest name', () => {
+    const { state } = act(start(), ...typeInto('search', 'x'.repeat(MAX_NAME_LENGTH + 5)));
+    expect(explorer(state).search.text).toHaveLength(MAX_NAME_LENGTH);
+  });
+
+  it('shows the folder while the search field holds only spaces', () => {
+    const { state } = act(start(), ...typeInto('search', '   '));
+    expect(explorerItems(state.fs, explorer(state)).map((node) => node.name)).toEqual(['Notes', 'Pictures', 'Toys']);
+  });
+
+  it('clears the selection', () => {
+    const state = start();
+    const selected = act(state, ex({ type: 'select', nodeId: pathId(state, 'Toys') })).state;
+    const { state: next, events } = act(selected, ex({ type: 'select', nodeId: null }));
+    expect(explorer(next).selectedId).toBeNull();
+    expect(events).toEqual([{ type: 'selection-changed', windowId: 'w1', nodeId: null }]);
+  });
+
+  it('refuses to rename the trash', () => {
+    expect(act(start(), ex({ type: 'start-rename', nodeId: TRASH_ID })).events[0]).toMatchObject({
+      reason: 'fixed-folder',
+    });
+  });
+
+  it('refuses to delete home or the trash when one is selected', () => {
+    const selected = act(start(), ex({ type: 'select', nodeId: TRASH_ID })).state;
+    expect(act(selected, run('delete')).events).toEqual([
+      { type: 'rejected', action: 'command', reason: 'fixed-folder' },
+    ]);
+  });
+
+  it('keeps both of two new folders', () => {
+    const { state } = act(start(), run('new-folder'), ex({ type: 'commit-rename' }), run('new-folder'));
+    expect(folderNames(state)).toEqual([NEW_FOLDER_NAME, `${NEW_FOLDER_NAME} 2`, 'Notes', 'Pictures', 'Toys']);
+  });
+
+  it('refuses a new folder when the file system is full', () => {
+    const many = Object.fromEntries(Array.from({ length: MAX_NODES - 2 }, (_, index) => [`F${index}`, note()]));
+    const state = buildDesktop({ files: many, windows: [{ app: 'file-explorer' }] });
+    expect(act(state, run('new-folder')).events).toEqual([{ type: 'rejected', action: 'command', reason: 'full' }]);
+  });
+});
+
+function folderNames(state: DesktopState): string[] {
+  return explorerItems(state.fs, explorer(state))
+    .filter((node) => node.kind === 'folder')
+    .map((node) => node.name);
+}

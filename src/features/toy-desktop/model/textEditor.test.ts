@@ -304,3 +304,62 @@ describe('undo and redo', () => {
     expect(undone.text).toBe('w '.repeat(5));
   });
 });
+
+describe('editor edges', () => {
+  it.each([
+    ['the first character past the basic plane', '\u{10000}', 2],
+    ['the last character there is', '\u{10FFFF}', 2],
+    ['the last character before the surrogates', '퟿', 1],
+    ['the first private use character after them', '', 1],
+  ])('steps over %s as one character', (_label, character, width) => {
+    const text = `a${character}b`;
+    expect(run(at(text, 1), move('right')).caret).toBe(1 + width);
+    expect(run(at(text, 1 + width), move('left')).caret).toBe(1);
+  });
+
+  it('replaces a lone surrogate, so the caret never lands past the text', () => {
+    const editor = createEditor({ text: 'a\uD83E', multiline: true });
+    expect(editor.text).toBe('a�');
+    expect(run({ ...editor, anchor: 1, caret: 1 }, move('right')).caret).toBe(2);
+  });
+
+  it('makes a one-line field unless told otherwise', () => {
+    expect(run(createEditor(), { type: 'insert', text: '\n' }).text).toBe('');
+  });
+
+  it('turns a lone carriage return into a line break', () => {
+    expect(createEditor({ text: 'a\rb', multiline: true }).text).toBe('a\nb');
+  });
+
+  it('reports no paste for typing', () => {
+    const result = applyTextOp(createEditor(), { type: 'insert', text: 'a' }, createToyClipboard());
+    expect(result.pasted).toBeUndefined();
+    expect(result.changed).toBe(true);
+  });
+
+  it('reports a change for each Backspace in a run', () => {
+    const once = applyTextOp(createEditor({ text: 'abc' }), { type: 'backspace' }, createToyClipboard());
+    const twice = applyTextOp(once.editor, { type: 'backspace' }, createToyClipboard());
+    expect(twice).toMatchObject({ changed: true, editor: { text: 'a' } });
+  });
+
+  it('undoes again after a redo', () => {
+    const typed = type(createEditor(), 'cat');
+    const back = run(typed, { type: 'undo' }, { type: 'redo' }, { type: 'undo' });
+    expect(back.text).toBe('');
+    expect(canRedo(back)).toBe(true);
+  });
+
+  it('joins typed text that starts with a space to the word before it', () => {
+    const typed = run(type(createEditor({ multiline: true }), 'a'), { type: 'insert', text: ' z' });
+    expect(run(typed, { type: 'undo' }).text).toBe('');
+  });
+
+  it('groups by what is before the caret, not by the end of the text', () => {
+    // Text after the caret ends with a space, which must not split the word being typed.
+    const editor = { ...createEditor({ text: 'x ', multiline: true }), anchor: 0, caret: 0 };
+    const typed = run(editor, { type: 'insert', text: 'a' }, { type: 'insert', text: 'b' });
+    expect(typed.text).toBe('abx ');
+    expect(run(typed, { type: 'undo' }).text).toBe('x ');
+  });
+});

@@ -84,7 +84,8 @@ export function emptyDesktop(size: Size = DEFAULT_DESKTOP_SIZE): DesktopState {
 }
 
 function isFileSpec(value: TreeSpec | FileSpec): value is FileSpec {
-  return typeof value.kind === 'string' && (FILE_KINDS as readonly string[]).includes(value.kind);
+  // A folder's `kind` is undefined, or a child item when the folder holds one named "kind".
+  return (FILE_KINDS as readonly unknown[]).includes(value.kind);
 }
 
 function fail(message: string): never {
@@ -131,10 +132,11 @@ function openWindow(state: DesktopState, spec: WindowSpec): DesktopState {
   if (rejected !== undefined) fail(`cannot open ${JSON.stringify(spec)}: ${rejected.reason}`);
   const window = opened.state.windows.at(-1) ?? fail('no window opened');
   let app = window.app;
-  if ('app' in spec && spec.app === 'notepad' && spec.text !== undefined && app.kind === 'notepad') {
+  // Only a notepad spec has `text`, and only a file explorer spec has `folder`.
+  if (app.kind === 'notepad' && 'text' in spec) {
     app = { ...app, editor: createEditor({ text: spec.text, multiline: true, maxLength: app.editor.maxLength }) };
   }
-  if ('app' in spec && spec.app === 'file-explorer' && spec.folder !== undefined && app.kind === 'file-explorer') {
+  if (app.kind === 'file-explorer' && 'folder' in spec && spec.folder !== undefined) {
     app = { ...app, folderId: folderId(state, spec.folder) };
   }
   const rect = clampWindowRect({ ...window.rect, ...spec.at, ...spec.size }, state.size);

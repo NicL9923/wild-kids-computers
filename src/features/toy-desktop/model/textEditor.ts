@@ -87,10 +87,10 @@ function codePointLength(text: string): number {
   return Array.from(text).length;
 }
 
-function isLowSurrogate(code: number): boolean {
-  return code >= 0xdc00 && code <= 0xdfff;
-}
-
+/**
+ * The first half of a character outside the Basic Multilingual Plane, such as an emoji. Text
+ * from the keyboard and the toy clipboard is well formed, so its second half always follows.
+ */
 function isHighSurrogate(code: number): boolean {
   return code >= 0xd800 && code <= 0xdbff;
 }
@@ -98,24 +98,17 @@ function isHighSurrogate(code: number): boolean {
 /** Moves an offset off the middle of a surrogate pair, toward the start. */
 function snap(text: string, offset: number): number {
   const clamped = Math.min(Math.max(Math.trunc(offset), 0), text.length);
-  return clamped > 0 &&
-    clamped < text.length &&
-    isLowSurrogate(text.charCodeAt(clamped)) &&
-    isHighSurrogate(text.charCodeAt(clamped - 1))
-    ? clamped - 1
-    : clamped;
+  // charCodeAt(-1) is NaN, which is no surrogate, so the start needs no special case.
+  return isHighSurrogate(text.charCodeAt(clamped - 1)) ? clamped - 1 : clamped;
 }
 
 function previousOffset(text: string, offset: number): number {
-  if (offset <= 0) return 0;
   return snap(text, offset - 1);
 }
 
 function nextOffset(text: string, offset: number): number {
   if (offset >= text.length) return text.length;
-  return isHighSurrogate(text.charCodeAt(offset)) && isLowSurrogate(text.charCodeAt(offset + 1))
-    ? offset + 2
-    : offset + 1;
+  return isHighSurrogate(text.charCodeAt(offset)) ? offset + 2 : offset + 1;
 }
 
 export interface EditorOptions {
@@ -169,8 +162,9 @@ export function canRedo(editor: TextEditorState): boolean {
   return editor.redo.length > 0;
 }
 
+/** Unifies line breaks and replaces a lone surrogate, so every emoji is a whole pair. */
 function normalize(text: string, multiline: boolean): string {
-  const unified = text.replace(/\r\n?/g, '\n');
+  const unified = text.toWellFormed().replace(/\r\n?/g, '\n');
   return multiline ? unified : unified.replace(/\n/g, ' ');
 }
 
@@ -189,8 +183,9 @@ function pushUndo(
   editor: TextEditorState,
   run: TextEditorState['run'],
   joins: boolean,
-): Pick<TextEditorState, 'undo' | 'redo' | 'run'> {
-  if (joins) return { undo: editor.undo, redo: [], run };
+): Partial<Pick<TextEditorState, 'undo' | 'redo' | 'run'>> {
+  // A joining edit keeps the open step. Redo is already empty, since undo ends every run.
+  if (joins) return {};
   return { undo: [...editor.undo, snapshot(editor)].slice(-MAX_UNDO_STEPS), redo: [], run };
 }
 
@@ -226,9 +221,8 @@ function moveCaret(editor: TextEditorState, move: CaretMove, extend: boolean): n
     case 'right':
       return collapsing ? end : nextOffset(text, caret);
     case 'up':
-      return verticalTarget(text, caret, 'up');
     case 'down':
-      return verticalTarget(text, caret, 'down');
+      return verticalTarget(text, caret, move);
     case 'line-start':
       return lineStart(text, caret);
     case 'line-end':
@@ -262,24 +256,28 @@ function insert(editor: TextEditorState, raw: string, kind: 'typing' | 'paste'):
   const room = editor.maxLength - (codePointLength(editor.text) - codePointLength(editor.text.slice(start, end)));
   const fitted = limit(typed, room);
   const pasted = kind === 'paste' ? { pasted: fitted.text } : {};
-  if (fitted.text === '' && start === end) return unchanged(editor, { hitLimit: fitted.cut, ...pasted });
+  // Only a full field leaves nothing to insert: a selection always makes room for its own length.
+  if (fitted.text === '') return unchanged(editor, { hitLimit: fitted.cut, ...pasted });
   const before = editor.text.slice(0, start);
   // A typed run joins the open step until a new word starts after a space or line break.
   const startsWord = /\s$/.test(before) && /^\S/.test(fitted.text);
-  const joins = kind === 'typing' && editor.run === 'typing' && start === end && !startsWord;
+  // A typing run ends whenever the caret moves or text is selected, so it never meets a selection.
+  const joins = kind === 'typing' && editor.run === 'typing' && !startsWord;
   const next = replaceSelection(editor, fitted.text);
   const history = pushUndo(editor, kind === 'typing' ? 'typing' : null, joins);
   return { editor: { ...editor, ...next, ...history }, changed: true, hitLimit: fitted.cut, ...pasted };
 }
 
-function deleteRange(editor: TextEditorState, direction: 'back' | 'forward'): TextOpResult {
-  if (hasSelection(editor)) {
-    const next = replaceSelection(editor, '');
-    return { editor: { ...editor, ...next, ...pushUndo(editor, null, false) }, changed: true };
-  }
+function deleteSelection(editor: TextEditorState): TextOpResult {
+  const next = replaceSelection(editor, '');
+  return { editor: { ...editor, ...next, ...pushUndo(editor, null, false) }, changed: true };
+}
+
+function deleteKey(editor: TextEditorState, key: 'backspace' | 'delete'): TextOpResult {
+  if (hasSelection(editor)) return deleteSelection(editor);
   const { text, caret } = editor;
-  const from = direction === 'back' ? previousOffset(text, caret) : caret;
-  const to = direction === 'back' ? caret : nextOffset(text, caret);
+  const from = key === 'backspace' ? previousOffset(text, caret) : caret;
+  const to = key === 'backspace' ? caret : nextOffset(text, caret);
   if (from === to) return unchanged(editor);
   const joins = editor.run === 'deleting';
   const next = { text: text.slice(0, from) + text.slice(to), anchor: from, caret: from };
@@ -309,9 +307,8 @@ export function applyTextOp(editor: TextEditorState, op: TextOp, clipboard: Text
     case 'insert':
       return insert(editor, op.text, 'typing');
     case 'backspace':
-      return deleteRange(editor, 'back');
     case 'delete':
-      return deleteRange(editor, 'forward');
+      return deleteKey(editor, op.type);
     case 'move': {
       const caret = moveCaret(editor, op.move, op.extend);
       const anchor = op.extend ? editor.anchor : caret;
@@ -332,12 +329,11 @@ export function applyTextOp(editor: TextEditorState, op: TextOp, clipboard: Text
       if (text === '') return unchanged(editor);
       clipboard.write({ kind: 'text', text });
       if (op.type === 'copy') return unchanged({ ...editor, run: null }, { copied: text });
-      return { ...deleteRange(editor, 'back'), copied: text };
+      return { ...deleteSelection(editor), copied: text };
     }
     case 'paste': {
       const content = clipboard.read();
-      if (content === null || content.text === '') return unchanged(editor);
-      return insert(editor, content.text, 'paste');
+      return content === null ? unchanged(editor) : insert(editor, content.text, 'paste');
     }
     case 'undo':
       return restore(editor, 'undo');

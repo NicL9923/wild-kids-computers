@@ -3,8 +3,11 @@
  * calculator works: 2 + 3 × 4 = 20. Pressing equals again repeats the last operation.
  */
 
-/** The most digits the display holds, as on a pocket calculator. */
+/** The most digits the display holds, as on a pocket calculator. A leading zero counts. */
 export const CALCULATOR_MAX_DIGITS = 10;
+
+/** The first number too big for the display. */
+const DISPLAY_LIMIT = 10 ** CALCULATOR_MAX_DIGITS;
 
 export const OPERATORS = ['add', 'subtract', 'multiply', 'divide'] as const;
 /** @public */
@@ -30,9 +33,8 @@ export interface CalculatorState {
   kind: 'calculator';
   /** The number on the display, such as "0", "12.5", or "-3". */
   display: string;
-  /** The number on the left of a waiting operation. */
-  stored: number | null;
-  pending: Operator | null;
+  /** An operation waiting for its second number, with the number on its left. */
+  pending: { operator: Operator; left: number } | null;
   /** True when the next digit starts a new number instead of adding to the display. */
   fresh: boolean;
   /** The last operation, so that pressing equals again repeats it. */
@@ -41,7 +43,7 @@ export interface CalculatorState {
 }
 
 export function createCalculator(): CalculatorState {
-  return { kind: 'calculator', display: '0', stored: null, pending: null, fresh: true, repeat: null, problem: null };
+  return { kind: 'calculator', display: '0', pending: null, fresh: true, repeat: null, problem: null };
 }
 
 function digitCount(display: string): number {
@@ -67,22 +69,25 @@ function compute(left: number, operator: Operator, right: number): number | Calc
  * trailing zeros and never "-0". Returns null when the whole part needs more digits.
  */
 export function formatNumber(value: number): string | null {
-  if (!Number.isFinite(value)) return null;
   const magnitude = Math.abs(value);
+  // NaN fails this test too.
+  if (!(magnitude < DISPLAY_LIMIT)) return null;
   const wholeDigits = String(Math.trunc(magnitude)).length;
-  if (wholeDigits > CALCULATOR_MAX_DIGITS) return null;
   // toFixed rounds from the exact binary value the same way on every machine.
   const fixed = magnitude.toFixed(CALCULATOR_MAX_DIGITS - wholeDigits);
   // Rounding can carry into a new digit, as 9999999999.6 does.
-  if (digitCount(fixed.replace(/\.\d*$/, '')) > CALCULATOR_MAX_DIGITS) return null;
+  if (Number(fixed) >= DISPLAY_LIMIT) return null;
   const trimmed = fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed;
+  // A value that rounds to zero shows "0", never "-0".
   return value < 0 && trimmed !== '0' ? `-${trimmed}` : trimmed;
 }
 
+/** Shows a result and gets ready for a new number, or shows a problem and starts over. */
 function showResult(state: CalculatorState, result: number | CalculatorProblem): CalculatorState {
-  const display = typeof result === 'number' ? formatNumber(result) : null;
-  if (display === null) return { ...createCalculator(), problem: typeof result === 'number' ? 'too-big' : result };
-  return { ...state, display, fresh: true, problem: null };
+  if (typeof result === 'string') return { ...createCalculator(), problem: result };
+  const display = formatNumber(result);
+  if (display === null) return { ...createCalculator(), problem: 'too-big' };
+  return { ...state, display, fresh: true };
 }
 
 function typeDigit(state: CalculatorState, digit: number): CalculatorState {
@@ -99,26 +104,24 @@ function typePoint(state: CalculatorState): CalculatorState {
 }
 
 function chooseOperator(state: CalculatorState, operator: Operator): CalculatorState {
+  const { pending } = state;
   // Pressing a second operator before a new number changes the operation.
-  if (state.pending !== null && state.fresh) return { ...state, pending: operator };
-  if (state.pending !== null && state.stored !== null) {
-    const shown = showResult(state, compute(state.stored, state.pending, Number(state.display)));
-    if (shown.problem !== null) return shown;
-    return { ...shown, stored: Number(shown.display), pending: operator, repeat: null };
-  }
-  return { ...state, stored: Number(state.display), pending: operator, fresh: true, repeat: null };
+  if (pending !== null && state.fresh) return { ...state, pending: { ...pending, operator } };
+  const shown =
+    pending === null ? state : showResult(state, compute(pending.left, pending.operator, Number(state.display)));
+  if (shown.problem !== null) return shown;
+  return { ...shown, pending: { operator, left: Number(shown.display) }, fresh: true, repeat: null };
 }
 
 function equals(state: CalculatorState): CalculatorState {
-  if (state.pending !== null && state.stored !== null) {
+  const { pending, repeat } = state;
+  if (pending !== null) {
     const operand = Number(state.display);
-    const shown = showResult(state, compute(state.stored, state.pending, operand));
+    const shown = showResult(state, compute(pending.left, pending.operator, operand));
     if (shown.problem !== null) return shown;
-    return { ...shown, stored: null, pending: null, repeat: { operator: state.pending, operand } };
+    return { ...shown, pending: null, repeat: { operator: pending.operator, operand } };
   }
-  if (state.repeat !== null) {
-    return showResult(state, compute(Number(state.display), state.repeat.operator, state.repeat.operand));
-  }
+  if (repeat !== null) return showResult(state, compute(Number(state.display), repeat.operator, repeat.operand));
   return { ...state, fresh: true };
 }
 
@@ -137,9 +140,10 @@ export function pressKey(state: CalculatorState, key: CalculatorKey): Calculator
     case 'point':
       return typePoint(start);
     case 'operator':
+      // After a problem, an operator only clears it: there is no number to work on.
       return state.problem === null ? chooseOperator(start, key.operator) : start;
     case 'equals':
-      return state.problem === null ? equals(start) : start;
+      return equals(start);
     case 'clear':
       return createCalculator();
     // 'backspace', the last case.
@@ -154,7 +158,7 @@ export function pressKey(state: CalculatorState, key: CalculatorKey): Calculator
  */
 export function pasteNumber(state: CalculatorState, text: string): CalculatorState | null {
   const trimmed = text.trim();
-  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(trimmed)) return null;
+  if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(trimmed)) return null;
   const display = formatNumber(Number(trimmed));
   if (display === null) return null;
   const base = state.problem === null ? state : createCalculator();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createToyClipboard } from '../../../app/inputGuards.ts';
-import { buildDesktop } from './build.ts';
+import { buildDesktop, note, pathId } from './build.ts';
 import { reduce, reduceAll, windowFrame, type DesktopAction, type Transition } from './desktop.ts';
 import type { DesktopEvent } from './events.ts';
 import {
@@ -362,5 +362,63 @@ describe('sound', () => {
     expect(muted.state.system.muted).toBe(true);
     expect(muted.events).toEqual([{ type: 'mute-changed', muted: true }]);
     expect(act(muted.state, { type: 'set-muted', muted: true }).events).toEqual([]);
+  });
+});
+
+describe('window edges', () => {
+  it.each(['notepad', 'picture-viewer', 'file-explorer', 'music-box', 'calculator', 'settings'] as const)(
+    'opens a %s, shown and not maximized',
+    (app) => {
+      const { state } = act(buildDesktop(), { type: 'open-app', app });
+      expect(win(state, 0)).toMatchObject({ app: { kind: app }, minimized: false, maximized: false });
+    },
+  );
+
+  it('reports no restore when the task strip brings forward a visible window', () => {
+    expect(act(three(), { type: 'activate-window', windowId: 'w1' }).events).toEqual([
+      { type: 'window-focused', windowId: 'w1' },
+    ]);
+  });
+
+  it('reports a move along one side only', () => {
+    expect(act(placed(), { type: 'move-window', windowId: 'w1', x: 300, y: 100 }).events[0]).toMatchObject({
+      type: 'window-moved',
+    });
+    expect(act(placed(), { type: 'move-window', windowId: 'w1', x: 100, y: 300 }).events[0]).toMatchObject({
+      type: 'window-moved',
+    });
+  });
+
+  it.each([
+    ['only the width is too small', 10, 300, true],
+    ['only the height is too small', 500, 10, true],
+    ['only the height changes', 500, 350, false],
+  ])('reports a resize when %s', (_label, width, height, clamped) => {
+    const { events } = act(placed(), { type: 'resize-window', windowId: 'w1', width, height });
+    expect(events[0]).toMatchObject({ type: 'window-resized', clamped });
+  });
+
+  it('reports nothing for a resize to the same size', () => {
+    expect(act(placed(), { type: 'resize-window', windowId: 'w1', width: 500, height: 300 }).events).toEqual([]);
+  });
+
+  it('brings back a minimized window that was maximized without maximizing it twice', () => {
+    const start = buildDesktop({
+      windows: [{ app: 'notepad', maximized: true, minimized: true }, { app: 'calculator' }],
+    });
+    expect(act(start, { type: 'maximize-window', windowId: 'w1' }).events).toEqual([
+      { type: 'window-restored', windowId: 'w1' },
+      { type: 'window-focused', windowId: 'w1' },
+    ]);
+  });
+
+  it('refuses to open a file once the desktop holds the most windows', () => {
+    const full = buildDesktop({
+      files: { List: note('x') },
+      windows: Array.from({ length: MAX_WINDOWS }, () => ({ app: 'calculator' as const })),
+    });
+    expect(act(full, { type: 'open-file', fileId: pathId(full, 'List') }).events).toEqual([
+      { type: 'rejected', action: 'open-file', reason: 'too-many-windows' },
+    ]);
   });
 });

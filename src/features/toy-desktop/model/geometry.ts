@@ -79,10 +79,13 @@ export function fullRect(desktop: Size): Rect {
 
 /** The share of a rectangle's area that lies on the desktop, from 0 to 1. */
 export function visibleFraction(rect: Rect, desktop: Size): number {
-  const width = Math.min(rect.x + rect.width, desktop.width) - Math.max(rect.x, 0);
-  const height = Math.min(rect.y + rect.height, desktop.height) - Math.max(rect.y, 0);
-  if (width <= 0 || height <= 0) return 0;
+  const width = Math.max(0, Math.min(rect.x + rect.width, desktop.width) - Math.max(rect.x, 0));
+  const height = Math.max(0, Math.min(rect.y + rect.height, desktop.height) - Math.max(rect.y, 0));
   return (width * height) / (rect.width * rect.height);
+}
+
+export function sameRect(a: Rect, b: Rect): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
 /**

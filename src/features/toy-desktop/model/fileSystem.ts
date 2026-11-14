@@ -71,8 +71,9 @@ export function emptyFileSystem(): FileSystem {
   };
 }
 
-export function getNode(fs: FileSystem, id: string): FsNode | undefined {
-  return Object.hasOwn(fs.nodes, id) ? fs.nodes[id] : undefined;
+/** The item with this id. Null, as a missing parent or selection, finds nothing. */
+export function getNode(fs: FileSystem, id: string | null): FsNode | undefined {
+  return id !== null && Object.hasOwn(fs.nodes, id) ? fs.nodes[id] : undefined;
 }
 
 export function isFolder(node: FsNode | undefined): node is FolderNode {
@@ -101,14 +102,16 @@ function siblingNames(fs: FileSystem, folderId: string, exceptId?: string): stri
     .map((node) => node.name);
 }
 
-/** The folders from the top down to this item, the item included. */
+/**
+ * The folders from the top down to this item, the item included. A loop in hand-edited data
+ * stops the walk at the first repeat, so the top of the chain then still has a parent.
+ */
 export function ancestry(fs: FileSystem, id: string): FsNode[] {
   const chain: FsNode[] = [];
-  let node = getNode(fs, id);
-  // A saved file system is checked for cycles, so this walk ends. The cap guards a hand-built one.
-  while (node !== undefined && chain.length <= MAX_NODES + 2) {
+  const seen = new Set<string>();
+  for (let node = getNode(fs, id); node !== undefined && !seen.has(node.id); node = getNode(fs, node.parentId)) {
+    seen.add(node.id);
     chain.unshift(node);
-    node = node.parentId === null ? undefined : getNode(fs, node.parentId);
   }
   return chain;
 }

@@ -40,6 +40,13 @@ describe('checkName', () => {
     expect(checkName(name, [])).toEqual({ ok: true, name });
   });
 
+  it.each(['.hidden', 'end.', 'a\u00a0b'])(
+    'accepts %j, which has dots or a no-break space but more besides',
+    (name) => {
+      expect(checkName(name, [])).toEqual({ ok: true, name });
+    },
+  );
+
   it('accepts dots inside a name and the characters around the refused ones', () => {
     expect(checkName('v1.2 - (draft) & more!', [])).toEqual({ ok: true, name: 'v1.2 - (draft) & more!' });
   });
