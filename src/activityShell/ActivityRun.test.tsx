@@ -8,6 +8,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { SessionProvider } from '../app/session/SessionProvider.tsx';
@@ -80,6 +81,19 @@ function StateFixture({ kit }: ActivityProps<string, { taps: number }>) {
 }
 
 const load = () => Promise.resolve({ default: Fixture });
+
+/** Every kit object a component was given, to prove a re-render reuses the same one. */
+const seenKits = new Set<unknown>();
+
+function KitWatcher({ kit }: ActivityProps<string>) {
+  const [renders, setRenders] = useState(0);
+  seenKits.add(kit);
+  return (
+    <button type='button' onClick={() => setRenders(renders + 1)}>
+      {`rendered ${String(renders)}`}
+    </button>
+  );
+}
 
 const rounds = defineActivity<string>({
   id: 'run-rounds',
@@ -451,6 +465,42 @@ describe('stepSolved outside a sequence', () => {
     click('solved');
     window.removeEventListener('error', onError);
     expect(String(errors[0])).toMatch(/run-rounds has no steps/);
+  });
+});
+
+describe('the kit across renders', () => {
+  it.each([
+    ['rounds', 'run-rounds-watch'],
+    ['free', 'run-free-watch'],
+  ] as const)('stays the same object when a %s activity renders again', async (kind, id) => {
+    const common = {
+      id,
+      area: 'early-learning',
+      order: 1,
+      bands: ['band-3-5'],
+      goal: strings.goal,
+      title: strings.title,
+      icon: { emoji: 'flower' },
+      inputs: ['click'],
+      spoken: [strings.say],
+      load: () => Promise.resolve({ default: KitWatcher }),
+    } as const;
+    const definition =
+      kind === 'rounds'
+        ? defineActivity<string>({
+            ...common,
+            kind: 'rounds',
+            difficulty: { 'band-3-5': { min: 1, max: 2 } },
+            roundsPerSession: 2,
+            generateLevel: () => 'level',
+          })
+        : defineActivity<string>({ ...common, kind: 'free', generateLevel: () => 'free' });
+    seenKits.clear();
+    await run(definition);
+    fireEvent.click(await screen.findByRole('button', { name: 'rendered 0' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'rendered 1' }));
+    await screen.findByRole('button', { name: 'rendered 2' });
+    expect(seenKits.size).toBe(1);
   });
 });
 

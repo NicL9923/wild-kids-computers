@@ -258,7 +258,7 @@ function Round({
   level,
   player,
   onRoundComplete,
-  onStepSolved = noSteps(definition.id),
+  onStepSolved,
 }: {
   definition: ActivityDefinition;
   band: Band;
@@ -270,10 +270,13 @@ function Round({
   const scope = useScope();
   const [tally] = useState(createTally);
   const { host, startInstruction, state, reducedMotion, pictures } = player;
+  // Stable across renders: a new handler would rebuild the kit, and an activity effect that
+  // depends on the kit would run again on every render.
+  const stepSolved = useMemo(() => onStepSolved ?? noSteps(definition.id), [onStepSolved, definition.id]);
   // Rebuilt when the saved state, motion, or pictures change; the tally keeps the round's counts.
   const kit = useMemo(
-    () => createKit({ scope, host, tally, onRoundComplete, onStepSolved, state, reducedMotion, pictures }),
-    [scope, host, tally, onRoundComplete, onStepSolved, state, reducedMotion, pictures],
+    () => createKit({ scope, host, tally, onRoundComplete, onStepSolved: stepSolved, state, reducedMotion, pictures }),
+    [scope, host, tally, onRoundComplete, stepSolved, state, reducedMotion, pictures],
   );
 
   useEffect(() => {
