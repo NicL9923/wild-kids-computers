@@ -18,6 +18,9 @@ const PRESSED_MS = 300;
  * One big letter at a time, spoken, with a picture of the keyboard below. The child presses the
  * real key; either case counts. A wrong letter lights the key that was pressed on the picture
  * and gets a neutral nudge. After two, the right key lights up.
+ *
+ * Keys can come faster than the screen draws, so the key handler reads and writes the wrong count
+ * and whether the letter is found in one live record, never the values of the last render.
  */
 export default function FindTheKeyActivity({ level, kit }: ActivityProps<KeyLevel>) {
   const [index, setIndex] = useState(0);
@@ -25,6 +28,7 @@ export default function FindTheKeyActivity({ level, kit }: ActivityProps<KeyLeve
   const [pressed, setPressed] = useState<string | null>(null);
   const [found, setFound] = useState(false);
   const card = useRef<HTMLButtonElement>(null);
+  const live = useRef({ index, wrong, found });
   const letter = level.letters[index];
   if (letter === undefined) throw new RangeError('A find-the-key level has at least one letter.');
   const name = letterNames[letter];
@@ -42,26 +46,32 @@ export default function FindTheKeyActivity({ level, kit }: ActivityProps<KeyLeve
   }
 
   useActivityKeys(kit, (event) => {
-    if (found || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    const { index: at, wrong: wrongSoFar, found: done } = live.current;
+    if (done || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     light(event.code);
     const typed = event.key.toLowerCase();
     if (!/^[a-z]$/.test(typed)) return;
     event.preventDefault();
-    if (typed !== letter) {
-      const count = wrong + 1;
+    const want = level.letters[at];
+    if (want === undefined) return;
+    if (typed !== want) {
+      const count = wrongSoFar + 1;
+      live.current = { ...live.current, wrong: count };
       setWrong(count);
       kit.feedback.wrong({ at: card.current ?? undefined });
       if (count === WRONG_BEFORE_HELP && level.help !== 'key') kit.hint(feedback.hereItIs);
       return;
     }
+    live.current = { ...live.current, found: true };
     setFound(true);
     kit.feedback.correct({ at: card.current ?? undefined });
     kit.scope.setTimeout(() => {
-      if (index + 1 >= level.letters.length) {
+      if (at + 1 >= level.letters.length) {
         kit.roundComplete();
         return;
       }
-      setIndex(index + 1);
+      live.current = { index: at + 1, wrong: 0, found: false };
+      setIndex(at + 1);
       setWrong(0);
       setFound(false);
     }, NEXT_LETTER_MS);
