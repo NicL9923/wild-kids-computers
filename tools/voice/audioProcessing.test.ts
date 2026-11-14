@@ -10,7 +10,7 @@ import {
   trimSilence,
   voicedRms,
 } from './audioProcessing.ts';
-import { phonemesOf } from './kokoro.ts';
+import { phonemesOf, synthesisInput, toKokoroPhonemes } from './kokoro.ts';
 
 const RATE = 1000;
 const options = { ...DEFAULT_PROCESS_OPTIONS, sampleRate: RATE, padStartMs: 10, padEndMs: 20, fadeMs: 5 };
@@ -114,5 +114,46 @@ describe('phonemesOf', () => {
     ['a/b/', undefined],
   ])('reads %j as %j', (speech, expected) => {
     expect(phonemesOf(speech)).toBe(expected);
+  });
+});
+
+describe('toKokoroPhonemes', () => {
+  it.each([
+    ['bˈɔɪ', 'bˈY'],
+    ['tʃˈɛɹ', 'ʧˈɛɹ'],
+    ['ˈeɪɾi', 'ˈAɾi'],
+    ['hˈɪpoʊ', 'hˈɪpO'],
+    ['mˈaʊθ', 'mˈWθ'],
+    ['ˈaɪs', 'ˈIs'],
+    ['dʒˈuːs', 'ʤˈus'],
+    ['ɐbˈaʊt', 'əbˈWt'],
+    ['ɡrˈiːn', 'ɡɹˈin'],
+  ])('maps %j to %j', (espeak, kokoro) => {
+    expect(toKokoroPhonemes(espeak)).toBe(kokoro);
+  });
+});
+
+describe('synthesisInput', () => {
+  // A fake of the espeak phonemizer, the external system. It knows only the words these cases use.
+  const espeak: Record<string, string> = {
+    bed: 'bˈɛd',
+    'All done': 'ˈɔːl dˈʌn',
+    Yes: 'jˈɛs',
+    'Find the boy': 'fˈaɪnd ðə bˈɔɪ',
+  };
+  const phonemize = (text: string) => {
+    const phonemes = espeak[text];
+    if (phonemes === undefined) throw new Error(`The fake phonemizer was not given "${text}".`);
+    return Promise.resolve(phonemes);
+  };
+
+  it.each([
+    ['bed', 'ɹˈɛdi? bˈɛd.'],
+    ['All done.', 'ɹˈɛdi? ˈɔl dˈʌn.'],
+    ['Yes!', 'ɹˈɛdi? jˈɛs!'],
+    ['Find the boy, Yes?', 'ɹˈɛdi? fˈInd ðə bˈY, jˈɛs?'],
+    ['/mːː/', 'sˈeɪ. . mːː.'],
+  ])('reads %j after the lead-in, in Kokoro phonemes, with end punctuation', async (speech, expected) => {
+    await expect(synthesisInput(speech, phonemize)).resolves.toBe(expected);
   });
 });

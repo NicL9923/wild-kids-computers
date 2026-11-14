@@ -45,11 +45,25 @@ LETTER_HOMOPHONES = {
     "u": "u", "vee": "v", "why": "y", "ex": "x", "zee": "z", "zed": "z",
 }
 
+# Words that sound the same as the expected word. The recognizer cannot hear the difference, so
+# these are not voice errors. Each pair is (heard, expected).
+HOMOPHONES = {
+    ("dear", "deer"), ("knows", "nose"), ("pi", "pie"), ("son", "sun"),
+    ("flour", "flower"), ("donut", "doughnut"), ("genes", "jeans"),
+}
+
+# Spellings a recognizer writes as one word or with digits.
+SPELLING_VARIANTS = {
+    "rollercoaster": "roller coaster", "trashcan": "trash can", "1st": "first", "2nd": "second",
+    "3rd": "third", "4th": "fourth", "5th": "fifth", "6th": "sixth", "7th": "seventh",
+    "8th": "eighth", "9th": "ninth", "10th": "tenth",
+}
+
 # The first sound each letter-sound clip should start with, in the recognizer's alphabet.
 # Vowels list several symbols: the recognizer is trained on sentences and blurs isolated vowels.
 LETTER_SOUND_ONSETS = {
     "a": ["æ", "a", "ɛ"], "b": ["b"], "c": ["k"], "d": ["d"], "e": ["ɛ", "e", "a"], "f": ["f"],
-    "g": ["ɡ"], "h": ["h", "x"], "i": ["ɪ", "i", "e"], "j": ["dʒ"], "k": ["k"], "l": ["l"],
+    "g": ["ɡ"], "h": ["h", "x"], "i": ["ɪ", "i", "e"], "j": ["dʒ", "tɕ"], "k": ["k"], "l": ["l"],
     "m": ["m"], "n": ["n"], "o": ["ɑ", "a", "ɔ"], "p": ["p"], "q": ["k"], "r": ["ɹ", "r"],
     "s": ["s"], "t": ["t"], "u": ["ʌ", "a", "ə"], "v": ["v"], "w": ["w"], "x": ["k"], "y": ["j"],
     "z": ["z"],
@@ -66,6 +80,7 @@ def number_words(n: int) -> str:
 
 def normalize_words(text: str) -> list[str]:
     text = text.lower().replace("’", "'").replace("-", " ")
+    text = " ".join(SPELLING_VARIANTS.get(w.strip(".,!?"), w) for w in text.split())
     text = re.sub(r"\b(\d{1,3})\b", lambda m: number_words(int(m.group(1))) if int(m.group(1)) <= 100 else m.group(1), text)
     text = re.sub(r"[^a-z0-9' ]+", " ", text)
     words = [w.strip("'") for w in text.split()]
@@ -81,7 +96,8 @@ def edit_distance(a: list[str], b: list[str]) -> int:
     for i, x in enumerate(a, 1):
         current = [i]
         for j, y in enumerate(b, 1):
-            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (x != y)))
+            same = x == y or (y, x) in HOMOPHONES
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (not same)))
         previous = current
     return previous[-1]
 
@@ -180,11 +196,14 @@ def write_report(profile: dict, words: list[WordResult], sounds: list[SoundResul
         "",
         f"- Words and sentences: `{WHISPER}` on the CPU, English, no prompt. Both sides are lower-cased,",
         "  stripped of punctuation, and numerals become words. A lone letter name may come back as a",
-        "  word that sounds the same (\"bee\" for b), which counts as the letter.",
+        "  word that sounds the same (\"bee\" for b), which counts as the letter. A true homophone of",
+        "  the expected word (\"son\" for sun) and a spelling variant (\"trashcan\", \"6th\") count as",
+        "  right, because no recognizer can hear the difference.",
         f"- Letter sounds: `{PHONEMES}`, a phoneme recognizer. A clip passes when its first sound,",
         "  ignoring a glottal stop, is the letter's sound. The recognizer is trained on sentences and",
         "  blurs isolated vowels, so it can confirm that a vowel clip starts with a clean vowel but",
-        "  cannot tell the short a from the short o.",
+        "  cannot tell the short a from the short o. It writes the English j sound as the similar",
+        "  `tɕ` of its multilingual alphabet, so that counts for j.",
         "",
         "## Word clips the recognizer got wrong",
         "",
