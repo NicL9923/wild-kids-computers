@@ -103,13 +103,28 @@ export function floodFill(
   }
 
   const region = regionBuffer(doc);
-  const inside = (p: number): boolean => {
-    if (region[p] === 1) return false;
-    if (wall !== undefined && (wall[p * 4 + 3] ?? 0) >= MASK_WALL_ALPHA) return false;
-    const i = p * 4;
-    const distance =
-      Math.abs((data[i] ?? 0) - sr) + Math.abs((data[i + 1] ?? 0) - sg) + Math.abs((data[i + 2] ?? 0) - sb);
-    return distance <= FILL_TOLERANCE;
+  // Region states. One tight pass marks every pixel that cannot join (a wall, or a color too far
+  // from the clicked one) as BLOCKED, so the flood itself reads one byte per pixel. A BLOCKED
+  // pixel the flood reaches becomes an EDGE: outside the region, touching it.
+  const OPEN = 0;
+  const IN = 1;
+  const EDGE = 2;
+  const BLOCKED = 3;
+  const total = width * height;
+  for (let p = 0, i = 0; p < total; p++, i += 4) {
+    let dr = (data[i] ?? 0) - sr;
+    if (dr < 0) dr = -dr;
+    let dg = (data[i + 1] ?? 0) - sg;
+    if (dg < 0) dg = -dg;
+    let db = (data[i + 2] ?? 0) - sb;
+    if (db < 0) db = -db;
+    const walled = wall !== undefined && (wall[i + 3] ?? 0) >= MASK_WALL_ALPHA;
+    region[p] = walled || dr + dg + db > FILL_TOLERANCE ? BLOCKED : OPEN;
+  }
+  const edgePixels: number[] = [];
+  const markEdge = (p: number): void => {
+    region[p] = EDGE;
+    edgePixels.push(p);
   };
 
   // Scanline flood: fill a whole run, then look for runs in the rows above and below it.
@@ -117,29 +132,37 @@ export function floodFill(
   let maxX = seedX;
   let minY = seedY;
   let maxY = seedY;
-  const stack: number[] = [seedX, seedY];
+  const stack: number[] = [seed];
   while (stack.length > 0) {
-    const ry = stack.pop() ?? 0;
-    const rx = stack.pop() ?? 0;
+    const start = stack.pop() ?? 0;
+    if (region[start] !== OPEN) continue;
+    const ry = Math.floor(start / width);
     const row = ry * width;
-    if (!inside(row + rx)) continue;
-    let left = rx;
-    while (left > 0 && inside(row + left - 1)) left--;
-    let right = rx;
-    while (right < width - 1 && inside(row + right + 1)) right++;
-    region.fill(1, row + left, row + right + 1);
+    let left = start - row;
+    while (left > 0 && region[row + left - 1] === OPEN) left--;
+    if (left > 0 && region[row + left - 1] === BLOCKED) markEdge(row + left - 1);
+    let right = start - row;
+    while (right < width - 1 && region[row + right + 1] === OPEN) right++;
+    if (right < width - 1 && region[row + right + 1] === BLOCKED) markEdge(row + right + 1);
+    region.fill(IN, row + left, row + right + 1);
     if (left < minX) minX = left;
     if (right > maxX) maxX = right;
     if (ry < minY) minY = ry;
     if (ry > maxY) maxY = ry;
-    for (const ny of [ry - 1, ry + 1]) {
-      if (ny < 0 || ny >= height) continue;
-      const nrow = ny * width;
+    for (let side = -1; side <= 1; side += 2) {
+      if (ry + side < 0 || ry + side >= height) continue;
+      const from = row + side * width + left;
+      const to = row + side * width + right;
       let inRun = false;
-      for (let nx = left; nx <= right; nx++) {
-        const open = inside(nrow + nx);
-        if (open && !inRun) stack.push(nx, ny);
-        inRun = open;
+      for (let q = from; q <= to; q++) {
+        const state = region[q];
+        if (state === OPEN) {
+          if (!inRun) stack.push(q);
+          inRun = true;
+        } else {
+          if (state === BLOCKED) markEdge(q);
+          inRun = false;
+        }
       }
     }
   }
@@ -153,88 +176,88 @@ export function floodFill(
 
   // Edge pixels first, while every neighbor still has its old color.
   const edges: number[] = [];
-  for (let py = area.y; py < area.y + area.height; py++) {
-    for (let px = area.x; px < area.x + area.width; px++) {
-      const p = py * width + px;
-      if (region[p] === 1 || !touchesRegion(region, px, py, width, height)) continue;
-      shade(px, py, fill);
-      const fr = fill[0] ?? 0;
-      const fg = fill[1] ?? 0;
-      const fb = fill[2] ?? 0;
-      if (wall !== undefined && (wall[p * 4 + 3] ?? 0) >= MASK_WALL_ALPHA) {
-        edges.push(p, fr, fg, fb, alpha);
-        continue;
-      }
-      // The pixel is the old color S blended with some edge color L by an unknown amount c.
-      // Take L from the neighbor least like S, and c from where the pixel sits between them.
-      const i = p * 4;
-      const pr = data[i] ?? 0;
-      const pg = data[i + 1] ?? 0;
-      const pb = data[i + 2] ?? 0;
-      let lr = pr;
-      let lg = pg;
-      let lb = pb;
-      let farthest = -1;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = px + dx;
-          const ny = py + dy;
-          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-          const q = ny * width + nx;
-          if (region[q] === 1) continue;
-          const j = q * 4;
-          const d =
-            Math.abs((data[j] ?? 0) - sr) + Math.abs((data[j + 1] ?? 0) - sg) + Math.abs((data[j + 2] ?? 0) - sb);
-          if (d > farthest) {
-            farthest = d;
-            lr = data[j] ?? 0;
-            lg = data[j + 1] ?? 0;
-            lb = data[j + 2] ?? 0;
-          }
+  for (const p of edgePixels) {
+    const px = p % width;
+    const py = (p - px) / width;
+    shade(px, py, fill);
+    const fr = fill[0] ?? 0;
+    const fg = fill[1] ?? 0;
+    const fb = fill[2] ?? 0;
+    if (wall !== undefined && (wall[p * 4 + 3] ?? 0) >= MASK_WALL_ALPHA) {
+      edges.push(p, fr, fg, fb, alpha);
+      continue;
+    }
+    // The pixel is the old color S blended with some edge color L by an unknown amount c.
+    // Take L from the neighbor least like S, and c from where the pixel sits between them.
+    const i = p * 4;
+    const pr = data[i] ?? 0;
+    const pg = data[i + 1] ?? 0;
+    const pb = data[i + 2] ?? 0;
+    let lr = pr;
+    let lg = pg;
+    let lb = pb;
+    let farthest = -1;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = px + dx;
+        const ny = py + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        const q = ny * width + nx;
+        if (region[q] === IN) continue;
+        const j = q * 4;
+        const d = Math.abs((data[j] ?? 0) - sr) + Math.abs((data[j + 1] ?? 0) - sg) + Math.abs((data[j + 2] ?? 0) - sb);
+        if (d > farthest) {
+          farthest = d;
+          lr = data[j] ?? 0;
+          lg = data[j + 1] ?? 0;
+          lb = data[j + 2] ?? 0;
         }
       }
-      const er = lr - sr;
-      const eg = lg - sg;
-      const eb = lb - sb;
-      const lengthSquared = er * er + eg * eg + eb * eb;
-      if (lengthSquared === 0) continue;
-      const c = clamp(((pr - sr) * er + (pg - sg) * eg + (pb - sb) * eb) / lengthSquared, 0, 1);
-      if (c >= 1) continue;
-      const keep = 1 - c;
-      const mixAlpha = Math.round(alpha * keep);
-      edges.push(
-        p,
-        clamp(Math.round(pr + (fr - sr) * keep), 0, 255),
-        clamp(Math.round(pg + (fg - sg) * keep), 0, 255),
-        clamp(Math.round(pb + (fb - sb) * keep), 0, 255),
-        alpha === 255 ? 255 : mixAlpha,
-      );
     }
+    const er = lr - sr;
+    const eg = lg - sg;
+    const eb = lb - sb;
+    const lengthSquared = er * er + eg * eg + eb * eb;
+    if (lengthSquared === 0) continue;
+    const c = clamp(((pr - sr) * er + (pg - sg) * eg + (pb - sb) * eb) / lengthSquared, 0, 1);
+    if (c >= 1) continue;
+    const keep = 1 - c;
+    edges.push(
+      p,
+      clamp(Math.round(pr + (fr - sr) * keep), 0, 255),
+      clamp(Math.round(pg + (fg - sg) * keep), 0, 255),
+      clamp(Math.round(pb + (fb - sb) * keep), 0, 255),
+      alpha === 255 ? 255 : Math.round(alpha * keep),
+    );
   }
 
-  for (let py = bounds.y; py < bounds.y + bounds.height; py++) {
-    const row = py * width;
-    for (let px = bounds.x; px < bounds.x + bounds.width; px++) {
-      const p = row + px;
-      if (region[p] !== 1) continue;
-      region[p] = 0;
-      shade(px, py, fill);
-      blendPixel(data, p * 4, fill[0] ?? 0, fill[1] ?? 0, fill[2] ?? 0, alpha);
+  if (style.kind === 'solid' && alpha === 255) {
+    // One 32-bit write per pixel. The packed value comes from the bytes, so byte order does not matter.
+    const pixels = new Uint32Array(data.buffer, data.byteOffset, width * height);
+    const packed = new Uint8ClampedArray([color.r, color.g, color.b, 255]);
+    const value = new Uint32Array(packed.buffer)[0] ?? 0;
+    for (let py = bounds.y; py < bounds.y + bounds.height; py++) {
+      const row = py * width;
+      for (let p = row + bounds.x; p < row + bounds.x + bounds.width; p++) {
+        if (region[p] === IN) pixels[p] = value;
+      }
+    }
+  } else {
+    for (let py = bounds.y; py < bounds.y + bounds.height; py++) {
+      const row = py * width;
+      for (let px = bounds.x; px < bounds.x + bounds.width; px++) {
+        const p = row + px;
+        if (region[p] !== IN) continue;
+        shade(px, py, fill);
+        blendPixel(data, p * 4, fill[0] ?? 0, fill[1] ?? 0, fill[2] ?? 0, alpha);
+      }
     }
   }
+  // Blocked pixels the flood never reached still hold their mark. Clear the buffer for the next fill.
+  region.fill(OPEN);
   for (let k = 0; k < edges.length; k += 5) {
     const p = edges[k] ?? 0;
     blendPixel(data, p * 4, edges[k + 1] ?? 0, edges[k + 2] ?? 0, edges[k + 3] ?? 0, edges[k + 4] ?? 0);
   }
   return area;
-}
-
-function touchesRegion(region: Uint8Array, x: number, y: number, width: number, height: number): boolean {
-  const p = y * width + x;
-  return (
-    (x > 0 && region[p - 1] === 1) ||
-    (x < width - 1 && region[p + 1] === 1) ||
-    (y > 0 && region[p - width] === 1) ||
-    (y < height - 1 && region[p + width] === 1)
-  );
 }

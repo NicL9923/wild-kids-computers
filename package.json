@@ -32,7 +32,7 @@
     "e2e": "npm run build && playwright test --project=electron",
     "e2e:browser": "npm run build && playwright test --project=browser",
     "mutation": "stryker run",
-    "perf": "node -e \"console.log('perf is not implemented yet.')\"",
+    "perf": "node tools/paintPerf.ts",
     "paint:goldens": "node tools/paintGoldens.ts",
     "voice:generate": "node -e \"console.log('voice:generate is not implemented yet.')\"",
     "dist": "npm run build && electron-builder --publish never",

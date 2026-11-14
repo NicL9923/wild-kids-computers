@@ -1,5 +1,5 @@
 import { hsv } from '../color.ts';
-import { discCoverage, forEachInDisc } from '../dab.ts';
+import { discCoverage } from '../dab.ts';
 import { defineTip } from '../types.ts';
 
 /** Pixels of stroke length for one trip around the color wheel. */
@@ -13,8 +13,15 @@ export default defineTip({
   paint(canvas, dab) {
     const radius = dab.size / 2;
     const color = hsv(dab.distance / RAINBOW_LENGTH, 0.85, 0.95);
-    forEachInDisc(dab.x, dab.y, radius, (x, y, distance) => {
-      canvas.put(x, y, discCoverage(radius, distance), color.r, color.g, color.b, dab.color.a);
-    });
+    canvas.disc(
+      dab.x,
+      dab.y,
+      radius,
+      (distance) => discCoverage(radius, distance),
+      color.r,
+      color.g,
+      color.b,
+      dab.color.a,
+    );
   },
 });

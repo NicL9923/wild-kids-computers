@@ -1,4 +1,3 @@
-import { forEachInDisc } from '../dab.ts';
 import { smoothstep } from '../math.ts';
 import { defineTip } from '../types.ts';
 
@@ -10,9 +9,16 @@ export default defineTip({
   paint(canvas, dab) {
     const radius = dab.size / 2;
     const { r, g, b, a } = dab.color;
-    forEachInDisc(dab.x, dab.y, radius, (x, y, distance) => {
-      const coverage = 1 - smoothstep(radius * 0.25, radius, distance);
-      canvas.put(x, y, Math.round(coverage * 255), r, g, b, a);
-    });
+    const solid = radius * 0.25;
+    canvas.disc(
+      dab.x,
+      dab.y,
+      radius,
+      (distance) => Math.round((1 - smoothstep(solid, radius, distance)) * 255),
+      r,
+      g,
+      b,
+      a,
+    );
   },
 });

@@ -1,4 +1,4 @@
-import { discCoverage, forEachInDisc } from '../dab.ts';
+import { discCoverage } from '../dab.ts';
 import { defineTip } from '../types.ts';
 
 /** A solid round brush with a smooth edge. */
@@ -9,8 +9,6 @@ export default defineTip({
   paint(canvas, dab) {
     const radius = dab.size / 2;
     const { r, g, b, a } = dab.color;
-    forEachInDisc(dab.x, dab.y, radius, (x, y, distance) => {
-      canvas.put(x, y, discCoverage(radius, distance), r, g, b, a);
-    });
+    canvas.disc(dab.x, dab.y, radius, (distance) => discCoverage(radius, distance), r, g, b, a);
   },
 });

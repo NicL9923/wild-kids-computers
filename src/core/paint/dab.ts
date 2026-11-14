@@ -71,6 +71,83 @@ export class DabCanvas {
     if (y > this.maxY) this.maxY = y;
   }
 
+  /**
+   * Paints a disc whose coverage depends only on the distance from its center. It gives the
+   * same pixels as forEachInDisc with put, in a tight loop: the fast path for the round, soft,
+   * marker, dotted, and rainbow tips, which a big brush runs thousands of times a frame.
+   */
+  disc(
+    cx: number,
+    cy: number,
+    radius: number,
+    profile: (distance: number) => number,
+    r: number,
+    g: number,
+    b: number,
+    a = 255,
+  ): void {
+    const reach = radius + 1;
+    const reachSquared = reach * reach;
+    const { width, height, mask, data, change } = this;
+    const firstRow = Math.max(0, Math.floor(cy - reach));
+    const lastRow = Math.min(height - 1, Math.ceil(cy + reach));
+    for (let y = firstRow; y <= lastRow; y++) {
+      const dy = y + 0.5 - cy;
+      const room = reachSquared - dy * dy;
+      if (room < 0) continue;
+      const half = Math.sqrt(room);
+      const firstColumn = Math.max(0, Math.floor(cx - half - 1));
+      const lastColumn = Math.min(width - 1, Math.ceil(cx + half));
+      const row = y * width;
+      let tileColumn = -1;
+      let before = data;
+      let rowMin = width;
+      let rowMax = -1;
+      for (let x = firstColumn; x <= lastColumn; x++) {
+        const dx = x + 0.5 - cx;
+        const squared = dx * dx + dy * dy;
+        if (squared > reachSquared) continue;
+        const coverage = profile(Math.sqrt(squared));
+        if (coverage <= 0) continue;
+        const p = row + x;
+        if (coverage < (mask[p] ?? 0)) continue;
+        mask[p] = coverage;
+        if (x >> 6 !== tileColumn) {
+          tileColumn = x >> 6;
+          before = change.tileAt(x, y);
+        }
+        const t = tileOffset(x, y);
+        const i = p * 4;
+        const br = before[t] ?? 0;
+        const bg = before[t + 1] ?? 0;
+        const bb = before[t + 2] ?? 0;
+        const ba = before[t + 3] ?? 0;
+        const alpha = div255(a * coverage);
+        if (ba === 255 && alpha < 255) {
+          const inverse = 255 - alpha;
+          data[i] = div255(r * alpha + br * inverse);
+          data[i + 1] = div255(g * alpha + bg * inverse);
+          data[i + 2] = div255(b * alpha + bb * inverse);
+          data[i + 3] = 255;
+        } else {
+          data[i] = br;
+          data[i + 1] = bg;
+          data[i + 2] = bb;
+          data[i + 3] = ba;
+          blendPixel(data, i, r, g, b, alpha);
+        }
+        if (x < rowMin) rowMin = x;
+        rowMax = x;
+      }
+      if (rowMax >= 0) {
+        if (rowMin < this.minX) this.minX = rowMin;
+        if (rowMax > this.maxX) this.maxX = rowMax;
+        if (y < this.minY) this.minY = y;
+        if (y > this.maxY) this.maxY = y;
+      }
+    }
+  }
+
   /** Reads the pixel at (x, y) as it was before this stroke into out[0..3]. */
   readBefore(x: number, y: number, out: number[]): void {
     const before = this.change.tileAt(x, y);

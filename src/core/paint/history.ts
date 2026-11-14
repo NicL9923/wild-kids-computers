@@ -20,6 +20,8 @@ export const DEFAULT_BYTE_CAP = 256 * 1024 * 1024;
 /** A ceiling on step count, so many tiny steps cannot pile up without limit. */
 export const DEFAULT_MAX_STEPS = 100;
 
+const swapRow = new Uint8ClampedArray(TILE_SIZE * 4);
+
 interface SavedMask {
   mask: Surface | null;
 }
@@ -188,11 +190,10 @@ export class Change {
       } else if (mode === 'to-document') {
         doc.set(saved.subarray(tileStart, tileStart + rowBytes), docStart);
       } else {
-        for (let i = 0; i < rowBytes; i++) {
-          const kept = saved[tileStart + i] ?? 0;
-          saved[tileStart + i] = doc[docStart + i] ?? 0;
-          doc[docStart + i] = kept;
-        }
+        // Three native row copies through a scratch row beat a byte-by-byte swap many times over.
+        swapRow.set(saved.subarray(tileStart, tileStart + rowBytes));
+        saved.set(doc.subarray(docStart, docStart + rowBytes), tileStart);
+        doc.set(swapRow.subarray(0, rowBytes), docStart);
       }
     }
   }
