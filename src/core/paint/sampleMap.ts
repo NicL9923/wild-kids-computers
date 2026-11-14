@@ -33,6 +33,19 @@ export function applySampleMap(map: Int32Array, source: Surface, target: Surface
 
 /** A whole-picture effect from a mapper, with its map cached per picture size. */
 export function sampleMapEffect(id: string, order: number, mapper: SampleMapper): PictureEffect {
+  return builtMapEffect(id, order, (width, height) => buildSampleMap(width, height, mapper));
+}
+
+/**
+ * A whole-picture effect whose map is built by a function of the picture size, cached per size.
+ * For a map that a tight loop builds faster than a mapper called once per pixel can, such as one
+ * that works a row at a time. Every entry must be a pixel index on a picture of that size.
+ */
+export function builtMapEffect(
+  id: string,
+  order: number,
+  build: (width: number, height: number) => Int32Array,
+): PictureEffect {
   const cache = new Map<string, Int32Array>();
   return {
     id,
@@ -42,7 +55,7 @@ export function sampleMapEffect(id: string, order: number, mapper: SampleMapper)
       const key = `${source.width}x${source.height}`;
       let map = cache.get(key);
       if (map === undefined) {
-        map = buildSampleMap(source.width, source.height, mapper);
+        map = build(source.width, source.height);
         cache.set(key, map);
       }
       applySampleMap(map, source, target);

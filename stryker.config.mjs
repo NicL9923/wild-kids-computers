@@ -15,6 +15,7 @@ const config = {
     'src/core/paint/color.ts',
     'src/core/paint/rect.ts',
     'src/core/paint/raster.ts',
+    'src/core/paint/scatter.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],

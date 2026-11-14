@@ -44,6 +44,7 @@ history.replaceDocument(blankPaper, coloringPageMask); // "open a coloring page"
 | `glyphs.ts`                   | Glyph tables for the text tool                                                                  |
 | `patterns.ts`, `sample.ts`    | Patterns for pattern tips and fills, and bilinear sampling                                      |
 | `sampleMap.ts`                | The precomputed sample map for whole-picture effects that move pixels                           |
+| `scatter.ts`                  | `Scatter`, which blends pieces over each other for paint-on effects that scatter things         |
 | `thumbnail.ts`                | Area-averaging downscale                                                                        |
 | `tools/`, `tips/`, `effects/` | One module per item, found by the registry in `src/registry/paint.ts`                           |
 | `testing/golden.ts`           | Golden image helpers. Test-only and excluded from the app build.                                |
@@ -102,7 +103,9 @@ Pick the group:
 | `paint-on`      | A stroke effect that adds things, like a brush. Scatter with a seeded random.                                 | `effects/confetti` |
 | `whole-picture` | `apply(source, target)`, pure, fixed cost per pixel, so it can run in a worker.                               | `effects/mirror`   |
 
-1. Copy the reference directory to `effects/<effectId>/` and change the id, order, and the work. For a whole-picture effect that moves pixels, `sampleMapEffect(id, order, mapper)` builds and caches the map. One that changes colors loops over the pixels once.
+1. Copy the reference directory to `effects/<effectId>/` and change the id, order, and the work.
+   - A paint-on effect whose pieces sit on top of each other, like bubbles with a shine or leaves with a vein, draws them with `Scatter` from `scatter.ts`, which blends each piece over the last and touches what it writes. One that reveals a pattern fixed to the paper, like `effects/honeycomb`, paints through a `DabCanvas` so overlapping dabs do not stack.
+   - A whole-picture effect that moves pixels is a sample map. `sampleMapEffect(id, order, mapper)` builds and caches the map from a function called once per pixel. `builtMapEffect(id, order, build)` takes a function that builds the whole map, which a tight loop does several times faster: use it when the first run would come near the 60 ms budget. One that changes colors loops over the pixels once, and a filter uses a separable kernel.
 2. Keep the test file next to it and point its `expectGolden('effect-<effectId>', ...)` at the new effect. Paint something with `paintBands(doc)` or strokes first, so the effect has something to work on. Test that the same seed gives the same pixels and another seed does not, for scattering effects.
 3. Run `npm run paint:goldens`, look at the PNG, and commit.
 
@@ -120,4 +123,4 @@ Pick the group:
 
 ## Measuring
 
-`npm run perf` times a full-canvas fill, a frame of fast strokes with large soft brushes, each whole-picture effect, and a full-canvas undo, on the 1600 by 1000 canvas. It prints numbers and gates nothing.
+`npm run perf` times a full-canvas fill, a frame of fast strokes with large soft brushes, a frame of fast strokes with each paint-on effect at 120 px, each whole-picture effect, and a full-canvas undo, on the 1600 by 1000 canvas. It prints numbers and gates nothing. A paint-on effect should stay under 4 ms a frame. A whole-picture effect should finish its first run, map included, in under 60 ms, because a child's laptop is several times slower.
