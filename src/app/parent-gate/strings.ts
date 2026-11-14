@@ -22,7 +22,7 @@ export const strings = defineStrings('parent-gate', {
   continue: { text: 'Continue', silent: 'parent' },
   forgotPin: { text: 'Forgot the PIN?', silent: 'parent' },
   forgotPinSteps: {
-    text: 'Close the app, then delete the file app.json in the folder below. Profiles, settings, and pictures stay. The app opens with the word gate and asks about sound and kiosk lock again.',
+    text: "Close the app, from the computer's task manager if kiosk lock keeps it open. Then delete the file app.json in the folder below. Profiles, settings, and pictures stay. The app opens with the word gate and asks about sound and kiosk lock again.",
     silent: 'parent',
   },
   'folder-linux': { text: '~/.config/Wild Kids - Computers/data', silent: 'parent' },

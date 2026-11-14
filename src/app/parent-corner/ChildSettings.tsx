@@ -132,7 +132,7 @@ export function ChildSettings() {
         />
       </Group>
 
-      <Group title={t(strings.sessionLength)}>
+      <Group title={t(strings.playTime)}>
         <p className='wk-parent-about'>{t(strings.sessionLengthAbout)}</p>
         <SegmentedChoice<SessionChoice>
           label={t(strings.sessionLength)}

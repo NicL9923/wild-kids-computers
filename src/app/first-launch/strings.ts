@@ -11,7 +11,7 @@ export const strings = defineStrings('first-launch', {
   bandHeading: { text: 'How old is the player?' },
   bandIntro: { text: 'This sets how big things are and how much reading there is. A grown-up can change it later.' },
   bandLabel: { text: 'Age band' },
-  soundHeading: { text: 'Let us check the sound.' },
+  soundHeading: { text: "Let's check the sound." },
   playSound: { text: 'Play the sound' },
   testSentence: { text: 'Hello! Can you hear me?' },
   heardQuestion: { text: 'Did you hear it?' },

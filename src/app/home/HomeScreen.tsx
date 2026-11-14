@@ -72,15 +72,7 @@ function Meadow() {
   return (
     <div className='wk-home'>
       <h1 className='wk-visually-hidden'>{t(strings.title)}</h1>
-      <div
-        className='wk-home-map-frame'
-        onPointerOver={(event) => speakPlace(event.target)}
-        onFocus={(event) => speakPlace(event.target)}
-        onPointerOut={forgetPlace}
-        onBlur={forgetPlace}
-      >
-        <HomeMap label={t(strings.title)} places={places} />
-      </div>
+      {/* The top bar comes first so Tab reaches it first, as the eye does; CSS lays it over the map. */}
       <div className='wk-screen-bar wk-home-bar'>
         <div className='wk-screen-slot' data-slot='exit'>
           {profiles.length > 1 && profile !== null && (
@@ -102,6 +94,15 @@ function Meadow() {
             onClick={toggleMute}
           />
         </div>
+      </div>
+      <div
+        className='wk-home-map-frame'
+        onPointerOver={(event) => speakPlace(event.target)}
+        onFocus={(event) => speakPlace(event.target)}
+        onPointerOut={forgetPlace}
+        onBlur={forgetPlace}
+      >
+        <HomeMap label={t(strings.title)} places={places} />
       </div>
       <div className='wk-corner-control'>
         <IconButton

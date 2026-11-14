@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
-import { act, render } from '@testing-library/react';
+import { act, configure, render } from '@testing-library/react';
 import { createAudioEngine, type AudioEngine } from '../../audio/audioEngine.ts';
 import { AudioProvider } from '../../audio/AudioProvider.tsx';
 import { CONTINUOUS } from '../../audio/sfx/continuous.ts';
@@ -33,6 +33,10 @@ export interface ShellHarness {
 }
 
 export const json = (value: unknown): string => JSON.stringify(value);
+
+// Lazy screens such as the parent corner load a chunk that Vitest transforms on first use, which
+// can pass the 1 second default while the whole suite runs with coverage.
+configure({ asyncUtilTimeout: 5_000 });
 
 /** Saved documents for profiles that exist, first launch done, and `active` chosen last time. */
 export function savedProfiles(

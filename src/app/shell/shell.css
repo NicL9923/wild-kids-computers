@@ -146,14 +146,21 @@
   }
 
   .wk-setup-body {
+    display: flex;
+    flex-direction: column;
     overflow: auto;
     /* Room for the focus ring and the raised look of the choices inside the scroll area. */
     padding: var(--wk-space-item);
   }
 
+  /* Auto margins center the step and fall to zero when it is taller than the window, so it scrolls. */
   .wk-setup-body > * {
     width: min(100%, 1240px);
-    margin-inline: auto;
+    margin: auto;
+  }
+
+  .wk-setup-body .wk-choice-options[data-layout='pictures'] {
+    justify-content: center;
   }
 
   .wk-setup-stack {
@@ -163,12 +170,14 @@
   }
 
   .wk-setup-name {
-    max-width: 32rem;
+    width: min(100%, 32rem);
+    margin-inline: auto;
   }
 
   .wk-setup-intro {
-    margin: 0;
+    margin: 0 auto;
     max-width: 48rem;
+    text-align: center;
   }
 
   .wk-setup-sound,
@@ -355,6 +364,7 @@
   /* The top bar floats over the sky of the meadow, in the same places as on every other screen. */
   .wk-home-bar {
     position: absolute;
+    z-index: 1;
     inset: 0 0 auto;
     pointer-events: none;
   }

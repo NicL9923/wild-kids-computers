@@ -63,6 +63,7 @@ export const strings = defineStrings('parent-corner', {
   'motion-system': { text: 'Follow this computer', silent: 'parent' },
   'motion-on': { text: 'Less movement', silent: 'parent' },
   'motion-off': { text: 'Full movement', silent: 'parent' },
+  playTime: { text: 'Play time', silent: 'parent' },
   sessionLength: { text: 'Session length', silent: 'parent' },
   sessionLengthAbout: {
     text: 'When the time is used up, the app lets the child finish what they are doing, then shows a calm closing screen. The child never sees a clock.',

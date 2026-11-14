@@ -28,6 +28,7 @@
   .wk-parent-title {
     margin: 0;
     font-size: var(--wk-text-display);
+    font-weight: var(--wk-font-weight-bold);
   }
 
   .wk-parent-main {
@@ -49,6 +50,7 @@
   .wk-parent-section h2 {
     margin: 0;
     font-size: var(--wk-text-title);
+    font-weight: var(--wk-font-weight-bold);
   }
 
   .wk-parent-group {
@@ -59,9 +61,11 @@
     border-top: var(--wk-border-width) solid var(--wk-color-divider);
   }
 
+  /* A group heading outranks the field labels under it, which are bold at body size. */
   .wk-parent-group h3 {
     margin: 0;
-    font-size: var(--wk-text-body);
+    font-size: calc(var(--wk-text-body) * 1.15);
+    font-weight: var(--wk-font-weight-bold);
   }
 
   .wk-parent-about,

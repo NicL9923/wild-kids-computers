@@ -72,11 +72,8 @@ export function ProfilesSection() {
               >
                 {t(strings.edit)}
               </Button>
-              <Button
-                variant='danger'
-                icon={<Trash2 className='wk-lucide' aria-hidden='true' />}
-                onClick={() => setDeleting(profile)}
-              >
+              {/* Quiet here; the confirmation carries the danger color. */}
+              <Button icon={<Trash2 className='wk-lucide' aria-hidden='true' />} onClick={() => setDeleting(profile)}>
                 {t(strings.delete)}
               </Button>
             </span>
