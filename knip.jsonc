@@ -6,6 +6,7 @@
     "electron/preload/index.ts",
     "tools/*.ts",
     // Public APIs the shell and the activity kit import. Drop each line once a consumer exists.
+    "src/app/session/sessionHooks.ts",
     "src/audio/AudioProvider.tsx",
     "src/audio/createAppAudio.ts",
     "src/core/strings/shared/index.ts",

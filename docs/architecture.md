@@ -97,10 +97,27 @@ A central list file causes a merge conflict every time two people add an item. T
 - Only files in `src/registry/` call `import.meta.glob`. `src/core/` exports types and builders and never globs.
 - Anything that needs a registry outside the app runs under Vitest, including the string, voice, and registry checks.
 - `activity.ts`, `level.ts`, and `strings.ts` import no assets, no CSS, and no registry, so Playwright tests can import them directly.
-- Routes are defined in code. One route, `/activity/$activityId`, serves every activity. Adding an activity never touches the router.
+- One route, `/activity/$activityId`, serves every activity. Adding an activity never touches the router.
+
+### Routes
+
+A feature adds screens in its own `routes.ts` or `routes.tsx`, which exports `routes`, an array of routes whose parent is `rootRoute`. `src/registry/routes.ts` finds every such file and `src/app/router.ts` adds them to the tree, so no feature edits the router. A test fails when two routes match the same path, and the error names both files.
+
+```tsx
+import { createRoute, lazyRouteComponent } from '@tanstack/react-router';
+import { rootRoute, type FeatureRoutes } from '../../app/rootRoute.ts';
+
+const PaintStudio = lazyRouteComponent(() => import('./PaintStudio.tsx'));
+export const routes: FeatureRoutes = [
+  createRoute({ getParentRoute: () => rootRoute, path: '/paint', component: PaintStudio }),
+];
+```
+
+Load each screen with `lazyRouteComponent`, because the registry imports every routes file at start. The router keeps hash history. TanStack Router cannot type a tree it finds by file convention, so the router is not registered for path types: a screen parses its own search parameters, as `parseGallerySearch` does, and links take plain strings.
 
 | Item                | Convention                                                                                               |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |
+| Route               | `src/**/routes.ts` or `src/**/routes.tsx`, named export `routes`                                         |
 | Activity definition | `src/features/**/activity.ts`, default export from `defineActivity`                                      |
 | Strings             | `src/**/strings.ts` and the shared sets in `src/core/strings/shared/*.ts`, named export `strings`        |
 | Paint tool          | `src/core/paint/tools/<toolId>/index.ts`                                                                 |
@@ -195,6 +212,8 @@ Documents:
 | `profile/<id>/settings`               | Voice volume, effects volume, mute, text size, letter spacing, reduced motion, session length, export and print gate        |
 | `profile/<id>/progress`               | Per activity: difficulty, recent outcomes, days practiced                                                                   |
 | `profile/<id>/activity/<activity-id>` | State that one activity owns, such as the furthest typing lesson. The activity definition supplies the schema and defaults. |
+
+Screens read and write these documents through the session in `src/app/session/`, never through the bridge. Its [README](../src/app/session/README.md) lists the hooks and what they guarantee: writes to one document land in order, a read never brings back an older value, and a failed write becomes a state a screen can show.
 
 An activity never edits a shared schema to save its own state. It declares `state: { schema, defaults }` in its definition and reads and writes through `kit.state`.
 
