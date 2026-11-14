@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useMute } from '../audio/AudioProvider.tsx';
-import { t, type SpokenHandle } from '../core/strings/defineStrings.ts';
+import { t, type SpokenHandle, type StringHandle } from '../core/strings/defineStrings.ts';
 import { IconButton } from '../components/ui/IconButton.tsx';
 import { InterfaceIcon } from '../components/ui/InterfaceIcon.tsx';
 import { strings } from './strings.ts';
@@ -40,7 +40,7 @@ export function InstructionControl({
   instruction,
   onReplay,
 }: {
-  instruction: readonly SpokenHandle[];
+  instruction: readonly StringHandle[];
   onReplay: () => void;
 }) {
   return (

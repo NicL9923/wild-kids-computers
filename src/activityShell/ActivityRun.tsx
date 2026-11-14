@@ -20,7 +20,7 @@ import type { ActivityDefinition } from '../core/activityKit/defineActivity.ts';
 import { clampDifficulty, nextDifficulty, startingDifficulty } from '../core/activityKit/difficulty.ts';
 import { roundSeed } from '../core/activityKit/random.ts';
 import type { Scope } from '../core/activityKit/scope.ts';
-import { t, type SpokenHandle } from '../core/strings/defineStrings.ts';
+import { t, type SpokenHandle, type StringHandle } from '../core/strings/defineStrings.ts';
 import { Screen } from '../components/ui/Screen.tsx';
 import { FeedbackLayer, defaultFeedbackText, type FeedbackMark } from './FeedbackLayer.tsx';
 import { FinishScreen } from './FinishScreen.tsx';
@@ -80,8 +80,14 @@ export function ActivityRun({ definition, band }: { definition: ActivityDefiniti
 }
 
 /** What every runner shares: the instruction, feedback marks, and the host the kit talks to. */
+/** What replay says, and what the instruction line shows. */
+interface Instruction {
+  readonly spoken: readonly SpokenHandle[];
+  readonly shown: readonly StringHandle[];
+}
+
 interface Player {
-  readonly instruction: readonly SpokenHandle[];
+  readonly instruction: Instruction;
   readonly marks: readonly FeedbackMark[];
   /** A callback ref for the stage, which feedback marks are placed in. */
   readonly attachStage: (element: HTMLDivElement | null) => void;
@@ -111,7 +117,10 @@ function ActivityRunWithState({
   const pictures = usePictures();
   const visit = useScope();
   const mainInstruction = definition.spoken[0];
-  const [instruction, setInstruction] = useState<readonly SpokenHandle[]>([mainInstruction]);
+  const [instruction, setInstruction] = useState<Instruction>(() => ({
+    spoken: [mainInstruction],
+    shown: [mainInstruction],
+  }));
   const [marks, setMarks] = useState<readonly FeedbackMark[]>([]);
   const stage = useRef<HTMLDivElement | null>(null);
   const attachStage = useCallback((element: HTMLDivElement | null) => {
@@ -137,8 +146,8 @@ function ActivityRunWithState({
       audio,
       clock: kitScheduler,
       activityId: definition.id,
-      onInstruction(handles, speak) {
-        setInstruction(handles);
+      onInstruction(handles, speak, shown) {
+        setInstruction({ spoken: handles, shown });
         if (speak) void audio.speakSequence(handles);
       },
       onFeedback(kind, options) {
@@ -150,9 +159,9 @@ function ActivityRunWithState({
   }, [audio, definition.id, visit]);
 
   // Both stay the same for the whole visit, so a round's effect never restarts the round.
-  const replay = useCallback(() => void audio.speakSequence(live.current), [audio]);
+  const replay = useCallback(() => void audio.speakSequence(live.current.spoken), [audio]);
   const startInstruction = useCallback(() => {
-    setInstruction([mainInstruction]);
+    setInstruction({ spoken: [mainInstruction], shown: [mainInstruction] });
     void audio.speakSequence([mainInstruction]);
   }, [audio, mainInstruction]);
   const player = useMemo<Player>(
@@ -207,7 +216,7 @@ function Frame({
     <div className='wk-activity-screen' data-activity={definition.id}>
       <Screen
         exit={<ExitControl to={AREA_PATH(definition.area)} label={strings.exitToArea} />}
-        instruction={<InstructionControl instruction={player.instruction} onReplay={player.replay} />}
+        instruction={<InstructionControl instruction={player.instruction.shown} onReplay={player.replay} />}
         end={<MuteControl />}
       >
         <h1 className='wk-visually-hidden'>{t(definition.title)}</h1>
