@@ -139,7 +139,8 @@ describe('fix it difficulty', () => {
     // only the right end of its title bar, where buttons would cover the part to grab.
     const { systemSound: _sound, ...parts } = withDefaults(generateLevel(1, 1, 'band-6-8').parts);
     expect(parts).toEqual({
-      hiddenCommands: [],
+      // No close button, so Close leaves the menus and shortcuts too.
+      hiddenCommands: ['close'],
       icons: [],
       menuBar: false,
       taskStrip: true,

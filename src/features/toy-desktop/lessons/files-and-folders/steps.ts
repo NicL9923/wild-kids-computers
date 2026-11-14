@@ -1,5 +1,6 @@
 import type { SpokenHandle } from '../../../../core/strings/defineStrings.ts';
 import { HOME_ID } from '../../model/fileSystem.ts';
+import type { DesktopState } from '../../model/state.ts';
 import { hasEvent } from '../../model/goals.ts';
 import { explorerShows, pointToward } from '../harness/explorerGoals.ts';
 import type { LessonStep } from '../harness/lesson.ts';
@@ -27,6 +28,10 @@ export function filesFoldersSteps(level: FilesFoldersLevel): LessonStep[] {
   const { kind, fileId, folderId, startFolderId } = level;
   const startIds = new Set(Object.keys(level.desktop.fs.nodes));
   const isNew = (nodeId: string) => !startIds.has(nodeId);
+  // The folder the instruction names must stay where the child can see it. Moved into another
+  // folder or into the trash, it is gone from home, so the step starts over with it back.
+  const folderAtHome = (state: DesktopState) =>
+    state.fs.nodes[folderId]?.parentId === level.desktop.fs.nodes[folderId]?.parentId;
 
   const goHome: LessonStep = {
     instruction: strings.goHome,
@@ -37,6 +42,7 @@ export function filesFoldersSteps(level: FilesFoldersLevel): LessonStep[] {
   const move: LessonStep = {
     instruction: MOVE[kind],
     done: (state) => state.fs.nodes[fileId]?.parentId === folderId,
+    possible: folderAtHome,
     // Moving something else, or opening the file instead of picking it up, is another try.
     wrong: ({ events }) =>
       hasEvent(events, 'node-moved') || hasEvent(events, 'node-trashed') || hasEvent(events, 'file-opened'),
@@ -45,6 +51,7 @@ export function filesFoldersSteps(level: FilesFoldersLevel): LessonStep[] {
   const open: LessonStep = {
     instruction: OPEN[kind],
     done: (state) => explorerShows(state, folderId),
+    possible: folderAtHome,
     wrong: ({ events }) => hasEvent(events, 'folder-opened', (event) => event.folderId !== HOME_ID),
     hint: (state) => pointToward(state, `item:${folderId}`, HOME_ID),
   };

@@ -160,6 +160,55 @@ describe('copy and paste steps', () => {
     expect(steps[1]?.hint?.(inNote.state)).toEqual({ kind: 'menu', menu: 'edit' });
   });
 
+  it.each([
+    [
+      'clears the calculator before copying',
+      1,
+      [() => ({ type: 'calculator', windowId: CALCULATOR_WINDOW, key: { type: 'clear' } }) as const],
+    ],
+    [
+      'deletes a digit of the number from the note',
+      2,
+      [() => ({ type: 'text', windowId: NOTEPAD_WINDOW, field: 'document', op: { type: 'backspace' } }) as const],
+    ],
+  ] as const)('puts the number back when the child %s, and counts no try', (_label, difficulty, actions) => {
+    const level = generateLevel(11, difficulty, 'band-6-8');
+    const steps = copyPasteSteps(level, 'linux');
+    const played = playSteps(level.desktop, steps, actions);
+    expect(played).toMatchObject({ done: 0, wrong: 0, restored: 1, rejected: [] });
+    expect(played.state).toBe(level.desktop);
+  });
+
+  it('puts the number back in the note when the child deletes it after copying something else', () => {
+    const level = generateLevel(11, 2, 'band-6-8');
+    const clipboard = createToyClipboard();
+    const played = playSteps(
+      level.desktop,
+      copyPasteSteps(level, 'linux'),
+      [
+        command(NOTEPAD_WINDOW, 'select-all'),
+        command(NOTEPAD_WINDOW, 'copy'),
+        () => {
+          // Something else reached the clipboard since, so the note is the only place left.
+          clipboard.write({ kind: 'text', text: 'apples' });
+          return { type: 'text', windowId: NOTEPAD_WINDOW, field: 'document', op: { type: 'backspace' } };
+        },
+      ],
+      { clipboard },
+    );
+    expect(played).toMatchObject({ done: 2, wrong: 0, restored: 1 });
+  });
+
+  it('keeps the round going while the copied number is still on the clipboard', () => {
+    const level = generateLevel(11, 1, 'band-6-8');
+    const played = playSteps(level.desktop, copyPasteSteps(level, 'linux'), [
+      command(CALCULATOR_WINDOW, 'copy'),
+      () => ({ type: 'calculator', windowId: CALCULATOR_WINDOW, key: { type: 'clear' } }),
+      command(NOTEPAD_WINDOW, 'paste'),
+    ]);
+    expect(played).toMatchObject({ restored: 0 });
+  });
+
   it('does not take typing the number for pasting it', () => {
     const level = generateLevel(11, 1, 'band-6-8');
     const played = playSteps(level.desktop, copyPasteSteps(level, 'linux'), [
@@ -230,7 +279,8 @@ describe('copy and paste layout', () => {
       resize: false,
       openMaximized: false,
       systemSound: false,
-      hiddenCommands: [],
+      // No close button, so Close leaves the menus and shortcuts too.
+      hiddenCommands: ['close'],
     });
   });
 });

@@ -14,14 +14,11 @@ import { strings } from './strings.ts';
  */
 export function DesktopIcons() {
   const { desktop, parts, highlight, sayName, open } = useDesktopContext();
-  const { state, dispatch } = desktop;
+  const { state } = desktop;
   const { iconSize, showNames } = state.settings;
 
   function openFolder(folderId: string): void {
-    const opened = open({ type: 'open-app', app: 'file-explorer' });
-    const windowId = opened.events.find((event) => event.type === 'window-opened')?.windowId;
-    if (windowId !== undefined)
-      dispatch({ type: 'explorer', windowId, action: { type: 'open-node', nodeId: folderId } });
+    open({ type: 'open-folder', folderId });
   }
 
   return (

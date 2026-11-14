@@ -72,6 +72,47 @@ describe('copy', () => {
   });
 });
 
+/** Page text marked as never to be copied, after some ordinary text. */
+function secret(): HTMLElement {
+  const box = document.createElement('div');
+  box.dataset.noCopy = '';
+  box.textContent = 'Fox*42';
+  const before = document.createElement('p');
+  before.textContent = 'page text';
+  document.body.append(before, box);
+  return box;
+}
+
+describe('text marked data-no-copy', () => {
+  it.each([
+    ['the marked text', (box: HTMLElement) => box],
+    ['the whole page, as Select all does', () => document.body],
+  ])('copies nothing when the selection reaches %s', (_label, around) => {
+    const box = secret();
+    document.getSelection()?.selectAllChildren(around(box));
+    expect(fire(box, 'copy')).toBe(true);
+    expect(clipboard.read()).toBeNull();
+  });
+
+  it('cuts nothing from a text field inside marked text, and leaves the field as it was', () => {
+    const box = secret();
+    const input = textField('Fox*42', 0, 6);
+    box.append(input);
+    input.setSelectionRange(0, 6);
+    expect(fire(input, 'cut')).toBe(true);
+    expect(clipboard.read()).toBeNull();
+    expect(input.value).toBe('Fox*42');
+  });
+
+  it('still copies from a text field elsewhere while the page selection covers marked text', () => {
+    const box = secret();
+    document.getSelection()?.selectAllChildren(box);
+    const input = textField('red fox', 4, 7);
+    expect(fire(input, 'copy')).toBe(true);
+    expect(clipboard.read()).toEqual({ kind: 'text', text: 'fox' });
+  });
+});
+
 describe('cut', () => {
   it('moves the selected text to the toy clipboard and reports an input', () => {
     const input = textField('red fox', 3, 7);

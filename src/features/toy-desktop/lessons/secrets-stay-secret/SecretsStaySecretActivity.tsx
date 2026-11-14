@@ -95,7 +95,9 @@ export default function SecretsStaySecretActivity({ level, band, kit }: Activity
   });
 
   return (
-    <div className='sss-stage' data-phase={phase}>
+    // Nothing here can be selected or copied, so the pretend password never reaches the toy
+    // clipboard and from there a note that could be saved, even through Select all.
+    <div className='sss-stage' data-phase={phase} data-no-copy>
       <section className='sss-builder' aria-label={t(strings.password)}>
         <div className='sss-password-row'>
           <Emoji id='lock' decorative className='sss-lock' />

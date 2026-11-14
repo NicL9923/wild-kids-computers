@@ -27,7 +27,7 @@ import './toyDesktop.css';
 import type { DesktopHandle } from './useDesktop.ts';
 import { usePlatformOs } from './usePlatformOs.ts';
 import { DesktopWindow } from './Window.tsx';
-import { byWindowNumber } from './windowOrder.ts';
+import { byWindowNumber, windowNumber } from './windowOrder.ts';
 
 export interface ToyDesktopProps {
   readonly desktop: DesktopHandle;
@@ -124,6 +124,9 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const [notice, setNotice] = useState<Notice | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ windowId: string | null; serial: number } | null>(null);
   const { state, dispatch, listen } = desktop;
+  // Windows numbered from here on were opened on this screen, by the child or the desktop's icons.
+  const [firstOpened] = useState(() => desktop.state.nextWindowId);
+  const openedHere = useCallback((windowId: string) => windowNumber({ id: windowId }) >= firstOpened, [firstOpened]);
   const fit = fitDesktop(space);
   // Read again whenever the space changes, which a change of the app's window size causes.
   const zoom = contentZoom(band, { width: globalThis.innerWidth, height: globalThis.innerHeight });
@@ -181,9 +184,13 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
         if (events.length > 0) setNotice((current) => (current === null ? current : null));
         // A window that came forward any way but a click inside it gets keyboard focus.
         const focused = events.findLast((event) => event.type === 'window-focused');
+        // A save or open dialog that opened takes the keyboard, from a menu or a shortcut alike.
+        const openedDialog = events.find((event) => event.type === 'dialog-opened');
         // A save or open dialog that closed hands the keyboard back to its window.
         const closedDialog = events.find((event) => event.type === 'dialog-closed');
-        if (focused !== undefined && action.type !== 'focus-window' && focused.type === 'window-focused') {
+        if (openedDialog !== undefined && openedDialog.type === 'dialog-opened') {
+          setFocusRequest((current) => ({ windowId: openedDialog.windowId, serial: (current?.serial ?? 0) + 1 }));
+        } else if (focused !== undefined && action.type !== 'focus-window' && focused.type === 'window-focused') {
           setFocusRequest((current) => ({ windowId: focused.windowId, serial: (current?.serial ?? 0) + 1 }));
         } else if (closedDialog !== undefined && closedDialog.type === 'dialog-closed') {
           setFocusRequest((current) => ({ windowId: closedDialog.windowId, serial: (current?.serial ?? 0) + 1 }));
@@ -235,14 +242,25 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const open = useCallback(
     (action: OpenAction) => {
       const now = desktop.current();
-      const app = action.type === 'open-app' ? action.app : appForNode(getNode(now.fs, action.fileId));
+      // When every window fills the screen, a second window of an app would hide the first
+      // exactly, and closing one would show another just like it. The open one comes forward.
+      const shown =
+        parts.openMaximized && action.type === 'open-app'
+          ? now.windows.findLast((window) => window.app.kind === action.app)
+          : undefined;
+      if (shown !== undefined) return dispatch({ type: 'activate-window', windowId: shown.id });
+      const app =
+        action.type === 'open-app'
+          ? action.app
+          : action.type === 'open-folder'
+            ? 'file-explorer'
+            : appForNode(getNode(now.fs, action.fileId));
       const targetPx = screen.current === null ? Number.NaN : measureTarget(screen.current);
       const size =
         app === null || !(targetPx > 0) ? undefined : comfortableSize(app, targetPx, fitDesktop(spaceRef.current));
-      const opened = dispatch({ ...action, size });
-      const windowId = opened.events.find((event) => event.type === 'window-opened')?.windowId;
-      if (parts.openMaximized && windowId !== undefined) dispatch({ type: 'maximize-window', windowId });
-      return opened;
+      // One dispatch: a window that opens maximized is one action for a lesson, never an open
+      // followed by a maximize the child did not ask for.
+      return dispatch({ ...action, size, maximized: parts.openMaximized });
     },
     [desktop, dispatch, parts.openMaximized],
   );
@@ -258,8 +276,21 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   );
 
   const context = useMemo<DesktopContextValue>(
-    () => ({ desktop, kit, band, os, parts, scale: fit.scale, highlight, notice, focusContent, open, sayName }),
-    [desktop, kit, band, os, parts, fit.scale, highlight, notice, focusContent, open, sayName],
+    () => ({
+      desktop,
+      kit,
+      band,
+      os,
+      parts,
+      scale: fit.scale,
+      highlight,
+      notice,
+      openedHere,
+      focusContent,
+      open,
+      sayName,
+    }),
+    [desktop, kit, band, os, parts, fit.scale, highlight, notice, openedHere, focusContent, open, sayName],
   );
 
   /** Menu shortcuts, and typing into the calculator, for the window in front. */

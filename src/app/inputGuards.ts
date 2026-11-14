@@ -3,6 +3,8 @@
  *
  * - Copy, cut, and paste go to an in-app toy clipboard and never touch the system clipboard.
  *   An adult's copied password cannot land in a toy app, and a child's text cannot leave.
+ * - Text inside an element marked `data-no-copy`, such as a pretend password, is never copied
+ *   or cut, even by a Select all that reaches over it.
  * - Every native drag is cancelled. Moving things uses the activity kit's useCarry, and a drop
  *   from another program would carry system data in.
  */
@@ -61,6 +63,26 @@ function textControl(target: EventTarget | null): TextControl | null {
   return null;
 }
 
+/** Marks text that copy and cut never take, such as a pretend password a lesson builds. */
+const NO_COPY = '[data-no-copy]';
+
+/**
+ * True when the copy starts in a no-copy element, or, outside a text field, when the page
+ * selection reaches into one. A text field's selection is its own, whatever the page selection.
+ */
+function touchesNoCopy(doc: Document, target: EventTarget | null, control: TextControl | null): boolean {
+  if (target instanceof Element && target.closest(NO_COPY) !== null) return true;
+  if (control !== null) return false;
+  const selection = doc.getSelection();
+  if (selection === null || selection.rangeCount === 0) return false;
+  const marked = [...doc.querySelectorAll(NO_COPY)];
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    const range = selection.getRangeAt(index);
+    if (marked.some((element) => range.intersectsNode(element))) return true;
+  }
+  return false;
+}
+
 function selectedText(doc: Document, control: TextControl | null): string {
   if (control !== null) {
     const start = control.selectionStart ?? 0;
@@ -97,7 +119,8 @@ export function installInputGuards(doc: Document, clipboard: ToyClipboard = toyC
     // Cancelling without setData leaves the system clipboard as it was.
     event.preventDefault();
     const control = textControl(event.target);
-    const text = selectedText(doc, control);
+    // A selection that reaches no-copy text gives nothing, rather than the rest of the page.
+    const text = touchesNoCopy(doc, event.target, control) ? '' : selectedText(doc, control);
     if (text !== '') clipboard.write({ kind: 'text', text });
     if (event.type !== 'cut' || text === '') return;
     if (control !== null) replaceSelection(control, '', 'deleteByCut');

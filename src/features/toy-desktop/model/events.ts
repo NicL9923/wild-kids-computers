@@ -24,7 +24,7 @@ export type RejectReason =
   | 'command-disabled'
   /** `MAX_WINDOWS` windows are open already. */
   | 'too-many-windows'
-  /** A minimized window cannot be moved, resized, or focused until it is restored. */
+  /** A minimized window cannot be moved, resized, restored to its size, or focused until it is restored. */
   | 'minimized'
   /** A maximized window cannot be resized until it is restored. */
   | 'maximized'
@@ -32,6 +32,8 @@ export type RejectReason =
   | 'no-text-field'
   /** The window has no dialog open. */
   | 'no-dialog'
+  /** A save or open dialog is up, so the document under it takes no edits until it closes. */
+  | 'dialog-open'
   /** Open needs a selected file first. */
   | 'nothing-selected'
   /** The item is a folder or a different kind of file than this app opens. */

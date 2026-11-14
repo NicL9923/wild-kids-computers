@@ -21,18 +21,23 @@ export interface DesktopContextValue {
   readonly highlight: HighlightTarget | null;
   /** The gentle sentence about the last refused action, and the window it happened in. */
   readonly notice: Notice | null;
+  /**
+   * True for a window the child opened on this screen, as opposed to one the desktop started
+   * with. Such a window always has a close button, whatever the parts say.
+   */
+  readonly openedHere: (windowId: string) => boolean;
   /** Moves keyboard focus into a window, to its text or its main control. */
   readonly focusContent: (windowId: string) => void;
   /**
-   * Opens an app or a file from a desktop icon or the launcher, maximized when the parts say so,
-   * and moves keyboard focus into the new window.
+   * Opens an app, a file, or a folder from a desktop icon or the launcher, maximized when the
+   * parts say so, and moves keyboard focus into the new window. One click is one action.
    */
   readonly open: (action: OpenAction) => Transition;
   /** Props that say a control's name when the pointer rests on it or it gets focus. */
   readonly sayName: (handle: SpokenHandle) => { onPointerEnter?: () => void; onFocus?: () => void };
 }
 
-export type OpenAction = Extract<DesktopAction, { type: 'open-app' | 'open-file' }>;
+export type OpenAction = Extract<DesktopAction, { type: 'open-app' | 'open-file' | 'open-folder' }>;
 
 export interface Notice {
   readonly windowId: string | null;

@@ -1,5 +1,5 @@
 import type { SpokenHandle } from '../../../../core/strings/defineStrings.ts';
-import { isTrashed, TRASH_ID } from '../../model/fileSystem.ts';
+import { ancestry, isTrashed, TRASH_ID } from '../../model/fileSystem.ts';
 import { hasEvent } from '../../model/goals.ts';
 import { explorers, explorerShows, pointToward } from '../harness/explorerGoals.ts';
 import type { LessonStep } from '../harness/lesson.ts';
@@ -18,7 +18,11 @@ const DELETE: Readonly<Record<LessonPictureId, SpokenHandle>> = {
 
 /** Three steps: put the named picture in the trash, open the trash, and restore the picture. */
 export function trashSteps({ pictureId, fileId, folderId }: TrashLevel): LessonStep[] {
-  const inTrash = (state: Parameters<LessonStep['done']>[0]) => state.fs.nodes[fileId]?.parentId === TRASH_ID;
+  type State = Parameters<LessonStep['done']>[0];
+  // A picture in a folder that went in the trash is in the trash too, as on a real computer.
+  const inTrash = (state: State) => isTrashed(state.fs, fileId);
+  /** What lies in the trash holding the picture: the picture itself, or the folder it went in with. */
+  const heldBy = (state: State) => ancestry(state.fs, fileId).find((node) => node.parentId === TRASH_ID)?.id ?? fileId;
   return [
     {
       instruction: DELETE[pictureId],
@@ -40,8 +44,9 @@ export function trashSteps({ pictureId, fileId, folderId }: TrashLevel): LessonS
       wrong: ({ events }) => hasEvent(events, 'node-restored', (event) => event.nodeId !== fileId),
       hint: (state) => {
         if (!explorerShows(state, TRASH_ID)) return { kind: 'key', key: `place:${TRASH_ID}` };
-        const picked = explorers(state).some((explorer) => explorer.selectedId === fileId);
-        return picked ? { kind: 'command', command: 'restore' } : { kind: 'key', key: `item:${fileId}` };
+        const holder = heldBy(state);
+        const picked = explorers(state).some((explorer) => explorer.selectedId === holder);
+        return picked ? { kind: 'command', command: 'restore' } : { kind: 'key', key: `item:${holder}` };
       },
     },
   ];

@@ -3,7 +3,7 @@
  * only what its goal needs, so nothing else competes for attention.
  */
 import type { CommandId } from '../model/commands.ts';
-import { APP_KINDS, type AppKind } from '../model/state.ts';
+import { APP_KINDS, type AppKind, type DesktopState } from '../model/state.ts';
 import type { MenuId } from '../model/appMenus.ts';
 
 /** An icon on the desktop. A single click opens it. */
@@ -25,13 +25,20 @@ export interface DesktopParts {
   readonly taskStrip?: boolean;
   /** The apps the launcher in the task strip offers. Empty hides the launcher. */
   readonly launcher?: readonly AppKind[];
-  /** The buttons in each title bar. */
+  /**
+   * The buttons in each title bar. Without `close`, nothing closes the windows the round starts
+   * with: Close also leaves every menu and shortcut. A window the child opens during the round
+   * always has a close button, so nothing the child opens stays on screen for good.
+   */
   readonly windowControls?: readonly WindowControl[];
   /** Whether windows move by their title bar. */
   readonly move?: boolean;
   /** Whether windows show a resize handle. */
   readonly resize?: boolean;
-  /** Opens every new window maximized, for the youngest children. */
+  /**
+   * Opens every new window maximized, for the youngest children. An app icon then brings the
+   * app's open window forward instead of opening a second one just like it.
+   */
   readonly openMaximized?: boolean;
   /** The toy computer's sound button and volume slider in the menu bar. */
   readonly systemSound?: boolean;
@@ -56,8 +63,25 @@ export const ALL_PARTS: Required<DesktopParts> = {
   hiddenCommands: [],
 };
 
+/**
+ * The parts as the screen uses them. A lesson that takes away the close button takes away every
+ * other way to close a window too, so a menu or a shortcut can never close the window the round
+ * needs and leave nothing on screen to bring it back.
+ */
 export function withDefaults(parts: DesktopParts = {}): Required<DesktopParts> {
-  return { ...ALL_PARTS, ...parts };
+  const full = { ...ALL_PARTS, ...parts };
+  if (full.windowControls.includes('close') || full.hiddenCommands.includes('close')) return full;
+  return { ...full, hiddenCommands: [...full.hiddenCommands, 'close'] };
+}
+
+/**
+ * A saved desktop made fit for the parts on screen. Without a task strip nothing brings a
+ * minimized window back, so a desktop saved by an older band shows every window again.
+ */
+export function fitForParts(state: DesktopState, parts: Required<DesktopParts>): DesktopState {
+  if (parts.taskStrip || state.windows.every((window) => !window.minimized)) return state;
+  const windows = state.windows.map((window) => ({ ...window, minimized: false }));
+  return { ...state, windows, focusedWindowId: windows.at(-1)?.id ?? null };
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { WindowState } from '../model/state.ts';
 
 /** The number in a window id such as "w12". */
-function windowNumber(window: WindowState): number {
+export function windowNumber(window: Pick<WindowState, 'id'>): number {
   return Number(window.id.slice(1));
 }
 
