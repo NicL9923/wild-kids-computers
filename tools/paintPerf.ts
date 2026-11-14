@@ -22,6 +22,10 @@ import type { BrushTip, PaintEffect, ToolPoint, ToolSettings } from '../src/core
 
 const FRAME_BUDGET_MS = 1000 / 120;
 
+/** Distort and color effects run at a large brush size and must stay well inside one frame. */
+const STROKE_EFFECT_SIZE = 120;
+const STROKE_EFFECT_TARGET_MS = 4;
+
 interface Stats {
   median: number;
   p95: number;
@@ -120,6 +124,20 @@ async function measureEffects(): Promise<{ id: string; first: number; steady: nu
   return results;
 }
 
+/** Stroke effects that move or recolor pixels, timed like a large brush: one frame of fast strokes each. */
+async function measureStrokeEffects(): Promise<{ id: string; group: string; frame: Stats }[]> {
+  const dir = path.join(process.cwd(), 'src/core/paint/effects');
+  const results: { id: string; group: string; frame: Stats }[] = [];
+  for (const id of readdirSync(dir).toSorted()) {
+    const module: unknown = await import(pathToFileURL(path.join(dir, id, 'index.ts')).href);
+    if (!isEffectModule(module)) throw new Error(`${id} has no default export.`);
+    const effect = module.default;
+    if (effect.group !== 'distort' && effect.group !== 'color') continue;
+    results.push({ id, group: effect.group, frame: measureStroke(round, STROKE_EFFECT_SIZE, 60, effect) });
+  }
+  return results;
+}
+
 function measureUndo(): { undo: Stats; redo: Stats } {
   const doc = createDocument();
   const history = new History(doc);
@@ -158,6 +176,13 @@ for (const [label, tip, size] of [
 for (const effect of await measureEffects()) {
   console.log(
     `Whole picture: ${effect.id.padEnd(15)} first ${ms(effect.first)} (builds its map), then ${ms(effect.steady)}`,
+  );
+}
+
+for (const effect of await measureStrokeEffects()) {
+  const { median, p95, max } = effect.frame;
+  console.log(
+    `${`${effect.group}: ${effect.id}`.padEnd(30)}per frame median ${ms(median)}, p95 ${ms(p95)}, max ${ms(max)}  (${STROKE_EFFECT_SIZE} px, target under ${ms(STROKE_EFFECT_TARGET_MS)})`,
   );
 }
 

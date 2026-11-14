@@ -44,9 +44,12 @@ history.replaceDocument(blankPaper, coloringPageMask); // "open a coloring page"
 | `glyphs.ts`                   | Glyph tables for the text tool                                                                  |
 | `patterns.ts`, `sample.ts`    | Patterns for pattern tips and fills, and bilinear sampling                                      |
 | `sampleMap.ts`                | The precomputed sample map for whole-picture effects that move pixels                           |
+| `warp.ts`                     | `warpDab`, which moves the pixels under one dab for distort effects                             |
+| `recolor.ts`                  | `recolorStroke`, which maps each pixel's color once per stroke for color effects, and `luma`    |
 | `thumbnail.ts`                | Area-averaging downscale                                                                        |
 | `tools/`, `tips/`, `effects/` | One module per item, found by the registry in `src/registry/paint.ts`                           |
 | `testing/golden.ts`           | Golden image helpers. Test-only and excluded from the app build.                                |
+| `testing/pictures.ts`         | Source pictures for effect goldens: a checkerboard and a spectrum                               |
 
 ## Rules
 
@@ -95,15 +98,15 @@ history.replaceDocument(blankPaper, coloringPageMask); // "open a coloring page"
 
 Pick the group:
 
-| Group           | Shape                                                                                                         | Reference          |
-| --------------- | ------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `distort`       | A stroke effect that moves pixels under the brush. Sample from a copy of the dab area.                        | `effects/swirl`    |
-| `color`         | A stroke effect that maps each pixel's color. Read the pixel from before the stroke with `canvas.readBefore`. | `effects/hueShift` |
-| `paint-on`      | A stroke effect that adds things, like a brush. Scatter with a seeded random.                                 | `effects/confetti` |
-| `whole-picture` | `apply(source, target)`, pure, fixed cost per pixel, so it can run in a worker.                               | `effects/mirror`   |
+| Group           | Shape                                                                                             | Reference          |
+| --------------- | ------------------------------------------------------------------------------------------------- | ------------------ |
+| `distort`       | A stroke effect that moves pixels under the brush. `warpDab` samples from a copy of the dab area. | `effects/puff`     |
+| `color`         | A stroke effect that maps each pixel's color. `recolorStroke` reads it from before the stroke.    | `effects/hueShift` |
+| `paint-on`      | A stroke effect that adds things, like a brush. Scatter with a seeded random.                     | `effects/confetti` |
+| `whole-picture` | `apply(source, target)`, pure, fixed cost per pixel, so it can run in a worker.                   | `effects/mirror`   |
 
 1. Copy the reference directory to `effects/<effectId>/` and change the id, order, and the work. For a whole-picture effect that moves pixels, `sampleMapEffect(id, order, mapper)` builds and caches the map. One that changes colors loops over the pixels once.
-2. Keep the test file next to it and point its `expectGolden('effect-<effectId>', ...)` at the new effect. Paint something with `paintBands(doc)` or strokes first, so the effect has something to work on. Test that the same seed gives the same pixels and another seed does not, for scattering effects.
+2. Keep the test file next to it and point its `expectGolden('effect-<effectId>', ...)` at the new effect. Paint something with `paintBands(doc)`, `paintChecks(doc)`, `paintSpectrum(doc)`, or strokes first, so the effect's change is obvious. Test that the same seed gives the same pixels and another seed does not, for scattering effects. `src/registry/paintStrokeEffects.test.ts` checks every distort and color effect at size zero, on a transparent picture, off the canvas edges, and on cancel.
 3. Run `npm run paint:goldens`, look at the PNG, and commit.
 
 ## Goldens
@@ -120,4 +123,4 @@ Pick the group:
 
 ## Measuring
 
-`npm run perf` times a full-canvas fill, a frame of fast strokes with large soft brushes, each whole-picture effect, and a full-canvas undo, on the 1600 by 1000 canvas. It prints numbers and gates nothing.
+`npm run perf` times a full-canvas fill, a frame of fast strokes with large soft brushes, each whole-picture effect, a frame of fast 120 px strokes with each distort and color effect, and a full-canvas undo, on the 1600 by 1000 canvas. It prints numbers and gates nothing. Keep a distort or color effect under 4 ms per frame on a developer machine, since a child's laptop is several times slower.
