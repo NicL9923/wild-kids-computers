@@ -2,7 +2,7 @@ import path from 'node:path';
 import { BrowserWindow, dialog } from 'electron';
 import { BridgeError, type ExportResult, type PrintResult } from '../../src/core/platform/bridge.ts';
 import { isExportFileStem } from '../../src/core/platform/names.ts';
-import { writeFileAtomic } from './atomicWrite.ts';
+import { NO_PATH_CHECK, writeFileAtomic } from './atomicWrite.ts';
 import { checkOutputPng, exportTarget, printOutcome } from './outputChecks.ts';
 
 /**
@@ -23,7 +23,7 @@ export async function exportPicture(
     properties: ['createDirectory', 'showOverwriteConfirmation'],
   });
   if (result.canceled || result.filePath === undefined || result.filePath === '') return 'cancelled';
-  await writeFileAtomic(exportTarget(result.filePath), png);
+  await writeFileAtomic(exportTarget(result.filePath), png, NO_PATH_CHECK);
   return 'saved';
 }
 

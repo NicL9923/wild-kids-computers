@@ -9,6 +9,11 @@ import {
   CLOSE_REQUEST_CHANNEL,
   MENU_COMMAND_CHANNEL,
 } from '../../src/core/platform/ipc.ts';
+import { installFileGuards, refuseFileShowPicker } from './fileGuards.ts';
+
+// Before any page script: no file from the system reaches the page.
+contextBridge.executeInMainWorld({ func: refuseFileShowPicker });
+installFileGuards(window);
 
 const api: Record<string, unknown> = Object.fromEntries(
   BRIDGE_METHODS.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channelFor(method), ...args)]),

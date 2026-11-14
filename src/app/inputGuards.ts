@@ -8,7 +8,9 @@
  * - Every native drag is cancelled. Moving things uses the activity kit's useCarry, and a drop
  *   from another program would carry system data in. A drag out of the window would also leave
  *   a file on the desktop.
- * - A click on a file input is cancelled, so no system file chooser opens.
+ * - A click on a file input is cancelled, so no system file chooser opens. This is the second
+ *   layer: the main process stops every chooser (electron/main/fileChooserBlock.ts), including
+ *   one inside a closed shadow root, which this guard cannot see.
  */
 
 /**
@@ -59,10 +61,12 @@ const DRAG_EVENTS = ['dragstart', 'dragover', 'drop'] as const;
 /**
  * A click on a file input, from the pointer, a label, the keyboard, or script, opens the
  * system's file chooser. Nothing in the app needs one, and a chooser is a system dialog outside
- * the bridge, so the click is cancelled before the input sees it.
+ * the bridge, so the click is cancelled before the input sees it. The composed path reaches an
+ * input inside an open shadow root, where the document sees only the host as the target.
  */
 function cancelFileChooser(event: Event): void {
-  if (event.target instanceof HTMLInputElement && event.target.type === 'file') event.preventDefault();
+  const [origin] = event.composedPath();
+  if (origin instanceof HTMLInputElement && origin.type === 'file') event.preventDefault();
 }
 
 /** Input types whose value supports selection and setRangeText. */

@@ -76,10 +76,14 @@ test('deleting a profile in the parent corner asks first and removes it from the
   await expect(confirm).toBeHidden();
   await expect(children.locator(`[data-profile="${OWL.id}"]`)).toHaveCount(0);
 
-  const saved = profilesDocument.schema.parse(
-    JSON.parse(await readFile(path.join(launched.dataDir, 'profiles.json'), 'utf8')),
-  );
-  expect(saved.profiles.map((profile) => profile.id)).toEqual([FOX.id]);
+  // The list changes on screen at once and the save follows in the background, so the file is
+  // read until it lands.
+  const dataDir = launched.dataDir;
+  const savedIds = async () =>
+    profilesDocument.schema
+      .parse(JSON.parse(await readFile(path.join(dataDir, 'profiles.json'), 'utf8')))
+      .profiles.map((profile) => profile.id);
+  await expect.poll(savedIds).toEqual([FOX.id]);
 
   // With one child left, the start goes straight to the meadow.
   await page.getByRole('button', { name: cornerStrings.back.text }).click();

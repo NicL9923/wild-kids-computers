@@ -6,11 +6,11 @@ When this file and the code disagree, fix one of them in the same change.
 
 ## Process model
 
-| Process  | Code                | Rules                                                                                                                   |
-| -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Main     | `electron/main/`    | Owns the window, the `app://` protocol, the network block, file storage, export, print, and kiosk lock.                 |
-| Preload  | `electron/preload/` | Exposes one object, `window.wkBridge`, through `contextBridge`. It contains no logic beyond forwarding typed IPC calls. |
-| Renderer | `src/`              | React app. No Node access. Context isolation and the sandbox stay on.                                                   |
+| Process  | Code                | Rules                                                                                                                                                                                   |
+| -------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Main     | `electron/main/`    | Owns the window, the `app://` protocol, the network block, file storage, export, print, and kiosk lock.                                                                                 |
+| Preload  | `electron/preload/` | Exposes one object, `window.wkBridge`, through `contextBridge`, and installs the file guards before any page script runs. It contains no other logic beyond forwarding typed IPC calls. |
+| Renderer | `src/`              | React app. No Node access. Context isolation and the sandbox stay on.                                                                                                                   |
 
 The renderer loads from `app://bundle/index.html`. The main process serves that scheme from the packaged renderer build. The app never loads `file://` or `http://` content, except the Vite dev server on `localhost` when the app is unpackaged and `WKC_DEV_SERVER_URL` is set.
 
@@ -49,7 +49,9 @@ All of these apply at once. Each has a test.
 
 The end-to-end no-network test starts a local HTTP server on a free port. From the renderer it tries `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, an `<img>`, a `<link rel="dns-prefetch">`, a fetch from a Worker, a WebRTC peer connection, `window.open`, and a navigation. It asserts that each fails and that the server saw zero requests.
 
-The page also cannot write a file or open a system dialog outside the bridge. A link with a `download` attribute or a navigation to a downloadable response meets the sandbox and then the download cancel. Print and alert meet the sandbox. The Chromium switch `--disable-blink-features=FileSystemAccessLocal` removes `showOpenFilePicker`, `showSaveFilePicker`, and `showDirectoryPicker`. `src/app/inputGuards.ts` cancels a click on a file input, which would open the system file chooser, and every native drag, which could drop a file on the desktop. The no-network test offers every download a save path and checks that no file appears, and the isolation test checks each dialog.
+The page also cannot write a file or open a system dialog outside the bridge, and no file from the system reaches it. A link with a `download` attribute or a navigation to a downloadable response meets the sandbox and then the download cancel. Print, alert, and confirm meet the sandbox. The Chromium switch `--disable-blink-features=FileSystemAccessLocal,EyeDropperAPI` removes `showOpenFilePicker`, `showSaveFilePicker`, `showDirectoryPicker`, and the screen-wide `EyeDropper`. Device pickers meet the permission and device handlers, and `contentsGuard.ts` cancels a Bluetooth device request, which Electron would otherwise answer with the first device in range.
+
+The system file chooser is stopped in three layers. `electron/main/fileChooserBlock.ts` is the boundary: every web contents gets an in-process DevTools session that intercepts and cancels each file chooser request, whatever opened it, including a file input inside a closed shadow root. The preload makes `showPicker()` refuse on a file input in the page's world, and stops a drag or paste that carries files at the window before any page listener hears it. A file paste becomes an empty paste, so the toy clipboard still pastes. `src/app/inputGuards.ts` cancels a click on a file input it can see through the composed path, and every native drag, which could drop a file on the desktop. `e2e/network/systemFiles.spec.ts` drives each with real input and calls every other page-reachable picker from a click. The no-network test offers every download a save path and checks that no file appears.
 
 A second end-to-end test asserts hard rule 8: `process` and `require` are undefined in the page, `window.wkBridge` holds only the bridge functions, and the renderer process is sandboxed. On Linux the test reads the renderer's seccomp status from `/proc`.
 

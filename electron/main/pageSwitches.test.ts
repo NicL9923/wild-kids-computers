@@ -3,9 +3,9 @@ import { applyPageSwitches } from './pageSwitches.ts';
 
 describe('applyPageSwitches', () => {
   // The end-to-end bridge boundary test sees the pickers missing from the page; this names why.
-  it('turns off the File System Access pickers', () => {
+  it('turns off the File System Access pickers and the screen eye dropper', () => {
     const switches: Record<string, string | undefined> = {};
     applyPageSwitches({ appendSwitch: (name, value) => void (switches[name] = value) });
-    expect(switches).toEqual({ 'disable-blink-features': 'FileSystemAccessLocal' });
+    expect(switches).toEqual({ 'disable-blink-features': 'FileSystemAccessLocal,EyeDropperAPI' });
   });
 });
