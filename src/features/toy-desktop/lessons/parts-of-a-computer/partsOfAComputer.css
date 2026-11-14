@@ -1,0 +1,69 @@
+/*
+ * The scene keeps its 5:3 shape and fits the stage. Each part is a button over its own drawing;
+ * the focus ring and the hint ring sit around the part, never on the art.
+ */
+
+.poc-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.poc-scene {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  overflow: hidden;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+}
+
+.poc-desk {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.poc-part {
+  position: absolute;
+  display: block;
+  min-width: var(--wk-target-min);
+  min-height: var(--wk-target-min);
+  padding: 0;
+  border: var(--wk-border-width) solid transparent;
+  border-radius: var(--wk-radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.poc-part svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.poc-part:hover {
+  background: color-mix(in srgb, var(--wk-color-surface) 45%, transparent);
+}
+
+/* After two tries the right part gets a ring that breathes gently, or holds still. */
+.poc-part[data-hint='true'] {
+  outline: calc(var(--wk-focus-width) * 1.5) solid var(--wk-color-accent);
+  outline-offset: var(--wk-focus-offset);
+  box-shadow: 0 0 0 calc(var(--wk-focus-width) * 2.5) var(--wk-profile-night);
+  animation: poc-point 1.6s var(--wk-ease-in-out) infinite;
+}
+
+.poc-part[data-found='true'] {
+  background: color-mix(in srgb, var(--wk-color-selected) 70%, transparent);
+  border-color: var(--wk-color-primary);
+}
+
+@keyframes poc-point {
+  50% {
+    outline-offset: calc(var(--wk-focus-offset) + 6px * var(--wk-motion-scale));
+  }
+}
