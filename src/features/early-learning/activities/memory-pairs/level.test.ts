@@ -42,7 +42,7 @@ describe('generateLevel', () => {
     }
   });
 
-  it.each([1, 5])('mixes pictures from different sets at difficulty %i', (difficulty) => {
+  it.each([1, 2, 3, 4, 5])('mixes pictures from different sets at difficulty %i', (difficulty) => {
     const mixed = SEEDS.filter((seed) => {
       const sets = new Set(generateLevel(seed, difficulty, 'band-3-5').cards.map((card) => setOf(card.picture)));
       return sets.size > 1;
@@ -50,7 +50,7 @@ describe('generateLevel', () => {
     expect(mixed.length).toBeGreaterThan(SEEDS.length * 0.6);
   });
 
-  it.each([6, 10])('draws every picture from one set at difficulty %i, and uses each set', (difficulty) => {
+  it.each([6, 7, 8, 9, 10])('draws every picture from one set at difficulty %i, and uses each set', (difficulty) => {
     const sets = new Set<string | undefined>();
     for (const seed of SEEDS) {
       const used = new Set(generateLevel(seed, difficulty, 'band-9-12').cards.map((card) => setOf(card.picture)));
