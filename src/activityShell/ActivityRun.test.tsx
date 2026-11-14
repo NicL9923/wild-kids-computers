@@ -8,6 +8,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { SessionProvider } from '../app/session/SessionProvider.tsx';
@@ -17,6 +18,7 @@ import { createAudioEngine, type AudioEngine } from '../audio/audioEngine.ts';
 import { AudioProvider } from '../audio/AudioProvider.tsx';
 import { CONTINUOUS } from '../audio/sfx/continuous.ts';
 import { ONE_SHOTS } from '../audio/sfx/oneShots.ts';
+import { FakeAudioContext } from '../audio/testing/fakeAudioContext.ts';
 import type { Band } from '../core/bands.ts';
 import { defineActivity, type ActivityDefinition } from '../core/activityKit/defineActivity.ts';
 import { nextDifficulty } from '../core/activityKit/difficulty.ts';
@@ -48,6 +50,9 @@ function Fixture({ level, kit }: ActivityProps<string, { taps: number }>) {
       <button type='button' onClick={() => kit.roundComplete()}>
         done
       </button>
+      <button type='button' onClick={() => kit.stepSolved()}>
+        solved
+      </button>
       <button type='button' onClick={() => kit.feedback.wrong()}>
         wrong
       </button>
@@ -76,6 +81,19 @@ function StateFixture({ kit }: ActivityProps<string, { taps: number }>) {
 }
 
 const load = () => Promise.resolve({ default: Fixture });
+
+/** Every kit object a component was given, to prove a re-render reuses the same one. */
+const seenKits = new Set<unknown>();
+
+function KitWatcher({ kit }: ActivityProps<string>) {
+  const [renders, setRenders] = useState(0);
+  seenKits.add(kit);
+  return (
+    <button type='button' onClick={() => setRenders(renders + 1)}>
+      {`rendered ${String(renders)}`}
+    </button>
+  );
+}
 
 const rounds = defineActivity<string>({
   id: 'run-rounds',
@@ -138,7 +156,7 @@ interface Harness {
 
 async function run(
   definition: ActivityDefinition,
-  options: { furthestStep?: number; sessionMinutes?: number; band?: Band } = {},
+  options: { furthestStep?: number; sessionMinutes?: number; band?: Band; voice?: FakeAudioContext } = {},
 ): Promise<Harness> {
   const clock = { mono: 0 };
   const progress = progressDocument.defaults();
@@ -158,12 +176,20 @@ async function run(
     test: { seed: SEED, difficulty: 3 },
   });
   const audio = createAudioEngine({
-    environment: {
-      createContext: () => null,
-      clipUrl: () => undefined,
-      fetchClip: () => Promise.reject(new Error('no clips in unit tests')),
-      now: () => 0,
-    },
+    // With a voice, every string has a clip that plays until the test ends it.
+    environment: options.voice
+      ? {
+          createContext: () => options.voice?.asAudioContext() ?? null,
+          clipUrl: (clip) => `app://bundle/${clip}`,
+          fetchClip: () => Promise.resolve(new ArrayBuffer(8)),
+          now: () => 0,
+        }
+      : {
+          createContext: () => null,
+          clipUrl: () => undefined,
+          fetchClip: () => Promise.reject(new Error('no clips in unit tests')),
+          now: () => 0,
+        },
     sfx: { oneShots: ONE_SHOTS, continuous: CONTINUOUS },
     testLog: true,
   });
@@ -248,6 +274,21 @@ describe('a rounds activity', () => {
     await advance(1);
     expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 1))} at 3`);
     expect(document.querySelector('.wk-activity-stage')?.getAttribute('data-resting')).toBe('false');
+  });
+
+  it('waits for the speech in progress before the next round, so no sentence is cut off', async () => {
+    const voice = new FakeAudioContext();
+    await run(rounds, { voice });
+    await level();
+    click('done');
+    await advance(BETWEEN_ROUNDS_MS);
+    // The instruction clip is still playing, so the round rests.
+    expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 0))} at 3`);
+    await act(async () => {
+      for (const source of voice.sources) if (source.started && !source.stopped) source.end();
+      await Promise.resolve();
+    });
+    expect((await level()).textContent).toBe(`seed ${String(roundSeed(SEED, 1))} at 3`);
   });
 
   it('counts mistakes and hints for the difficulty model, and a second completion in a round does nothing', async () => {
@@ -372,6 +413,24 @@ describe('a sequence activity', () => {
     expect((await level()).textContent).toBe('step 1');
   });
 
+  it('opens the next step as soon as a step is solved, even when the child stays', async () => {
+    const h = await run(sequence);
+    expect((await level()).textContent).toBe('step 0');
+    click('solved');
+    expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(1);
+    await advance(BETWEEN_ROUNDS_MS);
+    // Still on the solved step: solving does not end it.
+    expect((await level()).textContent).toBe('step 0');
+  });
+
+  it('never lowers the furthest step when an earlier step is solved again', async () => {
+    const h = await run(sequence, { furthestStep: 2 });
+    fireEvent.click(await screen.findByRole('button', { name: '1' }));
+    await level();
+    click('solved');
+    expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(2);
+  });
+
   it('lets a child who reached a later step pick any step up to it, and no further', async () => {
     await run(sequence, { furthestStep: 1 });
     // Steps one and two are shown; step three is not reached yet and is not shown at all.
@@ -390,6 +449,58 @@ describe('a sequence activity', () => {
     expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(2);
     await advance(BETWEEN_ROUNDS_MS);
     expect(await screen.findByRole('button', { name: '3' })).toBeTruthy();
+  });
+});
+
+describe('stepSolved outside a sequence', () => {
+  it('throws for a rounds activity, which has no steps to open', async () => {
+    await run(rounds);
+    await level();
+    const errors: unknown[] = [];
+    const onError = (event: ErrorEvent) => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener('error', onError);
+    click('solved');
+    window.removeEventListener('error', onError);
+    expect(String(errors[0])).toMatch(/run-rounds has no steps/);
+  });
+});
+
+describe('the kit across renders', () => {
+  it.each([
+    ['rounds', 'run-rounds-watch'],
+    ['free', 'run-free-watch'],
+  ] as const)('stays the same object when a %s activity renders again', async (kind, id) => {
+    const common = {
+      id,
+      area: 'early-learning',
+      order: 1,
+      bands: ['band-3-5'],
+      goal: strings.goal,
+      title: strings.title,
+      icon: { emoji: 'flower' },
+      inputs: ['click'],
+      spoken: [strings.say],
+      load: () => Promise.resolve({ default: KitWatcher }),
+    } as const;
+    const definition =
+      kind === 'rounds'
+        ? defineActivity<string>({
+            ...common,
+            kind: 'rounds',
+            difficulty: { 'band-3-5': { min: 1, max: 2 } },
+            roundsPerSession: 2,
+            generateLevel: () => 'level',
+          })
+        : defineActivity<string>({ ...common, kind: 'free', generateLevel: () => 'free' });
+    seenKits.clear();
+    await run(definition);
+    fireEvent.click(await screen.findByRole('button', { name: 'rendered 0' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'rendered 1' }));
+    await screen.findByRole('button', { name: 'rendered 2' });
+    expect(seenKits.size).toBe(1);
   });
 });
 

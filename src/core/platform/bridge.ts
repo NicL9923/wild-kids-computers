@@ -72,6 +72,13 @@ export interface PictureStore {
   purge(profileId: string, id: string): Promise<void>;
 }
 
+/** A command from the application menu that the page runs itself. */
+export type MenuCommand = 'undo' | 'redo';
+
+export function isMenuCommand(value: unknown): value is MenuCommand {
+  return value === 'undo' || value === 'redo';
+}
+
 export interface WindowState {
   fullscreen: boolean;
   kioskLock: boolean;
@@ -88,6 +95,11 @@ interface WindowControl {
    * after a few seconds, because a hung app must still close. Returns an unsubscribe function.
    */
   onCloseRequest(listener: () => void): () => void;
+  /**
+   * Called when the adult or child chooses Undo or Redo from the macOS Edit menu, so the page's
+   * own models handle it instead of the browser. Returns an unsubscribe function.
+   */
+  onMenuCommand(listener: (command: MenuCommand) => void): () => void;
   acknowledgeCloseRequest(): Promise<void>;
   /** Quits the app. The renderer calls it after the parent gate passes. */
   quit(): Promise<void>;

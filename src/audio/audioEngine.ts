@@ -81,6 +81,11 @@ export interface AudioEngine {
   speakSequence(handles: readonly SpokenHandle[]): Promise<void>;
   /** Stops the voice that is speaking and any sequence in progress. */
   cancelSpeech(): void;
+  /**
+   * Resolves once no speech is in progress: the newest sequence ended, was cancelled, or could
+   * not play. A sequence that starts while waiting is waited for too.
+   */
+  speechSettled(): Promise<void>;
   /** Plays a short synthesized effect. */
   play(name: SfxName): void;
   /** Starts a continuous effect. The caller stops it; dispose stops any left running. */
@@ -124,6 +129,8 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
   const running = new Set<ContinuousSound>();
   // Bumped by every speak and cancel, so a sequence or a slow decode knows it was superseded.
   let speechGeneration = 0;
+  /** The newest sequence while it runs, so speechSettled can wait for it. */
+  let speaking: Promise<void> | null = null;
 
   function record(entry: Omit<AudioLogEntry, 'at'>): void {
     log?.push({ ...entry, at: environment.now() - startedAt });
@@ -237,9 +244,26 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
       stopCurrent();
       speechGeneration += 1;
       const generation = speechGeneration;
-      for (const handle of handles) {
-        if (generation !== speechGeneration) return;
-        await speakOne(handle, generation);
+      const run = (async () => {
+        for (const handle of handles) {
+          if (generation !== speechGeneration) return;
+          await speakOne(handle, generation);
+        }
+      })();
+      speaking = run;
+      try {
+        await run;
+      } finally {
+        if (speaking === run) speaking = null;
+      }
+    },
+
+    async speechSettled() {
+      while (speaking !== null) {
+        const waiting = speaking;
+        // speakOne never rejects, so neither does a sequence; the catch keeps the loop safe.
+        await waiting.catch(() => undefined);
+        if (speaking === waiting) speaking = null;
       }
     },
 

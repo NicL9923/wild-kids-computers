@@ -6,6 +6,7 @@ import { SAMPLE_PICTURE_IDS } from '../../src/features/toy-desktop/model/sampleC
 import { expectAccessible } from '../support/accessibility.ts';
 import { expectInstructionSpoken, forEachBand, openActivity, REVIEW_SIZES } from '../support/activity.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
+import { readSystemClipboard, withSystemClipboard, writeSystemClipboard } from '../support/systemClipboard.ts';
 import {
   clickCenter,
   desktopIcon,
@@ -180,31 +181,34 @@ for (const band of ['band-6-8', 'band-9-12'] as const) {
     });
 
     test('text copied in the notepad never reaches the system clipboard', async () => {
-      launched = await openActivity({ activity: activity.id, band, seed: SEED });
-      const { page, app } = launched;
-      await app.evaluate(({ clipboard }) => clipboard.writeText('grown-up words'));
-      await clickCenter(page, desktopIcon(page, 'app:notepad'));
-      const text = windowOf(page, 'notepad').locator('textarea');
-      await expect(text).toBeFocused();
-      await page.keyboard.type('pond');
-      await page.keyboard.press(`${PRIMARY}+A`);
-      await page.keyboard.press(`${PRIMARY}+C`);
-      await page.keyboard.press('ArrowRight');
-      await page.keyboard.press(`${PRIMARY}+V`);
-      // The toy clipboard pasted it; the system clipboard never saw it.
-      await expect(text).toHaveValue('pondpond');
-      expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('grown-up words');
+      const open = await openActivity({ activity: activity.id, band, seed: SEED });
+      launched = open;
+      const { page } = open;
+      await withSystemClipboard(async () => {
+        await writeSystemClipboard(open, 'grown-up words');
+        await clickCenter(page, desktopIcon(page, 'app:notepad'));
+        const text = windowOf(page, 'notepad').locator('textarea');
+        await expect(text).toBeFocused();
+        await page.keyboard.type('pond');
+        await page.keyboard.press(`${PRIMARY}+A`);
+        await page.keyboard.press(`${PRIMARY}+C`);
+        await page.keyboard.press('ArrowRight');
+        await page.keyboard.press(`${PRIMARY}+V`);
+        // The toy clipboard pasted it; the system clipboard never saw it.
+        await expect(text).toHaveValue('pondpond');
+        expect(await readSystemClipboard(open)).toBe('grown-up words');
 
-      // The Edit menu runs the same commands, with the modifier of this computer.
-      await page.locator('[data-menu="edit"]').click();
-      const paste = page.locator('[data-command="paste"]');
-      await expect(paste).toHaveAttribute('aria-disabled', 'false');
-      await expect(paste.locator('kbd').first()).toHaveText(process.platform === 'darwin' ? 'Command' : 'Ctrl');
-      await saveReviewScreenshot(page, band, `${activity.id}-menu`);
-      await expectAccessible(page);
-      await paste.click();
-      await expect(text).toHaveValue('pondpondpond');
-      expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('grown-up words');
+        // The Edit menu runs the same commands, with the modifier of this computer.
+        await page.locator('[data-menu="edit"]').click();
+        const paste = page.locator('[data-command="paste"]');
+        await expect(paste).toHaveAttribute('aria-disabled', 'false');
+        await expect(paste.locator('kbd').first()).toHaveText(process.platform === 'darwin' ? 'Command' : 'Ctrl');
+        await saveReviewScreenshot(page, band, `${activity.id}-menu`);
+        await expectAccessible(page);
+        await paste.click();
+        await expect(text).toHaveValue('pondpondpond');
+        expect(await readSystemClipboard(open)).toBe('grown-up words');
+      });
     });
 
     test('works with the keyboard alone: open an app, use a menu, and switch windows', async () => {

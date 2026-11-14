@@ -9,7 +9,8 @@ import { Tile } from '../components/ui/Tile.tsx';
 import { activitiesFor } from '../registry/activities.ts';
 import { activityIconUrl } from './activityIcon.ts';
 import './activityShell.css';
-import { ACTIVITY_PATH, HOME_PATH, START_PATH } from './paths.ts';
+import { HOME_PATH, START_PATH } from '../app/paths.ts';
+import { ACTIVITY_PATH } from './paths.ts';
 import { ExitControl, InstructionControl, MuteControl } from './ShellControls.tsx';
 import { strings } from './strings.ts';
 import { useSpokenLabel } from './useSpokenLabel.ts';
@@ -48,7 +49,10 @@ function Area({ area }: { area: AreaId }) {
     <div className='wk-area-screen' data-area={area}>
       <Screen
         exit={<ExitControl to={HOME_PATH} label={strings.exitToMeadow} />}
-        instruction={<InstructionControl instruction={prompt} onReplay={() => void audio.speakSequence(prompt)} />}
+        // The heading already shows the area's name, so the line shows only what to do.
+        instruction={
+          <InstructionControl instruction={prompt.slice(1)} onReplay={() => void audio.speakSequence(prompt)} />
+        }
         end={<MuteControl />}
       >
         <h1 className='wk-area-title wk-reading-text'>{t(strings[area])}</h1>

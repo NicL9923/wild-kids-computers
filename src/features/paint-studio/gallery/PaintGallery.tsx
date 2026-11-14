@@ -12,8 +12,10 @@ import { getBridge } from '../../../platform/getBridge.ts';
 import { useRequestParentGate, type ParentGateReason } from '../parentGate.ts';
 import { PAINT_STUDIO_PATH } from '../paths.ts';
 import { strings } from '../strings.ts';
-import { createStudioScope, type StudioScope } from '../studioScope.ts';
+import { createScope } from '../../../core/activityKit/scope.ts';
+import { kitScheduler } from '../../../activityShell/kitTime.ts';
 import { EmojiPicture } from '../studio/controls.tsx';
+import { TrashUndo } from './trashUndo.ts';
 import '../paintStudio.css';
 
 interface GalleryItem {
@@ -58,8 +60,7 @@ function GalleryScreen() {
   const [items, setItems] = useState<readonly GalleryItem[] | null>(null);
   const [trashed, setTrashed] = useState<string | null>(null);
   const [outputFailed, setOutputFailed] = useState(false);
-  const scope = useRef<StudioScope | null>(null);
-  const hideUndo = useRef<() => void>(() => undefined);
+  const undo = useRef<TrashUndo | null>(null);
   const urls = useRef<string[]>([]);
 
   const show = useCallback((loaded: readonly GalleryItem[]) => {
@@ -71,16 +72,27 @@ function GalleryScreen() {
   const refresh = useCallback(async () => show(await loadGallery(pictures)), [pictures, show]);
 
   useEffect(() => {
-    const created = createStudioScope();
-    scope.current = created;
+    const created = createScope(kitScheduler);
+    const trashUndo = new TrashUndo({
+      scope: created,
+      undoMs: UNDO_DELETE_MS,
+      purge: (id) => void pictures.purge(id),
+      onChange: setTrashed,
+    });
+    undo.current = trashUndo;
     let live = true;
     void (async () => {
+      // A picture left in the trash by an earlier visit that never closed, such as a crash, has
+      // no way back on screen, so it goes now.
+      const leftOver = await pictures.list('trash');
+      if (leftOver.ok) for (const picture of leftOver.value) void pictures.purge(picture.id);
       const loaded = await loadGallery(pictures);
       if (live) show(loaded);
       else for (const item of loaded) URL.revokeObjectURL(item.url);
     })();
     return () => {
       live = false;
+      trashUndo.close();
       created.dispose();
       for (const url of urls.current) URL.revokeObjectURL(url);
       urls.current = [];
@@ -104,19 +116,16 @@ function GalleryScreen() {
     void audio.speak(strings.pictureGone);
     const result = await pictures.trash(id);
     if (!result.ok) return;
-    setTrashed(id);
-    hideUndo.current();
-    hideUndo.current = scope.current?.setTimeout(() => setTrashed(null), UNDO_DELETE_MS) ?? (() => undefined);
+    undo.current?.trashed(id);
     await refresh();
   };
 
   const bringBack = async (): Promise<void> => {
-    if (trashed === null) return;
-    hideUndo.current();
+    const id = undo.current?.bringBack() ?? null;
+    if (id === null) return;
     audio.play('pop');
     void audio.speak(strings.bringBack);
-    const result = await pictures.restore(trashed);
-    setTrashed(null);
+    const result = await pictures.restore(id);
     if (result.ok) await refresh();
   };
 

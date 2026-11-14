@@ -31,7 +31,7 @@ test('the page has no Node globals and sees only the bridge functions', async ()
     process: 'undefined',
     module: 'undefined',
     buffer: 'undefined',
-    bridgeKeys: [...BRIDGE_METHODS, 'onCloseRequest'].toSorted(),
+    bridgeKeys: [...BRIDGE_METHODS, 'onCloseRequest', 'onMenuCommand'].toSorted(),
     bridgeFrozen: true,
   });
 });

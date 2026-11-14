@@ -1,10 +1,12 @@
 import { surfaceFromData } from '../../../core/paint/surface.ts';
+import { encodePicture } from '../studio/pictureFile.ts';
 import { paintEffects } from '../../../registry/paint.ts';
 import type { EffectRequest, EffectResponse } from './protocol.ts';
 
 /**
- * Runs whole-picture effects off the main thread, so the screen never freezes. Each request
- * carries its own copy of the pixels and gets the result back as a transferred buffer.
+ * Runs whole-picture effects and the gallery's PNG encoding off the main thread, so the screen
+ * never freezes and a fill never waits for a save. Each request carries its own copy of the
+ * pixels and gets the result back as a transferred buffer.
  */
 interface WorkerScope {
   postMessage(message: EffectResponse, transfer: Transferable[]): void;
@@ -28,6 +30,18 @@ scope.addEventListener('message', (event: MessageEvent<EffectRequest>) => {
   const request = event.data;
   if (request.kind === 'warm') {
     respond({ kind: 'ready', id: request.id });
+    return;
+  }
+  if (request.kind === 'encode') {
+    const { width, height } = request;
+    const paint = surfaceFromData(width, height, request.paint);
+    const mask = request.mask === null ? null : surfaceFromData(width, height, request.mask);
+    encodePicture({ width, height, paint, mask }, request.pageId).then(
+      ({ png, thumbnail }) =>
+        respond({ kind: 'encoded', id: request.id, png, thumbnail }, [png.buffer, thumbnail.buffer]),
+      (error: unknown) =>
+        respond({ kind: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) }),
+    );
     return;
   }
   try {

@@ -41,6 +41,9 @@
   .wk-paint-tools,
   .wk-paint-colors {
     display: grid;
+    /* Each button keeps its full height. Without this, rows shrink to the buttons' minimum when
+       the window is short and the labels spill out; with it, the column scrolls instead. */
+    grid-auto-rows: max-content;
     align-content: start;
     gap: var(--wk-space-item);
     min-height: 0;
@@ -166,19 +169,39 @@
     opacity: 0.6;
   }
 
+  /* The pen is down. A fixed place at the picture's top left corner: a round badge with the
+     brush for the youngest, and a pill with the brush and the sentence on one line for readers. */
   .wk-paint-pen-badge {
     position: absolute;
     top: var(--wk-space-item);
     left: var(--wk-space-item);
-    display: grid;
-    place-items: center;
-    width: var(--wk-target-min);
-    height: var(--wk-target-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-item);
+    box-sizing: border-box;
+    min-width: var(--wk-target-min);
+    max-width: calc(100% - var(--wk-space-item) * 2);
+    min-height: var(--wk-target-min);
+    padding: 0 calc(var(--wk-target-min) * 0.2);
     border: var(--wk-border-width) solid var(--wk-color-focus);
     border-radius: var(--wk-radius-round);
     background: var(--wk-color-surface);
     box-shadow: var(--wk-shadow-raised);
+    font-size: var(--wk-text-small);
+    font-weight: var(--wk-font-weight-bold);
+    line-height: var(--wk-line-height-tight);
+    white-space: nowrap;
     pointer-events: none;
+  }
+
+  .wk-paint-pen-badge .wk-paint-emoji {
+    flex: none;
+  }
+
+  [data-band='band-6-8'] .wk-paint-pen-badge,
+  [data-band='band-9-12'] .wk-paint-pen-badge {
+    padding-inline-end: var(--wk-space-container);
   }
 
   /* ---- buttons ---- */
@@ -220,10 +243,24 @@
     height: calc(var(--wk-icon-size) * 1.2);
   }
 
+  /* Older bands read the names, so each tool puts its picture beside its name. That keeps all
+     eight tools in a 1280 by 800 window, and the longest name, "Straight line", on one line. */
   [data-band='band-6-8'] .wk-paint-tools .wk-paint-button,
   [data-band='band-9-12'] .wk-paint-tools .wk-paint-button {
-    width: calc(var(--wk-target-min) * 2);
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--wk-space-item);
+    /* The column takes the width of the longest name, and every tool stretches to it. */
+    width: auto;
+    min-width: calc(var(--wk-target-min) * 2.5);
     min-height: var(--wk-target-min);
+    padding-inline: var(--wk-space-item) var(--wk-space-container);
+  }
+
+  [data-band='band-6-8'] .wk-paint-tools .wk-paint-button-label,
+  [data-band='band-9-12'] .wk-paint-tools .wk-paint-button-label {
+    text-align: start;
+    white-space: nowrap;
   }
 
   .wk-paint-check {

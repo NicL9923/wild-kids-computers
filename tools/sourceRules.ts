@@ -81,6 +81,38 @@ export function findJsxAttributeLiterals(files: readonly SourceFile[]): Finding[
   return findings;
 }
 
+/** The files that own route paths. Every other file imports their constants. */
+export const ROUTE_OWNERS = ['src/app/paths.ts', 'src/activityShell/paths.ts', 'src/features/paint-studio/paths.ts'];
+
+// A string or template literal that starts with a path, with or without the hash router's "#".
+const PATH_LITERAL = /(["'`])#?(\/[a-z][\w-]*)(?=[/?$"'`])/g;
+
+function withoutComments(text: string): string {
+  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+/**
+ * Route literals outside their owner. The first segment of each path an owner declares, such as
+ * "/paint" or "/area", is a route root. Any other non-test file whose literal starts with a root
+ * repeats a path that the owner may change. Test files are skipped only under src/: end-to-end
+ * tests import the constants too.
+ */
+export function findRouteLiterals(files: readonly SourceFile[]): Finding[] {
+  const owners = files.filter((file) => ROUTE_OWNERS.includes(file.path));
+  const roots = new Set(owners.flatMap((file) => [...file.text.matchAll(PATH_LITERAL)].map((m) => m[2] ?? '')));
+  const findings: Finding[] = [];
+  for (const file of files) {
+    if (ROUTE_OWNERS.includes(file.path)) continue;
+    if (file.path.startsWith('src/') && /\.test\.tsx?$/.test(file.path)) continue;
+    for (const match of withoutComments(file.text).matchAll(PATH_LITERAL)) {
+      if (roots.has(match[2] ?? '')) {
+        findings.push({ path: file.path, detail: `route literal starting ${match[0]}: import the owner's constant` });
+      }
+    }
+  }
+  return findings;
+}
+
 export function readSourceTree(root: string, dir: string): SourceFile[] {
   return readdirSync(path.join(root, dir), { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.(ts|tsx)$/.test(file))

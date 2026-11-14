@@ -30,9 +30,11 @@ const TIERS: readonly Tier[] = [
   { min: 1, max: 8, groups: 2, gap: [2, 3], asks: ['more', 'fewer'], arrangement: 'rows' },
   { min: 2, max: 10, groups: 2, gap: [1, 3], asks: ['more', 'fewer'], arrangement: 'rows' },
   { min: 2, max: 10, groups: 2, gap: [1, 2], asks: ['more', 'fewer'], arrangement: 'scatter' },
-  { min: 3, max: 12, groups: 3, gap: [1, 3], asks: ['most', 'fewest'], arrangement: 'scatter' },
-  { min: 5, max: 15, groups: 3, gap: [1, 2], asks: ['most', 'fewest'], arrangement: 'scatter' },
-  { min: 8, max: 20, groups: 3, gap: [1, 2], asks: ['most', 'fewest'], arrangement: 'scatter' },
+  // Three groups side by side keep each thing at least band-6-8's target in a 1280 by 800 window
+  // only up to 10 things a group, so from here closer counts make a round harder, not bigger ones.
+  { min: 2, max: 10, groups: 3, gap: [2, 3], asks: ['most', 'fewest'], arrangement: 'scatter' },
+  { min: 3, max: 10, groups: 3, gap: [1, 2], asks: ['most', 'fewest'], arrangement: 'scatter' },
+  { min: 4, max: 10, groups: 3, gap: [1, 1], asks: ['most', 'fewest'], arrangement: 'scatter' },
 ];
 
 export const MAX_MORE_DIFFICULTY = TIERS.length;

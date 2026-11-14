@@ -42,6 +42,9 @@ export const CONTENT_RULES = {
   },
   // Hard rule 2: the two apps this one must not copy, and their mascot.
   'reference-app': { category: 'reference-app', words: ['gcompris', 'tux paint', 'tuxpaint', 'tux'] },
+  // A reference app's own name for one of its tools. Tux Paint calls its effects "Magic", so the
+  // paint studio says "Effects". A real object, such as the magic wand stamp, allows it.
+  'reference-tool': { category: 'reference-app', words: ['magic'] },
 } as const satisfies Readonly<Record<string, ContentRule>>;
 
 export type ContentRuleId = keyof typeof CONTENT_RULES;

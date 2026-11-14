@@ -35,7 +35,8 @@ import {
   type RoundCompleteHandler,
 } from './kit.ts';
 import { kitScheduler } from './kitTime.ts';
-import { AREA_PATH, SESSION_CLOSING_PATH } from './paths.ts';
+import { CLOSING_PATH } from '../app/paths.ts';
+import { AREA_PATH } from './paths.ts';
 import { ExitControl, InstructionControl, MuteControl } from './ShellControls.tsx';
 import { StepPicker } from './StepPicker.tsx';
 import { strings } from './strings.ts';
@@ -101,6 +102,11 @@ interface Player {
   readonly replay: () => void;
   /** Puts the instruction back to the definition's first spoken string and speaks it. */
   readonly startInstruction: () => void;
+  /**
+   * Runs `next` after the calm pause between rounds and after the speech in progress ends, so a
+   * round never cuts off what the last one is still saying.
+   */
+  readonly afterRest: (next: () => void) => void;
 }
 
 function ActivityRunWithState({
@@ -164,6 +170,16 @@ function ActivityRunWithState({
     setInstruction({ spoken: [mainInstruction], shown: [mainInstruction] });
     void audio.speakSequence([mainInstruction]);
   }, [audio, mainInstruction]);
+  const afterRest = useCallback(
+    (next: () => void) => {
+      const goOn = async (): Promise<void> => {
+        await audio.speechSettled();
+        if (!visit.disposed) next();
+      };
+      visit.setTimeout(() => void goOn(), BETWEEN_ROUNDS_MS);
+    },
+    [audio, visit],
+  );
   const player = useMemo<Player>(
     () => ({
       instruction,
@@ -176,8 +192,9 @@ function ActivityRunWithState({
       visit,
       replay,
       startInstruction,
+      afterRest,
     }),
-    [attachStage, host, instruction, marks, pictures, reducedMotion, replay, startInstruction, state, visit],
+    [afterRest, attachStage, host, instruction, marks, pictures, reducedMotion, replay, startInstruction, state, visit],
   );
 
   // Leaving the activity stops its voice, even mid-sentence.
@@ -241,20 +258,25 @@ function Round({
   level,
   player,
   onRoundComplete,
+  onStepSolved,
 }: {
   definition: ActivityDefinition;
   band: Band;
   level: unknown;
   player: Player;
   onRoundComplete: RoundCompleteHandler;
+  onStepSolved?: () => void;
 }) {
   const scope = useScope();
   const [tally] = useState(createTally);
   const { host, startInstruction, state, reducedMotion, pictures } = player;
+  // Stable across renders: a new handler would rebuild the kit, and an activity effect that
+  // depends on the kit would run again on every render.
+  const stepSolved = useMemo(() => onStepSolved ?? noSteps(definition.id), [onStepSolved, definition.id]);
   // Rebuilt when the saved state, motion, or pictures change; the tally keeps the round's counts.
   const kit = useMemo(
-    () => createKit({ scope, host, tally, onRoundComplete, state, reducedMotion, pictures }),
-    [scope, host, tally, onRoundComplete, state, reducedMotion, pictures],
+    () => createKit({ scope, host, tally, onRoundComplete, onStepSolved: stepSolved, state, reducedMotion, pictures }),
+    [scope, host, tally, onRoundComplete, stepSolved, state, reducedMotion, pictures],
   );
 
   useEffect(() => {
@@ -263,6 +285,13 @@ function Round({
   }, [scope, host, startInstruction]);
 
   return <RoundComponent definition={definition} level={level} band={band} kit={kit} />;
+}
+
+/** The stepSolved handler of an activity that is not a sequence. */
+function noSteps(activityId: string): () => void {
+  return () => {
+    throw new Error(`Activity ${activityId} has no steps: stepSolved is for sequence activities.`);
+  };
 }
 
 /** Renders the activity's lazy component. */
@@ -287,7 +316,7 @@ function useLimitOrContinue(): (next: () => void) => void {
   return useCallback(
     (next: () => void) => {
       // The session limit is checked only here, between rounds, never during one.
-      if (session.isLimitReached()) void navigate({ to: SESSION_CLOSING_PATH });
+      if (session.isLimitReached()) void navigate({ to: CLOSING_PATH });
       else next();
     },
     [session, navigate],
@@ -347,7 +376,7 @@ function RoundsRun({
     const next = nextDifficulty(played, [...history, { ...ended, level: played }], range);
     progress.recordRound(definition.id, { ...ended, level: played }, next);
     const roundsDone = phase.round + 1;
-    player.visit.setTimeout(() => {
+    player.afterRest(() => {
       continueOrClose(() => {
         if (roundsDone % definition.roundsPerSession === 0) {
           setPhase({ kind: 'finished', round: roundsDone, difficulty: next });
@@ -355,7 +384,7 @@ function RoundsRun({
           setPhase({ kind: 'playing', round: roundsDone, difficulty: next, outcome: null });
         }
       });
-    }, BETWEEN_ROUNDS_MS);
+    });
     // Runs once per finished round: `ended` changes only when a round ends.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [ended]);
@@ -414,18 +443,23 @@ function SequenceRun({
   const onRoundComplete = useCallback(() => {
     setPhase((current) => (current.kind === 'playing' && !current.ended ? { ...current, ended: true } : current));
   }, []);
+  // Solving opens the next step at once; the record never moves back, so solving an earlier step
+  // again changes nothing.
+  const onStepSolved = useCallback(() => {
+    if (step !== null) progress.recordStep(definition.id, Math.min(step + 1, lastStep));
+  }, [definition.id, lastStep, progress, step]);
 
   const ended = phase.kind === 'playing' && phase.ended;
   useEffect(() => {
     if (phase.kind !== 'playing' || !phase.ended) return;
     const next = Math.min(phase.step + 1, lastStep);
     progress.recordStep(definition.id, next);
-    player.visit.setTimeout(() => {
+    player.afterRest(() => {
       continueOrClose(() => {
         if (phase.step === lastStep) setPhase({ kind: 'picking' });
         else setPhase({ kind: 'playing', step: next, visit: phase.visit + 1, ended: false });
       });
-    }, BETWEEN_ROUNDS_MS);
+    });
     // Runs once per finished step: `ended` turns true only when a step ends.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [ended]);
@@ -448,6 +482,7 @@ function SequenceRun({
         level={level}
         player={player}
         onRoundComplete={onRoundComplete}
+        onStepSolved={onStepSolved}
       />
     </Frame>
   );

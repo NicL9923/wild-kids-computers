@@ -91,6 +91,12 @@ export interface ActivityKit<S = never> {
    * and the hints from `hint`. A second call in the same round does nothing.
    */
   readonly roundComplete: (outcome?: RoundOutcomeInput) => void;
+  /**
+   * For a `sequence` activity: the child solved this step, so the next step opens now, even if
+   * the child stays here and then leaves. It does not end the step; `roundComplete` does. Throws
+   * for any other kind of activity.
+   */
+  readonly stepSolved: () => void;
   /** The activity's saved state. Throws when the definition declares no `state`. */
   readonly state: KitState<S>;
   /** The profile's gallery pictures, for activities that use them, such as a jigsaw. */
@@ -137,6 +143,8 @@ export interface KitParts<S> {
   readonly host: KitHost;
   readonly tally: RoundTally;
   readonly onRoundComplete: RoundCompleteHandler;
+  /** Saves that the step after this one is open. Throws outside a sequence. */
+  readonly onStepSolved: () => void;
   /** The saved state now, or null when the definition declares none. */
   readonly state: KitState<S> | null;
   readonly reducedMotion: boolean;
@@ -198,6 +206,9 @@ export function createKit<S>(parts: KitParts<S>): ActivityKit<S> {
       if (scope.disposed || tally.complete) return;
       tally.hintsUsed += 1;
       if (say !== undefined) void host.audio.speak(say);
+    },
+    stepSolved() {
+      if (!scope.disposed) parts.onStepSolved();
     },
     roundComplete(outcome) {
       if (scope.disposed || tally.complete) return;

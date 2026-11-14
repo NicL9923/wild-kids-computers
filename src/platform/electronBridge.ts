@@ -1,4 +1,4 @@
-import { BridgeError, type PlatformBridge } from '../core/platform/bridge.ts';
+import { BridgeError, isMenuCommand, type PlatformBridge } from '../core/platform/bridge.ts';
 import type { IpcResult, WkBridgeIpc } from '../core/platform/ipc.ts';
 
 async function unwrap<T>(pending: Promise<IpcResult<T>>): Promise<T> {
@@ -31,6 +31,11 @@ export function createElectronBridge(ipc: WkBridgeIpc): PlatformBridge {
       setFullscreen: (on) => unwrap(ipc['window.setFullscreen'](on)),
       setKioskLock: (on) => unwrap(ipc['window.setKioskLock'](on)),
       onCloseRequest: (listener) => ipc.onCloseRequest(listener),
+      // The main process sends only known commands; anything else is dropped, never run.
+      onMenuCommand: (listener) =>
+        ipc.onMenuCommand((command) => {
+          if (isMenuCommand(command)) listener(command);
+        }),
       acknowledgeCloseRequest: () => unwrap(ipc['window.acknowledgeCloseRequest']()),
       quit: () => unwrap(ipc['window.quit']()),
     },

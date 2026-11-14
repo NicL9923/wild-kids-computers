@@ -4,19 +4,20 @@ A free, offline desktop app where children aged 3 to 12 learn to use a computer 
 
 ## Repo index
 
-| Path                                         | What it holds                                                                                 |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [docs/spec.md](docs/spec.md)                 | What the app does, the hard rules, and the definition of done for an activity                 |
-| [docs/architecture.md](docs/architecture.md) | How the code is organized. Read it before adding an activity, tool, effect, string, or asset. |
-| [docs/research.md](docs/research.md)         | The evidence behind the design rules                                                          |
-| [docs/decisions.md](docs/decisions.md)       | Choices the spec left open, and why each went the way it did                                  |
-| `electron/`                                  | Main process and preload                                                                      |
-| `src/core/`                                  | Paint engine, activity kit, storage, strings. No React, no Electron.                          |
-| `src/features/`                              | One directory per area of the app                                                             |
-| `assets/`                                    | Fonts, emoji, voice clips, art. Every file has a license entry.                               |
-| `e2e/`                                       | Playwright tests against the Electron app                                                     |
-| `tools/`                                     | Build, check, and generation scripts                                                          |
-| `.github/agents/review-agent.md`             | The pre-merge review prompt                                                                   |
+| Path                                                     | What it holds                                                                                 |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [docs/spec.md](docs/spec.md)                             | What the app does, the hard rules, and the definition of done for an activity                 |
+| [docs/architecture.md](docs/architecture.md)             | How the code is organized. Read it before adding an activity, tool, effect, string, or asset. |
+| [docs/adding-an-activity.md](docs/adding-an-activity.md) | The how-to for a new activity, with copyable skeletons and its definition of done             |
+| [docs/research.md](docs/research.md)                     | The evidence behind the design rules                                                          |
+| [docs/decisions.md](docs/decisions.md)                   | Choices the spec left open, and why each went the way it did                                  |
+| `electron/`                                              | Main process and preload                                                                      |
+| `src/core/`                                              | Paint engine, activity kit, storage, strings. No React, no Electron.                          |
+| `src/features/`                                          | One directory per area of the app                                                             |
+| `assets/`                                                | Fonts, emoji, voice clips, art. Every file has a license entry.                               |
+| `e2e/`                                                   | Playwright tests against the Electron app                                                     |
+| `tools/`                                                 | Build, check, and generation scripts                                                          |
+| `.github/agents/review-agent.md`                         | The pre-merge review prompt                                                                   |
 
 ## Hard rules
 
@@ -55,31 +56,38 @@ End-to-end screenshots are for human and agent review. No test compares them.
 
 Node 24.22.2 is pinned in `.node-version` and `engines`. `.npmrc` sets `engine-strict` and `save-exact`, so npm refuses another Node version and always saves exact versions.
 
-| Command                                                           | What it does                                                                                                   |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`                                                     | Vite dev server and Electron together. Renderer changes hot-reload. Restart for main or preload changes.       |
-| `npm run build`                                                   | `check:licenses`, then the renderer into `dist/renderer` and the main process and preload into `dist/electron` |
-| `npm run lint`                                                    | Oxlint with type-aware rules and the repository rules in `.oxlintrc.json`                                      |
-| `npm run knip`                                                    | Unused files, exports, and dependencies                                                                        |
-| `npm run format` / `npm run format:check`                         | Oxfmt for TypeScript and JavaScript, Prettier for CSS, JSON, Markdown, and YAML                                |
-| `npm run typecheck`                                               | `tsrs -b` over every TypeScript project                                                                        |
-| `npm test`                                                        | Vitest with coverage, in UTC                                                                                   |
-| `npm run test:tz`                                                 | The unit tests again in `Asia/Tokyo`                                                                           |
-| `npm run check`                                                   | Dependency deny list and license allow list, Node pins, then the license, voice, and strings checks            |
-| `npm run e2e`                                                     | Build, then Playwright against Electron                                                                        |
-| `npm run e2e:browser`                                             | Build, then Playwright against the static renderer build in Chromium                                           |
-| `npm run mutation`                                                | Stryker on `src/core/**`, and only the math and pixel arithmetic of the paint engine. Fails below 80%.         |
-| `npm run dist`                                                    | Build, then an unsigned installer for this operating system in `release/`                                      |
-| `npm run perf`, `npm run paint:goldens`, `npm run voice:generate` | `perf` prints paint timings. `paint:goldens` rewrites changed goldens. `voice:generate` is not built yet.      |
-| `npm run coloring:render`, `npm run coloring:regions`             | `coloring:render` makes masks from changed coloring page SVGs. `coloring:regions` prints a page's regions.     |
+| Command                                               | What it does                                                                                                                                                                                                                  |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                                         | Vite dev server and Electron together. Renderer changes hot-reload. Restart for main or preload changes.                                                                                                                      |
+| `npm run build`                                       | `check:licenses`, then the renderer into `dist/renderer`, `check:build-assets`, and the main process and preload into `dist/electron`                                                                                         |
+| `npm run lint`                                        | Oxlint with type-aware rules and the repository rules in `.oxlintrc.json`                                                                                                                                                     |
+| `npm run knip`                                        | Unused files, exports, and dependencies                                                                                                                                                                                       |
+| `npm run format` / `npm run format:check`             | Oxfmt for TypeScript and JavaScript, Prettier for CSS, JSON, Markdown, and YAML                                                                                                                                               |
+| `npm run typecheck`                                   | `tsrs -b` over every TypeScript project                                                                                                                                                                                       |
+| `npm test`                                            | Vitest with coverage, in UTC, including the registry test over every activity                                                                                                                                                 |
+| `npm run test:tz`                                     | The unit tests again in `Asia/Tokyo`                                                                                                                                                                                          |
+| `npm run check`                                       | Dependency deny list and license allow list, Node pins, then `check:licenses`, `check:voice`, and `check:strings`                                                                                                             |
+| `npm run check:voice`                                 | Fails when a spoken string has no clip in `assets/voice/en/`, a clip matches no string, or two texts share a hash                                                                                                             |
+| `npm run check:strings`                               | Duplicate namespaces, reward, pressure, and scolding words, and the reference app names in strings and file names                                                                                                             |
+| `npm run e2e`                                         | Build, then Playwright against Electron                                                                                                                                                                                       |
+| `npm run e2e:browser`                                 | Build, then Playwright against the static renderer build in Chromium                                                                                                                                                          |
+| `npm run mutation`                                    | Stryker on `src/core/**`, and only the math and pixel arithmetic of the paint engine. Fails below 80%.                                                                                                                        |
+| `npm run dist`                                        | Build, then an unsigned installer for this operating system in `release/`                                                                                                                                                     |
+| `npm run perf`                                        | The paint engine benchmark, then studio timings in the built app at 1920 by 1080: frame pacing, fill latency, memory, and start time. Prints numbers and gates nothing. `WKC_PERF_MINUTES` sets the memory run, 5 by default. |
+| `npm run paint:goldens`                               | Rewrites changed paint goldens. Look at every changed image before you commit it.                                                                                                                                             |
+| `npm run voice:generate`                              | Makes the missing voice clips with Kokoro-82M. Needs `npm ci --prefix tools/voice` once and ffmpeg. See `tools/voice/README.md`.                                                                                              |
+| `npm run voice:round-trip`                            | Transcribes every clip with speech recognizers and writes `docs/voice-round-trip.md`. Needs the Python environment in `tools/voice/README.md`.                                                                                |
+| `npm run coloring:render`, `npm run coloring:regions` | `coloring:render` makes masks from changed coloring page SVGs. `coloring:regions -- <page-id>` prints a page's regions.                                                                                                       |
 
-`check:voice` and `check:strings` are placeholders. Each one passes only while the files it would check do not exist yet, so the first clip or string catalog fails the check until someone writes the real one.
+During parallel work a feature branch does not generate clips, so `check:voice` lists the strings it added until the coordinator generates them on the integration branch.
 
-Electron tests need a display. On a machine without one, run them under `xvfb-run -a`. The first `npm run e2e:browser` on a machine needs `npx playwright install chromium`.
+After `npm ci`, run `node node_modules/electron/install.js` once. Electron otherwise downloads its binary on first launch, and parallel test workers race to unpack it.
+
+Electron tests need a display. On a machine without one, run them under `xvfb-run -a -s "-screen 0 1920x1200x24"`. The default virtual screen is smaller than 1920 by 1080 and clips the large review window. The first `npm run e2e:browser` on a machine needs `npx playwright install chromium`.
 
 The pre-commit hook runs lint-staged, which formats staged files. Lint the workflow with actionlint: `docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12 .github/workflows/ci.yml`.
 
-Rules that Oxlint cannot express run as unit tests in `tools/sourceRules.test.ts`: `src/core/` imports that leave `src/core/` by path, and string literals in user-facing JSX attributes such as `aria-label`, `alt`, and `title`.
+Rules that Oxlint cannot express run as unit tests in `tools/sourceRules.test.ts`: `src/core/` imports that leave `src/core/` by path, string literals in user-facing JSX attributes such as `aria-label`, `alt`, and `title`, and route paths written outside their owner's `paths.ts`.
 
 ## Project workflow
 

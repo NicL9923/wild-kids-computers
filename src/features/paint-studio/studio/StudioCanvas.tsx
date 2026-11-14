@@ -1,10 +1,18 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH } from '../../../core/paint/document.ts';
 import { isEmptyRect } from '../../../core/paint/rect.ts';
 import type { ToolPoint } from '../../../core/paint/types.ts';
 import { t } from '../../../core/strings/defineStrings.ts';
 import { strings } from '../strings.ts';
-import type { StudioScope } from '../studioScope.ts';
+import type { Scope } from '../../../core/activityKit/scope.ts';
 import {
   PEN_UP,
   isPenDown,
@@ -42,11 +50,13 @@ export interface StudioCanvasHandle {
 interface StudioCanvasProps {
   readonly studio: StudioDocument;
   readonly driver: ToolDriver;
-  readonly scope: StudioScope;
+  readonly scope: Scope;
   /** True while a whole-picture effect runs. Input waits. */
   readonly busy: boolean;
   readonly onPenChange: (down: boolean) => void;
   readonly handleRef: { current: StudioCanvasHandle | null };
+  /** Shown on top of the picture, in a place fixed to its corner, such as the pen-down badge. */
+  readonly overlay?: ReactNode;
 }
 
 /**
@@ -79,7 +89,7 @@ const KEY_STEP_FAR = 100;
  * document's own size, scaled together by CSS to fit. Pointer input runs through the sticky pen,
  * and the area each stroke changes is copied to the screen once per animation frame.
  */
-export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleRef }: StudioCanvasProps) {
+export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleRef, overlay }: StudioCanvasProps) {
   const paintRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -317,6 +327,7 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
           )}
         </div>
       )}
+      {overlay}
     </div>
   );
 }

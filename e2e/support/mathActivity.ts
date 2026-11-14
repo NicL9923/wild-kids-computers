@@ -70,3 +70,16 @@ export async function tabToAndPress(page: Page, selector: string): Promise<void>
   await expect(target).toBeFocused();
   await page.keyboard.press('Enter');
 }
+
+/**
+ * The seed, of the first 200, whose round has the largest group, so a layout test sees the most
+ * things a level can show.
+ */
+export function busiestSeed(groupsFor: (seed: number) => readonly { readonly count: number }[]): number {
+  let best = { seed: 1, count: -1 };
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const count = Math.max(...groupsFor(seed).map((group) => group.count));
+    if (count > best.count) best = { seed, count };
+  }
+  return best.seed;
+}

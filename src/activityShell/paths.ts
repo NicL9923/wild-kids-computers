@@ -19,13 +19,3 @@ export function AREA_PATH(areaId: AreaId): string {
 export function ACTIVITY_PATH(activityId: string): string {
   return `/activity/${activityId}`;
 }
-
-/** The calm closing screen when the session length is up. The app shell builds the screen. */
-export const SESSION_CLOSING_PATH = '/closing';
-
-// Paths of screens other agents build in parallel, by their literal values from the shared path
-// table. The coordinator replaces these with the owners' constants after the merge.
-/** The home map, built by the app shell. */
-export const HOME_PATH = '/home';
-/** The start screen, first launch or the profile choice, built by the app shell. */
-export const START_PATH = '/';

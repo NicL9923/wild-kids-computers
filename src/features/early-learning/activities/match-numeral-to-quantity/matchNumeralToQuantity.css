@@ -1,6 +1,7 @@
 /* The numeral card on top, and the groups below it. */
 
 .match-stage {
+  container-type: size;
   grid-template-rows: auto minmax(0, 1fr);
 }
 
@@ -14,8 +15,14 @@
   color: var(--wk-color-text);
   box-shadow: var(--wk-shadow-raised);
   font: inherit;
-  font-size: calc(var(--wk-target-large) * 0.62);
+  /* Grows with the window, so the numeral reads from across a room on a large screen. */
+  font-size: clamp(calc(var(--wk-target-large) * 0.62), 15cqh, calc(var(--wk-target-large) * 1.1));
   font-weight: var(--wk-font-weight-bold);
   line-height: 1;
   cursor: pointer;
+}
+
+/* A slimmer edge inside each group, so the busiest round keeps every thing a target wide. */
+.match-stage .math-group {
+  padding: var(--wk-space-item);
 }

@@ -4,8 +4,12 @@
  */
 
 .findkey-stage {
+  /* The card and the keyboard grow with the window: both size from this container. */
+  --findkey-upper: clamp(calc(var(--wk-target-large) * 0.8), 24cqh, calc(var(--wk-target-large) * 1.8));
+
   position: absolute;
   inset: 0;
+  container-type: size;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   justify-items: center;
@@ -33,12 +37,12 @@
 }
 
 .findkey-upper {
-  font-size: calc(var(--wk-target-large) * 1.05);
+  font-size: var(--findkey-upper);
   font-weight: var(--wk-font-weight-bold);
 }
 
 .findkey-lower {
-  font-size: calc(var(--wk-target-large) * 0.45);
+  font-size: calc(var(--findkey-upper) * 0.43);
   color: var(--wk-color-text-muted);
 }
 
@@ -47,5 +51,7 @@
 }
 
 .findkey-keyboard {
-  width: min(100%, calc(var(--wk-target-min) * 18));
+  /* At least the old fixed width, and up to half the stage's height in a large window. The
+     picture is about 19 keys wide and 5 rows tall. */
+  width: min(100%, max(calc(var(--wk-target-min) * 18), calc(48cqh * 19 / 5)));
 }

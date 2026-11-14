@@ -16,6 +16,7 @@ import {
 import type { LaunchedApp } from '../support/launchApp.ts';
 import { expectTargetsFit, rangeOf, tabTo } from '../support/reading.ts';
 import { carryWithKeys, dragTo } from '../support/sorting.ts';
+import { ACTIVITY_PATH } from '../../src/activityShell/paths.ts';
 
 const SEED = 4_242;
 
@@ -116,9 +117,12 @@ forEachBand(activity.bands, (band) => {
     await saveBandScreenshot(page, band, `${activity.id}-patterns`);
     // Leaving and coming back keeps the patterns on.
     await page.locator('[data-control="exit"]').click();
-    await page.evaluate((hash) => {
-      window.location.hash = hash;
-    }, `#/activity/${activity.id}`);
+    await page.evaluate(
+      (hash) => {
+        window.location.hash = hash;
+      },
+      `#${ACTIVITY_PATH(activity.id)}`,
+    );
     await expect(page.locator('.cm-stage')).toHaveAttribute('data-patterns', 'true');
   });
 

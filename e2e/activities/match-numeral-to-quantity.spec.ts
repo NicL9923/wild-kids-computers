@@ -14,7 +14,7 @@ import {
   saveBandScreenshot,
   spokenIds,
 } from '../support/activity.ts';
-import { expectTargetsFit, rangeOf, tabToAndPress } from '../support/mathActivity.ts';
+import { busiestSeed, expectTargetsFit, rangeOf, tabToAndPress } from '../support/mathActivity.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
 
 const SEED = 4_242;
@@ -75,12 +75,14 @@ forEachBand(activity.bands, (band: Band) => {
     await expect(page.locator(`[data-group="${level.answer}"]`)).toHaveAttribute('data-look', 'answer');
   });
 
-  test('fits the hardest round of the band at both review sizes', async () => {
+  test('fits the hardest round of the band at both review sizes, each thing at least a target wide', async () => {
     const { max } = rangeOf(activity, band);
+    // The busiest round of the hardest level: the seed whose largest group has the most things.
+    const seed = busiestSeed((candidate) => generateLevel(roundSeed(candidate, 0), max, band).groups);
     for (const size of REVIEW_SIZES) {
-      launched = await openActivity({ activity: activity.id, band, seed: SEED, difficulty: max, size });
+      launched = await openActivity({ activity: activity.id, band, seed, difficulty: max, size });
       const { page } = launched;
-      await expectTargetsFit(page, band, size, ['[data-group]', '.match-numeral']);
+      await expectTargetsFit(page, band, size, ['[data-group]', '.match-numeral', '.math-object']);
       await saveBandScreenshot(page, band, activity.id, `${String(size.width)}x${String(size.height)}`);
       await launched.close();
       launched = undefined;

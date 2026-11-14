@@ -9,7 +9,7 @@ export default defineActivity<ShapeSorterLevel>({
   bands: ['band-3-5', 'band-6-8'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'puzzle-piece' },
+  icon: { emoji: 'box' },
   kind: 'rounds',
   inputs: ['click', 'drag', 'keyboard'],
   difficulty: {

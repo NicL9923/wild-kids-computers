@@ -1,11 +1,14 @@
 import { readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { contentRulesMatched } from '../src/core/strings/contentRules.ts';
+import { CONTENT_RULES, contentRulesMatched } from '../src/core/strings/contentRules.ts';
 
 // Hard rule 2, the obvious case: no file or folder in the app, its assets, or its tools carries
 // the name of a reference app or its mascot. String text is checked by the strings check.
 const SCANNED_ROOTS = ['src', 'assets', 'electron', 'e2e', 'tools'];
 const SKIPPED = new Set(['node_modules']);
+// Files named for a real object that shares a word with a reference app's tool name. Each entry
+// is a real word; the stamp string allows the same rule.
+const ALLOWED = new Set(['assets/emoji/magic-wand.svg']);
 
 function pathsUnder(root: string): string[] {
   const entries = readdirSync(root, { recursive: true, encoding: 'utf8' });
@@ -18,7 +21,8 @@ function referenceAppPaths(paths: readonly string[]): string[] {
   // File names join words with hyphens, underscores, dots, or case changes. Split them into words.
   return paths.filter((file) => {
     const words = file.replaceAll(/([a-z])([A-Z])/g, '$1 $2').replaceAll(/[-_./\\]+/g, ' ');
-    return contentRulesMatched(words).includes('reference-app');
+    if (ALLOWED.has(file)) return false;
+    return contentRulesMatched(words).some((rule) => CONTENT_RULES[rule].category === 'reference-app');
   });
 }
 
@@ -28,11 +32,16 @@ describe('original work', () => {
     ['src/features/tux-paint-tools/index.ts'],
     ['src/features/gcomprisClone.ts'],
     ['tools/importTuxPaintStamps.ts'],
+    ['src/features/paint-studio/magicPicker.tsx'],
   ])('flags %s', (file) => {
     expect(referenceAppPaths([file])).toEqual([file]);
   });
 
-  it.each([['assets/emoji/tuxedo.svg'], ['src/features/paint-studio/stamps/animals.ts']])('allows %s', (file) => {
+  it.each([
+    ['assets/emoji/tuxedo.svg'],
+    ['src/features/paint-studio/stamps/animals.ts'],
+    ['assets/emoji/magic-wand.svg'],
+  ])('allows %s', (file) => {
     expect(referenceAppPaths([file])).toEqual([]);
   });
 

@@ -1,10 +1,9 @@
-import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH, flattenDocument } from '../../../core/paint/document.ts';
+import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH, flattenDocument, type PaintDocument } from '../../../core/paint/document.ts';
 import type { Surface } from '../../../core/paint/surface.ts';
 import { thumbnail } from '../../../core/paint/thumbnail.ts';
 import type { EncodedPicture } from './autosave.ts';
 import { decodePng, encodePng, fitOnPaper } from './browserPixels.ts';
 import { readTextChunk, withTextChunk } from './pngText.ts';
-import type { StudioDocument } from './studioDocument.ts';
 
 /** The PNG text keyword that names the coloring page a picture was painted on. */
 const PAGE_KEYWORD = 'wkc-coloring-page';
@@ -16,10 +15,10 @@ const THUMBNAIL_HEIGHT = 300;
 /**
  * The picture as files for the gallery: the flattened PNG, which any screen can show, with the
  * coloring page id in a text chunk, and a thumbnail. The pixels are read before the first await.
+ * The studio runs it in its worker, so a fill never waits for a save; see worker/effectRunner.ts.
  */
-export function encodePicture(studio: StudioDocument): Promise<EncodedPicture> {
-  const flat = flattenDocument(studio.doc);
-  const pageId = studio.pageId;
+export function encodePicture(doc: PaintDocument, pageId: string | null): Promise<EncodedPicture> {
+  const flat = flattenDocument(doc);
   const small = thumbnail(flat, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
   return Promise.all([encodePng(flat), encodePng(small)]).then(([png, thumb]) => ({
     png: pageId === null ? png : withTextChunk(png, PAGE_KEYWORD, pageId),

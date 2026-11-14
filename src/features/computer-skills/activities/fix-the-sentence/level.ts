@@ -1,5 +1,5 @@
 import type { Band } from '../../../../core/bands.ts';
-import { createRandom, type Random } from '../../../../core/activityKit/random.ts';
+import { createRandom } from '../../../../core/activityKit/random.ts';
 
 /**
  * Fix the sentence: a short sentence with one small slip, in a real text field, and the sentence
@@ -12,7 +12,7 @@ import { createRandom, type Random } from '../../../../core/activityKit/random.t
  * slip is no longer marked.
  */
 
-interface Sentence {
+export interface Sentence {
   readonly id: SentenceId;
   readonly text: string;
   /** A word of the sentence and a word that could stand in its place, for a changed word. */
@@ -39,7 +39,7 @@ export const SENTENCES = [
 export type SentenceId = (typeof SENTENCES)[number]['id'];
 
 /** What is wrong with the sentence in the field. */
-type SlipKind = 'extra-letter' | 'missing-letter' | 'changed-letter' | 'extra-word' | 'changed-word';
+export type SlipKind = 'extra-letter' | 'missing-letter' | 'changed-letter' | 'extra-word' | 'changed-word';
 
 /** Where the caret starts: just after the slip, just before it, or away at one end of the text. */
 type CaretStart = 'after' | 'before' | 'end' | 'start';
@@ -113,34 +113,96 @@ function splice(text: string, at: number, remove: number, insert: string): strin
   return text.slice(0, at) + insert + text.slice(at + remove);
 }
 
-function extraLetter(sentence: Sentence, random: Random): string {
+/**
+ * Words a slip must never make. The slips are made by rule, so a changed or missing letter can
+ * turn a word into another real one: "ride" can become "rude". A child reads the slipped
+ * sentence, so any candidate with one of these words is dropped. Lower case, whole words.
+ */
+const DENIED_SLIP_WORDS: ReadonlySet<string> = new Set([
+  'arse',
+  'ass',
+  'bad',
+  'beer',
+  'blood',
+  'bomb',
+  'bum',
+  'butt',
+  'crap',
+  'cuss',
+  'damn',
+  'dead',
+  'die',
+  'died',
+  'dies',
+  'drug',
+  'drunk',
+  'dumb',
+  'fart',
+  'fat',
+  'fight',
+  'gun',
+  'hate',
+  'hell',
+  'hit',
+  'hurt',
+  'kill',
+  'mad',
+  'mean',
+  'nag',
+  'pee',
+  'piss',
+  'poo',
+  'poop',
+  'puke',
+  'rude',
+  'sad',
+  'sex',
+  'shot',
+  'sick',
+  'slap',
+  'stupid',
+  'tit',
+  'ugly',
+  'war',
+  'weed',
+  'wine',
+]);
+
+/** True when a slipped sentence contains a denied word. */
+export function hasDeniedWord(text: string): boolean {
+  return wordsOf(text).some((word) => DENIED_SLIP_WORDS.has(word.text.toLowerCase()));
+}
+
+function extraLetters(sentence: Sentence): string[] {
   // A letter typed twice. In a run such as the "ee" of "sleeps", the extra one is the last of the
   // run, which is where the caret starts.
-  const letter = random.pick(Array.from(sentence.text.matchAll(/[A-Za-z]/g)));
-  return splice(sentence.text, letter.index, 0, letter[0]);
+  return Array.from(sentence.text.matchAll(/[A-Za-z]/g), (letter) => splice(sentence.text, letter.index, 0, letter[0]));
 }
 
-function missingLetter(sentence: Sentence, random: Random): string {
+function missingLetters(sentence: Sentence): string[] {
   // Keep the first and last letters, so the word still looks like itself.
-  const word = random.pick(wordsOf(sentence.text).filter((entry) => entry.text.length >= 4));
-  return splice(sentence.text, word.at + random.int(1, word.text.length - 2), 1, '');
+  return wordsOf(sentence.text)
+    .filter((entry) => entry.text.length >= 4)
+    .flatMap((word) =>
+      Array.from({ length: word.text.length - 2 }, (_, index) => splice(sentence.text, word.at + index + 1, 1, '')),
+    );
 }
 
-function changedLetter(sentence: Sentence, random: Random): string {
-  const vowels = wordsOf(sentence.text).flatMap((word) =>
-    Array.from(word.text, (letter, index) => ({ letter, at: word.at + index })).filter((entry) =>
-      (VOWELS as readonly string[]).includes(entry.letter),
+function changedLetters(sentence: Sentence): string[] {
+  return wordsOf(sentence.text).flatMap((word) =>
+    Array.from(word.text).flatMap((letter, index) =>
+      (VOWELS as readonly string[]).includes(letter)
+        ? VOWELS.filter((vowel) => vowel !== letter).map((vowel) => splice(sentence.text, word.at + index, 1, vowel))
+        : [],
     ),
   );
-  const { letter, at } = random.pick(vowels);
-  const other = random.pick(VOWELS.filter((vowel) => vowel !== letter));
-  return splice(sentence.text, at, 1, other);
 }
 
-function extraWord(sentence: Sentence, random: Random): string {
+function extraWords(sentence: Sentence): string[] {
   // Not the last word, so the doubled word never sits against the full stop.
-  const word = random.pick(wordsOf(sentence.text).slice(0, -1));
-  return splice(sentence.text, word.at + word.text.length, 0, ` ${word.text}`);
+  return wordsOf(sentence.text)
+    .slice(0, -1)
+    .map((word) => splice(sentence.text, word.at + word.text.length, 0, ` ${word.text}`));
 }
 
 /** The sentence with its swap word changed. Throws when the word is not in the sentence. */
@@ -151,21 +213,27 @@ export function changedWord(sentence: Pick<Sentence, 'text' | 'swap'>): string {
   return splice(sentence.text, word.at, from.length, to);
 }
 
-/** The sentence with one slip of the kind. */
-function slipFor(kind: SlipKind, sentence: Sentence, random: Random): string {
-  switch (kind) {
-    case 'extra-letter':
-      return extraLetter(sentence, random);
-    case 'missing-letter':
-      return missingLetter(sentence, random);
-    case 'changed-letter':
-      return changedLetter(sentence, random);
-    case 'extra-word':
-      return extraWord(sentence, random);
-    // 'changed-word', the last case.
-    default:
-      return changedWord(sentence);
-  }
+/**
+ * Every sentence one slip of the kind can make, without any that would read as a denied word.
+ * The order is fixed, so a seed always picks the same one.
+ */
+export function slipCandidates(kind: SlipKind, sentence: Sentence): string[] {
+  const all = (() => {
+    switch (kind) {
+      case 'extra-letter':
+        return extraLetters(sentence);
+      case 'missing-letter':
+        return missingLetters(sentence);
+      case 'changed-letter':
+        return changedLetters(sentence);
+      case 'extra-word':
+        return extraWords(sentence);
+      // 'changed-word', the last case.
+      default:
+        return [changedWord(sentence)];
+    }
+  })();
+  return all.filter((text) => !hasDeniedWord(text));
 }
 
 function stepFor(difficulty: number): Step {
@@ -200,7 +268,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
   const random = createRandom(seed);
   const sentence: Sentence = random.pick(SENTENCES);
   const kind = random.pick(step.kinds);
-  const start = slipFor(kind, sentence, random);
+  const start = random.pick(slipCandidates(kind, sentence));
   return {
     sentence: sentence.id,
     target: sentence.text,

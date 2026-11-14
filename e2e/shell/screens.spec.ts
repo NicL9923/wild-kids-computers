@@ -7,6 +7,7 @@ import { expectAccessible } from '../support/accessibility.ts';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
 import { resizeWindow, saveScreen, SCREENS_DIR, settle, WINDOW_SIZES } from '../support/screens.ts';
 import { gateDialog, grownUps, homeMap, openParentCorner, waitForHome } from './shellSupport.ts';
+import { HOME_PATH } from '../../src/app/paths.ts';
 
 /** The smallest target per band, from src/styles/tokens.css. */
 const TARGET_MIN: Record<Band, number> = { 'band-3-5': 72, 'band-6-8': 56, 'band-9-12': 44 };
@@ -47,7 +48,7 @@ for (const band of BANDS) {
 
     for (const size of WINDOW_SIZES) {
       await resizeWindow(launched, size);
-      await openHash(page, '#/home');
+      await openHash(page, `#${HOME_PATH}`);
       await waitForHome(page);
       for (const place of await homeMap(page).getByRole('button').all()) {
         await expect(place).toBeInViewport({ ratio: 1 });

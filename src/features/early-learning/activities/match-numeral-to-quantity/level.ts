@@ -27,10 +27,22 @@ export const TIERS: readonly Tier[] = [
   { min: 3, max: 8, groups: 3, gap: 1 },
   { min: 4, max: 10, groups: 3, gap: 1 },
   { min: 5, max: 12, groups: 3, gap: 1 },
-  { min: 6, max: 15, groups: 4, gap: 1 },
+  { min: 6, max: 15, groups: 3, gap: 1 },
 ];
 
 export const MAX_MATCH_DIFFICULTY = TIERS.length;
+
+/**
+ * How many groups a band sees at most. The groups sit in one row, and each thing must stay at
+ * least the band's smallest target wide in a 1280 by 800 window: three groups of up to 17 at
+ * band-6-8, and two of up to 10 for the youngest, whose band shows the fewest choices anyway.
+ */
+const MOST_GROUPS: Readonly<Record<Band, number>> = { 'band-3-5': 2, 'band-6-8': 3, 'band-9-12': 3 };
+
+/** The number of groups in a round of this tier for this band. */
+export function groupsFor(tier: Tier, band: Band): number {
+  return Math.min(tier.groups, MOST_GROUPS[band]);
+}
 
 /** How far, at most, a wrong group is from the right one. */
 const SPREAD = 3;
@@ -86,12 +98,12 @@ export function wrongCounts(target: number, tier: Tier): number[] {
 }
 
 /** Pure: the same seed, difficulty, and band give the same round. */
-export function generateLevel(seed: number, difficulty: number, _band: Band): MatchLevel {
+export function generateLevel(seed: number, difficulty: number, band: Band): MatchLevel {
   const tier = tierFor(difficulty);
   const random = createRandom(seed);
   const target = random.int(tier.min, tier.max);
   const kind = random.pick(THINGS);
-  const counts = random.shuffle(pickChoices(random, target, tier.groups, wrongCounts(target, tier)));
+  const counts = random.shuffle(pickChoices(random, target, groupsFor(tier, band), wrongCounts(target, tier)));
   const groups = counts.map((count, index) => ({ id: `group-${String(index)}`, count }));
   return { target, kind, groups, answer: `group-${String(counts.indexOf(target))}` };
 }

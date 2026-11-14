@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import path from 'node:path';
 import type { Band } from '../../src/core/bands.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
+import { PAINT_STUDIO_PATH } from '../../src/features/paint-studio/paths.ts';
 
 /**
  * Helpers for the paint studio's end-to-end tests. Canvas checks read pixels back from the page's
@@ -40,7 +41,7 @@ export async function openRoute(page: Page, hash: string): Promise<void> {
   });
 }
 
-export const openStudio = (page: Page): Promise<void> => openRoute(page, '#/paint');
+export const openStudio = (page: Page): Promise<void> => openRoute(page, `#${PAINT_STUDIO_PATH}`);
 
 export async function saveScreen(page: Page, band: Band, name: string): Promise<void> {
   const size = await page.evaluate(() => `${window.innerWidth}x${window.innerHeight}`);
@@ -111,12 +112,15 @@ export async function frames(page: Page): Promise<void> {
 const PROFILE_ID = 'e2e-child';
 
 /** Gallery picture ids of the test profile, newest first, read through the app's own bridge. */
-export async function galleryIds(page: Page): Promise<string[]> {
-  return page.evaluate(async (profileId) => {
-    const bridge = window.wkcTest?.bridge;
-    if (bridge === undefined) return [];
-    return (await bridge.pictures.list(profileId, 'gallery')).map((picture) => picture.id);
-  }, PROFILE_ID);
+export async function galleryIds(page: Page, place: 'gallery' | 'trash' = 'gallery'): Promise<string[]> {
+  return page.evaluate(
+    async ({ profileId, where }) => {
+      const bridge = window.wkcTest?.bridge;
+      if (bridge === undefined) return [];
+      return (await bridge.pictures.list(profileId, where)).map((picture) => picture.id);
+    },
+    { profileId: PROFILE_ID, where: place },
+  );
 }
 
 /** A coloring page's points, read from its entry file, so the test does not ask the page for answers. */

@@ -9,7 +9,7 @@ export default defineActivity<KeyLevel>({
   bands: ['band-3-5', 'band-6-8'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'keyboard' },
+  icon: { emoji: 'key' },
   kind: 'rounds',
   inputs: ['keyboard'],
   difficulty: {

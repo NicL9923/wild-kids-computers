@@ -26,6 +26,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **WebRTC is limited per web contents, not by a Chromium switch.** A probe on Electron 45 counted 16 UDP packets to a local STUN socket with the `force-webrtc-ip-handling-policy` switch and none with `setWebRTCIPHandlingPolicy`.
 - **The dead proxy is `127.0.0.1:9`, and the app reloads the proxy config after setting it.** A probe showed real requests failing closed through the proxy from the first one, but `resolveProxy` reported DIRECT for the first lookup in a session until the reload. The reload makes the layer test see what requests see.
 - **Copy, cut, and paste never fall back to the system clipboard, even when the toy clipboard is empty.** A paste with nothing copied in the app inserts nothing.
+- **Known limit: on Linux, text selected in the app may reach the X primary selection,** which a middle click pastes into other programs. Chromium writes that buffer itself when a selection changes, no Chromium switch turns it off, and the renderer cannot reach it. Clearing it from the main process would need a polling timer and would also wipe what an adult selected in another program. A probe under Xvfb with Playwright's input, which bypasses the X server, selected text by keyboard and by double-click and left the primary selection unchanged, so no fix could be verified in CI. The exposure is a child's own words in the app, never adult data, and the system clipboard stays untouched. Checked 2026-11-14.
 - **Root guards also cancel `dragover` and `drop`**, so text or files dropped from another program cannot carry system data in. Every drag in the app uses `useCarry`, so nothing needs native drops.
 - **A close request that gets no answer within 3 seconds destroys the window.** A plain close waits for the page's unload handlers, which a hung page never finishes. A test measured 39 seconds with a plain close.
 - **The renderer must answer a close request explicitly.** The preload does not answer for it, because a renderer that is alive but showing an error screen would then trap the child behind a gate that never appears.
@@ -48,6 +49,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Every paint tool has a sticky pen.** A click puts the pen down and the next click lifts it. Hard rule 7 requires a click alternative to every drag, and a 3-year-old on a trackpad cannot hold a drag.
 - **Undo copies 64 px tiles on first touch.** Thirty full-canvas steps cost about 192 MB at worst, which fits under the cap.
 - **Whole-picture effects run in a Web Worker.** A measured kaleidoscope took 100 ms and a blur 200 ms on a fast laptop CPU, which would freeze a slow one.
+- **The autosave PNG encoding runs in the same worker.** On the main thread it delayed a fill that landed during a save. `npm run perf` on an i9-14900HX under Xvfb measured fill click to pixels at a median of 43.3 ms and a p95 of 87.2 ms before, and 26.1 ms and 55.3 ms after. The studio copies the pixels before it hands them over, so painting goes on during the encode.
 - **The text tool fills glyph outlines from a table built at build time.** The app ships no font parser.
 - **The paint text face is Andika Bold 7.000, shipped as the glyph table "Meadow Sans".** Bold strokes read better on a painting. "Andika" is a Reserved Font Name under the OFL, and a subset table is a modified version, so it takes another name.
 - **Within one stroke, a pixel keeps the highest coverage any dab gave it.** Overlapping dabs never darken each other, so a see-through marker stays even and a soft brush shows no beads.
@@ -55,6 +57,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **The fill bucket grows one pixel under line art and unmixes antialiased painted edges.** Neither leaves a pale fringe between the paint and a line.
 - **A change that left every pixel as it was adds no undo step.** A fill in the color already there, or a stamp with no visible pixels, does not cost the child an undo.
 - **The undo cap is 256 MiB and at most 100 steps.** Thirty full-canvas steps take about 197 MB, and the step limit keeps many tiny steps from piling up.
+- **The effects tool is called "Effects", not "Magic".** Tux Paint calls its effects tools "Magic", so hard rule 2 rules the name out. The strings and file name scans flag "magic"; only the magic wand stamp, a real object, allows it. The tool's picture is sparkles, not the wand.
 
 ### Activities
 
@@ -68,7 +71,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **The difficulty model moves one level at a time:** up after two clean rounds at the current level, down right after a round with three or more mistakes and hints. Each saved round records its level, an optional field, so a raise never counts rounds from the level before. A bad saved level is dropped, not a reason to reset progress.
 - **The kit counts mistakes and hints itself.** `kit.feedback.wrong` and `kit.hint` count, and `kit.roundComplete()` uses the counts, so an activity cannot forget to report them.
 - **A click on empty ground in a pointer activity is a quiet mistake:** a ring where the click landed, no sound, and it counts toward easing the level.
-- **Between rounds the stage rests for 1.2 seconds and takes no input.** The child sees the last action land, and the session limit is checked then.
+- **Between rounds the stage rests for 1.2 seconds and takes no input, and the next round also waits for the speech in progress to end.** The child sees the last action land and hears the whole sentence about it, such as "four plus six equals ten", before a new instruction starts. The session limit is checked then.
 - **A sequence shows only the steps reached.** Nothing looks locked.
 - **Pop the seed pods draws original seed heads,** not an emoji: no bundled emoji reads as a seed pod. Pods are at least 160 board units, about twice the youngest band's target, and never near the exit corner.
 - **Count the flowers lets a child touch each flower to count it out loud.** Counting is the goal, so the aid serves it. Rows hold at most five, like a ten frame, and distractors are within two of the answer.
@@ -77,6 +80,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Letters that say the same sound never share a round.** c and k share the shared clip "kuh", and q starts with it, so a sound or a spelling round never offers two of them.
 - **Sight words, missing letter, and sentence builder start at band-6-8.** Each needs the child to read written words, which hard rule 5 keeps away from the youngest. First sound and build the word with its letter guide cover the same ground for them.
 - **Rhyme sets are true rhymes in General American English, checked by ear.** Pairs that share only a vowel, such as goat and nose, meet only at higher difficulty, and near rhymes are left out.
+- **A thing to count is never smaller than the band's target, at 1280 by 800.** Match the numeral shows two groups at band-3-5 and at most three elsewhere, and more or fewer stops at ten things a group, with closer counts making the top levels harder. More groups or more things in a row shrank each thing to about 40 px. The "fits the hardest round" tests measure every thing in the busiest seed.
 
 ### Assets
 
@@ -110,6 +114,15 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 
 - **401 emoji in 12 categories.** People use the upstream "Default" tone, which is not a human skin color. Flags, alcohol, weapons, tobacco, religious symbols, scary pictures, reward symbols, and timers are left out.
 - **SVGO's default preset optimizes each file only when a 256 px render matches the original.** That saved 28 percent. The worst file changed 0.4 percent of pixel values, all on anti-aliased edges.
+
+### Session
+
+- **At startup the session makes the last active profile active again** when it still exists, so a returning child lands on the meadow without choosing. The profile choice still shows when several profiles exist; see "App shell".
+- **No profiles means "needs first launch"**, even when `app.json` says setup is done. A household whose last profile was deleted starts again from a profile, not from an empty meadow.
+- **Routes are not registered with TanStack Router for path types.** The router tree is found by file convention at run time, which the router's type registration cannot see. Each path has one owner file instead, and a source rule fails on a route literal anywhere else.
+- **`recordStep` never moves the furthest step back.** Replaying an early step keeps later ones open, and a step solved but not left still opens the next one.
+- **`setKioskLock` saves the lock and applies it to the window in one call.** A screen cannot save the choice and forget to apply it, or the reverse. A failed apply becomes the session's save problem.
+- **A profile being deleted cannot be made active.** Its files are on their way out, so loading its settings would bring some of them back.
 
 ### App shell
 

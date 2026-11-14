@@ -24,6 +24,7 @@ function setup(state: KitParts<{ n: number }>['state'] = null) {
       read: () => Promise.reject(new Error('not used')),
     },
     onRoundComplete: (outcome) => outcomes.push(outcome),
+    onStepSolved: () => calls.push('step solved'),
     host: {
       clock: { now: () => 0, monotonic: () => 0 },
       activityId: 'kit-test',
@@ -141,6 +142,7 @@ describe('createKit', () => {
     kit.feedback.correct();
     kit.hint(strings.a);
     kit.roundComplete();
+    kit.stepSolved();
     expect(calls).toEqual([]);
     expect(outcomes).toEqual([]);
   });

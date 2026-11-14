@@ -56,7 +56,8 @@ forEachBand(activity.bands, (band) => {
     const targets = level.things.filter((thing) => thing.isTarget);
     await expect(stage(page)).toHaveAttribute('data-zoom-step', '0');
     await expectInstructionSpoken(page, strings.findTiny);
-    expect(await spokenIds(page)).toContain(emojiNames[level.target].id);
+    // The thing's name follows the first clip, so it is logged only once that clip ends.
+    await expect.poll(() => spokenIds(page)).toContain(emojiNames[level.target].id);
     await saveBandScreenshot(page, band, activity.id);
     await expectAccessible(page);
     const width = await page.evaluate(() => window.innerWidth);

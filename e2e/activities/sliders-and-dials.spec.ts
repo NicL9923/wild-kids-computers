@@ -37,10 +37,27 @@ async function pointFor(page: Page, control: Control, value: number): Promise<{ 
   return { x: track.x + (value / (control.stops - 1)) * track.width, y: track.y + track.height / 2 };
 }
 
+/**
+ * The center of a knob once it has stopped moving. A knob glides to its new stop, so a box read
+ * right after a put-down can be partway there, and a click on it would miss.
+ */
 async function centerOf(page: Page, control: Control) {
-  const box = await knobOf(page, control).boundingBox();
-  if (box === null) throw new Error(`${control.id} has no knob`);
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const knob = knobOf(page, control);
+  const read = async () => {
+    const box = await knob.boundingBox();
+    if (box === null) throw new Error(`${control.id} has no knob`);
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  let before = await read();
+  await expect
+    .poll(async () => {
+      const now = await read();
+      const still = Math.abs(now.x - before.x) < 0.5 && Math.abs(now.y - before.y) < 0.5;
+      before = now;
+      return still;
+    })
+    .toBe(true);
+  return before;
 }
 
 forEachBand(activity.bands, (band) => {

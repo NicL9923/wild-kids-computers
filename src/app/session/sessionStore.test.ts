@@ -288,6 +288,26 @@ describe('profiles', () => {
     expect(fake.calls).not.toContain(`pictures.save ${FOX.id}`);
   });
 
+  it('refuses to make a profile active while it is being deleted', async () => {
+    const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], FOX.id) });
+    fake.holdWrites();
+    store.updateSettings({ muted: true });
+    const deleting = store.deleteProfile(FOX.id);
+    expect(() => store.chooseProfile(FOX.id)).toThrow(/Profile fox-kid is being deleted/);
+    expect(store.getSnapshot().activeProfile).toBeNull();
+    fake.resumeWrites();
+    await deleting;
+    expect(store.getSnapshot().activeProfile).toBeNull();
+  });
+
+  it('lets a profile be chosen again after its deletion failed', async () => {
+    const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], null) });
+    fake.failNext('removeProfile', FOX.id, new BridgeError('io', 'disk full'));
+    await store.deleteProfile(FOX.id);
+    store.chooseProfile(FOX.id);
+    expect(store.getSnapshot().activeProfile).toEqual(FOX);
+  });
+
   it('keeps a profile whose files could not be removed and says why', async () => {
     const { store, fake } = await startSession({ documents: savedApp([FOX, OWL], null) });
     fake.failNext('removeProfile', FOX.id, new BridgeError('io', 'disk full'));

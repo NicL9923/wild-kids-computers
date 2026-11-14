@@ -56,7 +56,7 @@ test('first launch, the home map, and the parent corner with the keyboard alone'
 
   await expect(heading(firstLaunch.soundHeading.text)).toBeVisible();
   await press(page.getByRole('button', { name: firstLaunch.playSound.text }));
-  await press(page.getByRole('button', { name: firstLaunch.heardYes.text }));
+  await press(next);
 
   await expect(heading(firstLaunch.kioskHeading.text)).toBeVisible();
   await press(page.getByRole('button', { name: firstLaunch.finish.text }));

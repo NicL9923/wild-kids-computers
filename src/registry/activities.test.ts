@@ -1,7 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defineActivity } from '../core/activityKit/defineActivity.ts';
+import { AREAS, defineActivity } from '../core/activityKit/defineActivity.ts';
+import { BANDS } from '../core/bands.ts';
 import { defineStrings } from '../core/strings/defineStrings.ts';
 import { activitiesFor, activityById, allActivityModules, collectActivities } from './activities.ts';
 import { activityArtIds } from './activityArt.ts';
@@ -83,6 +84,23 @@ describe('every activity', () => {
         allActivityModules.map((module) => module.definition.id),
       ),
     ).toEqual([]);
+  });
+});
+
+describe('area screens', () => {
+  // A child who cannot read finds a game by its picture, so no two tiles on one area screen may
+  // share one. The check covers every band, because each band sees its own set of tiles.
+  it('give every activity an area shows a band its own picture', () => {
+    const shared: string[] = [];
+    for (const band of BANDS) {
+      for (const area of AREAS) {
+        const byPicture = Map.groupBy(activitiesFor(area, band), (definition) => JSON.stringify(definition.icon));
+        for (const [picture, sharing] of byPicture) {
+          if (sharing.length > 1) shared.push(`${band} ${area} ${picture}: ${sharing.map((d) => d.id).join(', ')}`);
+        }
+      }
+    }
+    expect(shared).toEqual([]);
   });
 });
 

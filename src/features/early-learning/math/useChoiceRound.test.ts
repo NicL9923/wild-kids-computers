@@ -41,6 +41,7 @@ function fakeKit(scheduler: ManualScheduler): { kit: ActivityKit; calls: KitCall
     },
     hint: (say) => calls.push({ call: 'hint', say: say?.id ?? null }),
     roundComplete: () => calls.push({ call: 'round-complete' }),
+    stepSolved: unexpected('stepSolved'),
     get state(): never {
       throw new Error('The choice round has no state');
     },

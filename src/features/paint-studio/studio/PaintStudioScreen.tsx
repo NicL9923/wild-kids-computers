@@ -21,10 +21,12 @@ import { coloringPageById } from '../../../registry/coloringPages.ts';
 import { emojiUrl } from '../../../registry/emoji.ts';
 import { brushTips, paintFonts, paintTools } from '../../../registry/paint.ts';
 import type { ColoringPage } from '../coloringPage.ts';
-import { HOME_PATH, PAINT_GALLERY_PATH, SESSION_CLOSING_PATH } from '../paths.ts';
+import { CLOSING_PATH, HOME_PATH } from '../../../app/paths.ts';
+import { PAINT_GALLERY_PATH } from '../paths.ts';
 import { clearStartingPicture, paintLines, peekStartingPicture, type StartingPicture } from '../startingPicture.ts';
 import { strings } from '../strings.ts';
-import { createStudioScope, type StudioScope } from '../studioScope.ts';
+import { createScope, type OwnedScope } from '../../../core/activityKit/scope.ts';
+import { kitScheduler } from '../../../activityShell/kitTime.ts';
 import { createEffectRunner, startEffectWorker, type EffectRunner } from '../worker/effectRunner.ts';
 import { Autosaver } from './autosave.ts';
 import { decodePngUrl, fitOnPaper, rasterizeSvg } from './browserPixels.ts';
@@ -56,19 +58,18 @@ import {
   type StudioToolId,
 } from './studioOptions.ts';
 import { SurfaceImage } from './SurfaceImage.tsx';
+import { SESSION_CHECK_MS } from './timing.ts';
 import { unflattenUnderMask } from './unflatten.ts';
 
 /** How long painting must pause before the picture saves itself. */
 const AUTOSAVE_DELAY_MS = 1500;
-/** How often the studio asks whether the session length is used up. */
-const SESSION_CHECK_MS = 2000;
 /** Brush speed, in document pixels per millisecond, that makes the brush sound loudest. */
 const LOUDEST_SPEED = 3;
 
 type Panel = 'stamps' | 'effects' | 'pages' | 'tips' | 'shapes';
 
 interface StudioRuntime {
-  readonly scope: StudioScope;
+  readonly scope: OwnedScope;
   readonly runner: EffectRunner;
 }
 
@@ -80,7 +81,7 @@ const TOOL_PICTURES: Readonly<Record<StudioToolId, React.ReactNode>> = {
   fill: <EmojiPicture id='bucket' />,
   text: <Glyph name='letters' />,
   stamp: <EmojiPicture id='butterfly' />,
-  effects: <EmojiPicture id='magic-wand' />,
+  effects: <EmojiPicture id='sparkles' />,
 };
 
 function toolById(id: string) {
@@ -174,8 +175,8 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
 
   // The timers, frames, and worker live as long as the screen.
   useEffect(() => {
-    const scope = createStudioScope();
-    const runner = createEffectRunner(startEffectWorker);
+    const scope = createScope(kitScheduler);
+    const runner = createEffectRunner(startEffectWorker, encodePicture);
     let live = true;
     void (async () => {
       await runner.warm();
@@ -190,9 +191,14 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }, []);
 
   const makeSaver = useCallback(
-    (owner: StudioDocument, id: string | null, savedVersion: number, scope: StudioScope) =>
+    (owner: StudioDocument, id: string | null, savedVersion: number, { scope, runner }: StudioRuntime) =>
       new Autosaver(
-        { scope, delayMs: AUTOSAVE_DELAY_MS, encode: () => encodePicture(owner), save: pictures.save },
+        {
+          scope,
+          delayMs: AUTOSAVE_DELAY_MS,
+          encode: () => runner.encode(owner.doc, owner.pageId),
+          save: pictures.save,
+        },
         id,
         savedVersion,
       ),
@@ -204,7 +210,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     (next: StudioDocument, id: string | null, savedVersion: number) => {
       if (runtime === null) return;
       void saverRef.current?.flush();
-      saverRef.current = makeSaver(next, id, savedVersion, runtime.scope);
+      saverRef.current = makeSaver(next, id, savedVersion, runtime);
       setStudio(next);
     },
     [makeSaver, runtime],
@@ -309,7 +315,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     if (runtime === null) return undefined;
     return runtime.scope.setInterval(() => {
       if (canvasRef.current?.penDown === true || busy || studioRef.current.stroking) return;
-      if (isLimitReached()) void leave(SESSION_CLOSING_PATH);
+      if (isLimitReached()) void leave(CLOSING_PATH);
     }, SESSION_CHECK_MS);
   }, [runtime, busy, isLimitReached, leave]);
 
@@ -734,7 +740,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
             <StudioButton
               className='wk-paint-wide'
               label={t(strings.chooseEffect)}
-              picture={<EmojiPicture id='magic-wand' />}
+              picture={<EmojiPicture id='sparkles' />}
               aria-expanded={panel === 'effects'}
               onClick={() => {
                 setPanel(panel === 'effects' ? null : 'effects');
@@ -840,13 +846,15 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
                   busy={busy || !ready}
                   onPenChange={setPenIsDown}
                   handleRef={canvasRef}
+                  overlay={
+                    penIsDown && (
+                      <output className='wk-paint-pen-badge'>
+                        <EmojiPicture id='paintbrush' />
+                        <span className='wk-reading-text'>{t(strings.penDown)}</span>
+                      </output>
+                    )
+                  }
                 />
-              )}
-              {penIsDown && (
-                <output className='wk-paint-pen-badge'>
-                  <EmojiPicture id='paintbrush' />
-                  <span className='wk-reading-text'>{t(strings.penDown)}</span>
-                </output>
               )}
               {panel === 'stamps' && (
                 <StampPanel

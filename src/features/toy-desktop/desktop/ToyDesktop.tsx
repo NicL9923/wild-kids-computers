@@ -17,7 +17,7 @@ import {
 } from './desktopContext.ts';
 import { DesktopIcons } from './DesktopIcons.tsx';
 import { rejectionSentence } from './labels.ts';
-import { comfortableSize, fitDesktop } from './layout.ts';
+import { comfortableSize, contentZoom, fitDesktop } from './layout.ts';
 import { FileDialogView } from './FileDialogView.tsx';
 import { MenuBar } from './MenuBar.tsx';
 import { withDefaults, type DesktopParts, type HighlightTarget } from './parts.ts';
@@ -92,6 +92,16 @@ function isControlTarget(target: EventTarget): boolean {
   );
 }
 
+/** The band's smallest target as rendered in `element`, in CSS pixels, zoom included. */
+function measureTarget(element: HTMLElement): number {
+  const probe = element.ownerDocument.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;width:var(--wk-target-min)';
+  element.append(probe);
+  const width = probe.getBoundingClientRect().width;
+  probe.remove();
+  return width;
+}
+
 /**
  * A pretend computer inside the app, drawn as a friendly monitor so it never looks like the real
  * one. It renders a model state and sends every change through the model, so a lesson sees the
@@ -115,6 +125,8 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const [focusRequest, setFocusRequest] = useState<{ windowId: string | null; serial: number } | null>(null);
   const { state, dispatch, listen } = desktop;
   const fit = fitDesktop(space);
+  // Read again whenever the space changes, which a change of the app's window size causes.
+  const zoom = contentZoom(band, { width: globalThis.innerWidth, height: globalThis.innerHeight });
   const measured = space.width > 0 && space.height > 0;
 
   // Measure the space the desktop has, and follow it as the window changes size.
@@ -224,9 +236,7 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
     (action: OpenAction) => {
       const now = desktop.current();
       const app = action.type === 'open-app' ? action.app : appForNode(getNode(now.fs, action.fileId));
-      const targetPx = Number.parseFloat(
-        screen.current === null ? '' : getComputedStyle(screen.current).getPropertyValue('--wk-target-min'),
-      );
+      const targetPx = screen.current === null ? Number.NaN : measureTarget(screen.current);
       const size =
         app === null || !(targetPx > 0) ? undefined : comfortableSize(app, targetPx, fitDesktop(spaceRef.current));
       const opened = dispatch({ ...action, size });
@@ -293,7 +303,7 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const layers = new Map(state.windows.map((window, index) => [window.id, index + 1]));
   return (
     <DesktopContext.Provider value={context}>
-      <div className='td-monitor' data-band={band}>
+      <div className='td-monitor' data-band={band} style={{ '--wk-zoom': zoom }}>
         <section
           className='td-screen'
           aria-label={t(strings.screen)}

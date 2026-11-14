@@ -16,6 +16,7 @@ import {
 import { FIXTURE_PROFILE, type LaunchedApp } from '../support/launchApp.ts';
 import { settle } from '../support/logic.ts';
 import { expectTargetsFit, rangeOf, tabTo } from '../support/reading.ts';
+import { ACTIVITY_PATH, AREA_PATH } from '../../src/activityShell/paths.ts';
 
 const SEED = 4_242;
 
@@ -162,13 +163,19 @@ async function savePainting(page: Page, kind: 'busy' | 'blank'): Promise<void> {
 
 /** Leaves the activity and comes back, so the first round starts again and reads the gallery. */
 async function reopen(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    window.location.hash = '#/area/early-learning';
-  });
+  await page.evaluate(
+    (hash) => {
+      window.location.hash = hash;
+    },
+    `#${AREA_PATH('early-learning')}`,
+  );
   await expect(page.locator('[data-activity="jigsaw"] .wk-activity-stage')).toHaveCount(0);
-  await page.evaluate(() => {
-    window.location.hash = '#/activity/jigsaw';
-  });
+  await page.evaluate(
+    (hash) => {
+      window.location.hash = hash;
+    },
+    `#${ACTIVITY_PATH('jigsaw')}`,
+  );
 }
 
 test.describe('pictures from the gallery', () => {

@@ -116,6 +116,7 @@ export function createFakeBridge(options: FakeBridgeOptions = {}): FakeBridge {
     setFullscreen: options.window?.setFullscreen ?? (() => notConfigured('window.setFullscreen')),
     setKioskLock: options.window?.setKioskLock ?? (() => notConfigured('window.setKioskLock')),
     onCloseRequest: options.window?.onCloseRequest ?? (() => notConfigured('window.onCloseRequest')),
+    onMenuCommand: options.window?.onMenuCommand ?? (() => notConfigured('window.onMenuCommand')),
     acknowledgeCloseRequest:
       options.window?.acknowledgeCloseRequest ?? (() => notConfigured('window.acknowledgeCloseRequest')),
     quit: options.window?.quit ?? (() => notConfigured('window.quit')),

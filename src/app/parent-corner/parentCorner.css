@@ -5,6 +5,10 @@
 
 @layer components {
   .wk-parent {
+    /* Hints and other small text stay at least the adult minimum. A child preview inside sets its
+       own band, which declares this token again with the child's values. */
+    --wk-text-small: max(var(--wk-adult-text-min), calc(var(--wk-font-small) * var(--wk-text-scale)));
+
     box-sizing: border-box;
     min-height: 100dvh;
     padding: var(--wk-space-screen-edge);

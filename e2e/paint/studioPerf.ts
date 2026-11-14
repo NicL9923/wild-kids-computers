@@ -4,6 +4,7 @@ import { cpus, platform, release, totalmem } from 'node:os';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
+import { PAINT_STUDIO_PATH } from '../../src/features/paint-studio/paths.ts';
 
 /**
  * Paint studio timings in the real Electron app at 1920 by 1080: npm run perf, after the engine
@@ -67,9 +68,9 @@ async function resize(launched: LaunchedApp): Promise<string> {
 }
 
 async function openStudio(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    window.location.hash = '#/paint';
-  });
+  await page.evaluate((hash) => {
+    window.location.hash = hash;
+  }, `#${PAINT_STUDIO_PATH}`);
   await page.locator('.wk-paint-screen[data-ready="true"]').waitFor({ timeout: 30_000 });
 }
 

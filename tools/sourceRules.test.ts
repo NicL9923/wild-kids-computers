@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { findCoreImportEscapes, findJsxAttributeLiterals, importSpecifiers, readSourceTree } from './sourceRules.ts';
+import {
+  findCoreImportEscapes,
+  findJsxAttributeLiterals,
+  findRouteLiterals,
+  importSpecifiers,
+  readSourceTree,
+  ROUTE_OWNERS,
+} from './sourceRules.ts';
 
 describe('importSpecifiers', () => {
   it('reads static, re-export, side-effect, type, and dynamic imports', () => {
@@ -74,6 +81,37 @@ describe('findJsxAttributeLiterals', () => {
   });
 });
 
+describe('findRouteLiterals', () => {
+  const owner = {
+    path: 'src/features/paint-studio/paths.ts',
+    text: "export const PAINT_STUDIO_PATH = '/paint';\nexport const PAINT_GALLERY_PATH = '/paint/gallery';",
+  };
+
+  it.each([
+    ['a plain path', "navigate({ to: '/paint' });"],
+    ['a deeper path', "const to = '/paint/gallery';"],
+    ['a hash route in an end-to-end test', "await openRoute(page, '#/paint');"],
+    ['a template', 'const to = `/paint?picture=${id}`;'],
+  ])('reports %s outside the owner', (_label, text) => {
+    const findings = findRouteLiterals([owner, { path: 'e2e/paint/x.ts', text }]);
+    expect(findings.map((f) => f.path)).toEqual(['e2e/paint/x.ts']);
+  });
+
+  it.each([
+    ['a path no owner declares', "const icon = '/painted';"],
+    ['a comment', "// Opens '/paint' from the map"],
+    ['a block comment', '/** `/paint/gallery` lists pictures */'],
+    ['an asset path', "import x from '../paint/a.svg';"],
+  ])('allows %s', (_label, text) => {
+    expect(findRouteLiterals([owner, { path: 'src/features/x.ts', text }])).toEqual([]);
+  });
+
+  it('skips the owner itself and unit tests', () => {
+    const unitTest = { path: 'src/app/paths.test.ts', text: "expect(x).toBe('/paint');" };
+    expect(findRouteLiterals([owner, unitTest])).toEqual([]);
+  });
+});
+
 describe('the source tree', () => {
   const files = readSourceTree(process.cwd(), 'src');
 
@@ -83,5 +121,11 @@ describe('the source tree', () => {
 
   it('has no user-facing JSX attribute literals', () => {
     expect(findJsxAttributeLiterals(files)).toEqual([]);
+  });
+
+  it('keeps every route literal in its owner', () => {
+    const tree = [...files, ...readSourceTree(process.cwd(), 'e2e')];
+    expect(tree.filter((file) => ROUTE_OWNERS.includes(file.path))).toHaveLength(ROUTE_OWNERS.length);
+    expect(findRouteLiterals(tree)).toEqual([]);
   });
 });

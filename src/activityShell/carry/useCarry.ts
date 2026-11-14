@@ -152,6 +152,8 @@ export function useCarry<I extends string, T extends string = never>(
   const [active, setActive] = useState<Active<I> | null>(null);
   const [over, setOver] = useState<T | null>(null);
   const targets = useRef(new Map<T, HTMLElement>());
+  // The press that picked the item up. The window hears it too, and must not take it for a new one.
+  const pickUpPress = useRef<Event | null>(null);
   const items = useRef(new Map<I, HTMLElement>());
   // The newest values for window listeners, which outlive a render.
   const live = useRef({ active, over, mode });
@@ -282,6 +284,16 @@ export function useCarry<I extends string, T extends string = never>(
         // A drag ends where it is released. A picked-up item lands where the placing click is.
         finish(true, point(event));
       }),
+      scope.listen(window, 'pointerdown', (event: PointerEvent) => {
+        const now = live.current.active;
+        if (now?.how !== 'held' || event === pickUpPress.current) return;
+        // A second press while the first is still held: its release never arrived, as happens
+        // when the window loses the pointer mid-click. The first press was a pick-up click, so
+        // this one is the placing click and its release puts the item down.
+        setActive({ ...now, how: 'clicked' });
+      }),
+      // The browser took the pointer away, for example for a system gesture. Nothing is placed.
+      scope.listen(window, 'pointercancel', () => finish(false)),
       scope.listen(window, 'keydown', (event: KeyboardEvent) => {
         if (event.key !== 'Escape') return;
         event.preventDefault();
@@ -319,6 +331,7 @@ export function useCarry<I extends string, T extends string = never>(
           if (now !== null) return;
           event.preventDefault();
           play('pick-up');
+          pickUpPress.current = event.nativeEvent;
           setActive({
             item: id,
             how: 'held',

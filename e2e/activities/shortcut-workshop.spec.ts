@@ -11,6 +11,7 @@ import { expectAccessible } from '../support/accessibility.ts';
 import { expectInstructionSpoken, forEachBand, REVIEW_SIZES, saveBandScreenshot } from '../support/activity.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
 import { openSequenceStep, savedFurthestStep } from '../support/sequenceStep.ts';
+import { readSystemClipboard, withSystemClipboard, writeSystemClipboard } from '../support/systemClipboard.ts';
 
 const mac = process.platform === 'darwin';
 const primary = mac ? 'Meta' : 'Control';
@@ -79,8 +80,6 @@ async function pressNative(app: LaunchedApp, presses: readonly Press[]): Promise
   }, presses);
 }
 
-const systemClipboard = (app: LaunchedApp) => app.app.evaluate(({ clipboard }) => clipboard.readText());
-
 forEachBand(activity.bands, (band) => {
   test('selects all with the shortcut, moves on to the next step, and saves how far it got', async () => {
     launched = await openSequenceStep({ activity: activity.id, band, step: 0 });
@@ -110,18 +109,21 @@ forEachBand(activity.bands, (band) => {
     for (const [index, step] of STEPS.entries()) {
       launched = await openSequenceStep({ activity: activity.id, band, step: index });
       const { page } = launched;
-      await launched.app.evaluate(({ clipboard }) => clipboard.writeText('adult password'));
-      await expect(stage(page)).toHaveAttribute('data-step', step.id);
-      await expect(note(page)).toHaveValue(step.text);
-      await pressNative(launched, PRESSES[step.id]);
-      await expect(stage(page), step.id).toHaveAttribute('data-done', 'true');
-      const lines = DONE_LINES[step.id];
-      // A shortcut that ran twice, such as a paste, would leave extra text here.
-      if (lines !== undefined) expect(tidyLines(await note(page).inputValue()), step.id).toEqual(lines);
-      if (step.id === 'save' || step.id === 'all-together') {
-        await expect(page.locator('.sw-status'), step.id).toHaveAttribute('data-saved', 'true');
-      }
-      expect(await systemClipboard(launched), step.id).toBe('adult password');
+      const open = launched;
+      await withSystemClipboard(async () => {
+        await writeSystemClipboard(open, 'adult password');
+        await expect(stage(page)).toHaveAttribute('data-step', step.id);
+        await expect(note(page)).toHaveValue(step.text);
+        await pressNative(open, PRESSES[step.id]);
+        await expect(stage(page), step.id).toHaveAttribute('data-done', 'true');
+        const lines = DONE_LINES[step.id];
+        // A shortcut that ran twice, such as a paste, would leave extra text here.
+        if (lines !== undefined) expect(tidyLines(await note(page).inputValue()), step.id).toEqual(lines);
+        if (step.id === 'save' || step.id === 'all-together') {
+          await expect(page.locator('.sw-status'), step.id).toHaveAttribute('data-saved', 'true');
+        }
+        expect(await readSystemClipboard(open), step.id).toBe('adult password');
+      });
       await launched.close();
       launched = undefined;
     }

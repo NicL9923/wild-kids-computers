@@ -2,6 +2,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { installInputGuards } from './app/inputGuards.ts';
+import { runMenuCommand } from './app/menuCommands.ts';
 import { createAppRouter } from './app/router.ts';
 import { SessionProvider } from './app/session/SessionProvider.tsx';
 import { createSessionStore } from './app/session/sessionStore.ts';
@@ -21,6 +22,7 @@ if (container === null) {
 
 installInputGuards(document);
 const bridge = getBridge();
+bridge.window.onMenuCommand((command) => runMenuCommand(command, document));
 void installTestHook(bridge, window.location);
 
 // The audio test log is chosen when the engine is made, so the engine waits for the bridge info.

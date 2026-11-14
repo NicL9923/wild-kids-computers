@@ -28,7 +28,7 @@ Inline styles are allowed because Radix adds `<style>` tags for scroll locking. 
 
 ### Keyboard and clipboard ownership
 
-- The main process sets an application menu with only the edit roles, which macOS needs for text fields. It blocks reload, close, quit, zoom, and developer tools shortcuts in `before-input-event` unless the app runs unpackaged in dev. It fixes the zoom factor at 1.
+- The main process sets an application menu with only the edit commands, which macOS needs for text fields. On macOS, Undo and Redo from the menu bar go to the page over `MENU_COMMAND_CHANNEL`, and `src/app/menuCommands.ts` replays them as the shortcut on the focused element, so an activity's own text model handles them instead of the browser's undo. Windows and Linux hide the menu bar and keep the plain edit role. It blocks reload, close, quit, zoom, and developer tools shortcuts in `before-input-event` unless the app runs unpackaged in dev. It fixes the zoom factor at 1.
 - The app never reads or writes the system clipboard. `src/app/` handles `copy`, `cut`, and `paste` events at the document root and routes them to an in-app toy clipboard. An adult's copied password cannot land in a toy app, and a child's text cannot leave the app.
 - The app root cancels every `dragstart`, so images do not produce ghost drags.
 - Spellcheck is off.
@@ -112,6 +112,8 @@ export const routes: FeatureRoutes = [
   createRoute({ getParentRoute: () => rootRoute, path: '/paint', component: PaintStudio }),
 ];
 ```
+
+Each route path has one owner: `src/app/paths.ts` for the shell's screens, `src/activityShell/paths.ts` for the area and activity screens, and `src/features/paint-studio/paths.ts` for the studio and its gallery. Everything else, end-to-end tests included, imports the constant. `tools/sourceRules.test.ts` fails on a route literal outside its owner.
 
 Load each screen with `lazyRouteComponent`, because the registry imports every routes file at start. The router keeps hash history. TanStack Router cannot type a tree it finds by file convention, so the router is not registered for path types: a screen parses its own search parameters, as `parseGallerySearch` does, and links take plain strings.
 
@@ -260,11 +262,11 @@ e2e/activities/<activity-id>.spec.ts
 
 ### Activity kinds
 
-| Kind       | Shape                                                                                                                                                            | Examples                                                  |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `rounds`   | The kit generates a level from a seed and a difficulty, the child plays it, and the difficulty model adjusts. A finish screen follows `roundsPerSession` rounds. | Most activities                                           |
-| `sequence` | An ordered list of authored steps. The kit saves the furthest step and lets the child pick any step up to it. No difficulty model.                               | Typing course, shortcut workshop, each robot painter tier |
-| `free`     | Open play with no rounds and no finish screen.                                                                                                                   | Robot free mode, toy desktop free play                    |
+| Kind       | Shape                                                                                                                                                                                           | Examples                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `rounds`   | The kit generates a level from a seed and a difficulty, the child plays it, and the difficulty model adjusts. A finish screen follows `roundsPerSession` rounds.                                | Most activities                                           |
+| `sequence` | An ordered list of authored steps. The kit saves the furthest step and lets the child pick any step up to it. `kit.stepSolved()` opens the next step before the step ends. No difficulty model. | Typing course, shortcut workshop, each robot painter tier |
+| `free`     | Open play with no rounds and no finish screen.                                                                                                                                                  | Robot free mode, toy desktop free play                    |
 
 Robot painter has one `sequence` activity per tier and one `free` activity. Each puzzle is a step, with a unit test that its reference solution solves it. Each toy desktop lesson is its own activity.
 
@@ -284,25 +286,25 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 - **Drag with click alternative.** `useCarry` implements one interaction for moving things. The child can press, drag, and release, or click to pick up and click to place. It supports drop targets, free positions such as a window on the toy desktop, and movement limited to an axis and a range such as a slider or a resize handle. A carried item also moves with the arrow keys and drops with Enter. Every drag in the app uses it. A lint rule bans `draggable`, `onDrag*` handlers, and `setPointerCapture` outside the kit and the paint studio.
 - **Drag exemptions.** Native form controls and text selection are exempt, because the platform already gives them a keyboard alternative. The exemption list lives next to the lint rule.
 - **Pictures.** `kit.pictures` lists the profile's gallery pictures for activities that use them, such as the jigsaw. Activities do not call the bridge.
-- **Session length.** The kit checks the session limit only between rounds, after a 1.2 second pause, and when it is reached routes to `SESSION_CLOSING_PATH` (`/closing`). `src/activityShell/paths.ts` exports it with `AREA_PATH(areaId)` and `ACTIVITY_PATH(id)`.
+- **Session length.** The kit checks the session limit only between rounds, after a 1.2 second pause and the end of the speech in progress, and when it is reached routes to `CLOSING_PATH` (`/closing`) from `src/app/paths.ts`. `src/activityShell/paths.ts` exports `AREA_PATH(areaId)` and `ACTIVITY_PATH(id)`.
 - **Area screen.** `/area/$areaId` shows the activities of an area that serve the profile's band as picture tiles that speak their titles on hover and focus. It is the only step between the home map and an activity.
 
 ### Hard rule checks
 
-| Rule                                           | Check                                                                                                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| One goal, bands, spoken strings                | Registry test over every definition                                                                                                        |
-| An end-to-end test per activity                | Registry test checks that `e2e/activities/<id>.spec.ts` exists                                                                             |
-| Click before drag                              | Registry test: an activity with `drag` in `inputs` must use `useCarry`, and its end-to-end test must contain a test named "click to place" |
-| Double-click and right-click only where taught | A test scans `src/` for double-click and context-menu handlers outside an allow list                                                       |
-| No manipulative design                         | A test scans every string for banned reward words, with an allow list for false positives such as the star shape                           |
-| Spoken instructions                            | `check:voice`                                                                                                                              |
-| Timers cancelled on exit                       | The lint rule above, plus a kit test that the scope cancels everything                                                                     |
-| Levels are pure                                | Registry test: `generateLevel` gives the same level twice for the same arguments, at each band's lowest and highest difficulty             |
-| Playwright can import an activity              | Registry test: `activity.ts`, `level.ts`, and `strings.ts` import no registry, asset, CSS, React, or `.tsx` file                           |
-| No forgotten sequence step                     | Registry test: the files in `stepsDirectory` equal the ids in `steps`                                                                      |
-| Native drag only in the kit                    | Oxlint rule `wkc/no-native-drag`, with its exemption list `NATIVE_DRAG_EXEMPT` in `tools/oxlintPlugin.ts`                                  |
-| Original work only                             | A test scans strings and file names for the names of the two reference apps and their mascots. This catches only the obvious case.         |
+| Rule                                           | Check                                                                                                                                                                         |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One goal, bands, spoken strings                | Registry test over every definition                                                                                                                                           |
+| An end-to-end test per activity                | Registry test checks that `e2e/activities/<id>.spec.ts` exists                                                                                                                |
+| Click before drag                              | Registry test: an activity with `drag` in `inputs` must use `useCarry`, and its end-to-end test must contain a test named "click to place"                                    |
+| Double-click and right-click only where taught | A test scans `src/` for double-click and context-menu handlers outside an allow list                                                                                          |
+| No manipulative design                         | A test scans every string for banned reward words, with an allow list for false positives such as the star shape                                                              |
+| Spoken instructions                            | `check:voice`                                                                                                                                                                 |
+| Timers cancelled on exit                       | The lint rule above, plus a kit test that the scope cancels everything                                                                                                        |
+| Levels are pure                                | Registry test: `generateLevel` gives the same level twice for the same arguments, at each band's lowest and highest difficulty                                                |
+| Playwright can import an activity              | Registry test: `activity.ts`, `level.ts`, and `strings.ts` import no registry, asset, CSS, React, or `.tsx` file                                                              |
+| No forgotten sequence step                     | Registry test: the files in `stepsDirectory` equal the ids in `steps`                                                                                                         |
+| Native drag only in the kit                    | Oxlint rule `wkc/no-native-drag`, with its exemption list `NATIVE_DRAG_EXEMPT` in `tools/oxlintPlugin.ts`                                                                     |
+| Original work only                             | A test scans strings and file names for the names of the two reference apps, their mascot, and "magic", Tux Paint's name for its effects. This catches only the obvious case. |
 
 ### End-to-end tests
 
@@ -315,7 +317,7 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 - Each activity test completes one round with real input events and asserts something the child would notice, such as the finish screen or a counted object on screen.
 - Each test calls `expectAccessible(page)`, which runs axe with WCAG 2.2 AA tags.
 - Each test saves a screenshot per band it serves to `reports/screens/<band>/<activity-id>.png` for review, with `saveBandScreenshot(page, band, id, variant?)`. Shell and studio tests use `saveScreen` from `e2e/support/screens.ts`. Playwright empties `test-results/` on every run, so screenshots never go there.
-- The app exposes test hooks only when `WKC_TEST=1`: a log of voice clips and sounds played, and the pinned clock.
+- The app exposes test hooks only when `WKC_TEST=1` and it runs unpackaged: a log of voice clips and sounds played, and the pinned clock. The packaged app ignores `WKC_TEST` and its test user data directory, and removes the `--remote-debugging-*` switches before Chromium reads them (`electron/main/testMode.ts`). A probe of an `electron-builder --dir` build kept the debugging port closed and the test directory empty.
 
 Build activities from DOM and SVG elements with real buttons and labels. Use `<canvas>` only where the content is a picture, such as the paint studio and the robot's drawing.
 
@@ -333,7 +335,7 @@ Build activities from DOM and SVG elements with real buttons and labels. Use `<c
 - **Random effects.** Effects that scatter things take a seed.
 - **Undo.** The canvas is divided into 64 px tiles. An operation copies a tile the first time it touches it, so a stroke stores only the tiles it changed. Undo swaps the saved tiles with the current pixels, so a step holds one copy. A step that replaces the document, such as "Start over" or opening a coloring page, also saves the mask. The cap is set in bytes, and a test proves that 30 full-canvas steps fit under it.
 - **Input.** The studio reads `getCoalescedEvents()` and feeds every point to the tool. Once per animation frame it calls `putImageData` with the document-sized `ImageData` and the changed rectangle, so no pixels are copied to build a frame.
-- **Worker.** The studio runs whole-picture effects in a Web Worker so the screen never freezes. The engine itself stays synchronous, and tests call it directly.
+- **Worker.** The studio runs whole-picture effects and the autosave PNG encoding in a Web Worker so the screen never freezes and a fill never waits for a save. The engine itself stays synchronous, and tests call it directly.
 - **Sticky pen.** A click without movement puts the pen down, and the next click lifts it. Press, drag, and release also works. This is the click alternative to drag for every paint tool.
 
 A registry test fails when a tool, tip, or effect has no golden image test. [src/core/paint/README.md](../src/core/paint/README.md) explains the API and how to add a tool, tip, or effect.
