@@ -46,9 +46,7 @@ forEachBand(activity.bands, (band) => {
       await expect(stage(page)).toHaveAttribute('data-arrived', String(index + 1));
       await expect(page.locator(`[data-friend="${level.friends[index]?.id ?? ''}"]`)).toBeVisible();
     }
-    const spoken = await spokenIds(page);
-    expect(spoken).toContain(letterNames.b.id);
-    expect(spoken).toContain(numbers['7'].id);
+    await expect.poll(() => spokenIds(page)).toEqual(expect.arrayContaining([letterNames.b.id, numbers['7'].id]));
     expect((await readAudioLog(page)).some((entry) => entry.kind === 'sfx' && entry.name === 'pop')).toBe(true);
     // Tab is a party key here, so it did not move focus to a control.
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);

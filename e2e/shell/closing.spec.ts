@@ -30,8 +30,7 @@ for (const band of BANDS) {
     await advanceClock(page, TWENTY_MINUTES);
     await page.getByRole('button', { name: homeStrings['place-paint-studio'].text }).click();
     await expect(closingHeading()).toBeVisible();
-    const spoken = (await readAudioLog(page)).map((entry) => entry.name);
-    expect(spoken).toContain(strings.heading.id);
+    await expect.poll(async () => (await readAudioLog(page)).map((entry) => entry.name)).toContain(strings.heading.id);
     // One control, for grown-ups. No clock, no count, no way out for the child.
     await expect(page.getByRole('button')).toHaveCount(1);
     await expectAccessible(page);

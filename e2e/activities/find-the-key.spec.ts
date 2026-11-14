@@ -45,7 +45,8 @@ forEachBand(activity.bands, (band) => {
     await expect(stage(page)).toHaveAttribute('data-letter', first);
     // The instruction names the letter: replay says "Press the letter" and the letter.
     await expectInstructionSpoken(page, strings.press);
-    expect(await spokenIds(page)).toContain(letterNames[first].id);
+    // The letter follows the first clip, so it is logged only once that clip ends.
+    await expect.poll(() => spokenIds(page)).toContain(letterNames[first].id);
     // The youngest band always sees the key lit on the picture.
     const lit = page.locator(`[data-key="${letterCode(first)}"]`);
     if (level.help === 'key') await expect(lit).toHaveAttribute('data-mark', 'target');
