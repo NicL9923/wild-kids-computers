@@ -21,6 +21,8 @@ function silentKit() {
     },
     onRoundComplete: () => undefined,
     onStepSolved: () => undefined,
+    onCheckpoint: () => undefined,
+    onHoldCheckpoint: () => () => undefined,
     host: {
       clock: { now: () => 0, monotonic: () => 0 },
       activityId: 'secrets-stay-secret',
