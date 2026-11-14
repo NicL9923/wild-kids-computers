@@ -155,7 +155,7 @@ export interface SessionStore {
    * afterwards. On failure the profile stays in the list and `saveProblem` says why.
    */
   readonly deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
-  /** Makes a profile active and loads its documents, or makes none active with null. */
+  /** Makes a profile active and loads its documents, or makes none active with null. Throws for a profile being deleted. */
   readonly chooseProfile: (profileId: string | null) => void;
 
   /** Throws when no profile is active, because there are no settings to save. */
@@ -436,6 +436,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     if (profileId !== null && !profiles.value.profiles.some((p) => p.id === profileId)) {
       throw new Error(`No profile with id ${profileId}.`);
     }
+    if (profileId !== null && removed.has(profileId)) throw new Error(`Profile ${profileId} is being deleted.`);
     activate(profileId);
     change(app, { lastActiveProfileId: profileId });
     emit();
