@@ -64,6 +64,8 @@ import { unflattenUnderMask } from './unflatten.ts';
 
 /** How long painting must pause before the picture saves itself. */
 const AUTOSAVE_DELAY_MS = 1500;
+/** How long input waits after a save for leaving, in case the route change that asked for it never came. */
+const STALLED_LEAVE_MS = 2000;
 /** Brush speed, in document pixels per millisecond, that makes the brush sound loudest. */
 const LOUDEST_SPEED = 3;
 
@@ -342,9 +344,12 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     if (!kept) {
       setLeaving(false);
       repeatNotSaved(wasFailing);
+    } else {
+      // The screen closes next. If something stopped that route change, input comes back.
+      runtime?.scope.setTimeout(() => setLeaving(false), STALLED_LEAVE_MS);
     }
     return kept;
-  }, [settle, repeatNotSaved]);
+  }, [settle, repeatNotSaved, runtime]);
 
   // Every way out of the studio is a route change: the exit and gallery controls, browser history,
   // the session limit, another feature's link. Each one waits here until the picture is saved,
