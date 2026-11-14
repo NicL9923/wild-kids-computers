@@ -122,6 +122,10 @@ describe('documents', () => {
     await documents.removeProfile('p1');
   });
 
+  it('removes a profile from a store with nothing saved yet', async () => {
+    await expect(store().documents.removeProfile('p1')).resolves.toBeUndefined();
+  });
+
   it('rejects an unsafe profile id for removal', async () => {
     expect(await rejection(store().documents.removeProfile('..'))).toMatchObject({ code: 'invalid-argument' });
   });

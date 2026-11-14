@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir as readdirUnchecked, realpath, rm as rmUnchecked } from 'node:fs/promises';
 import path from 'node:path';
 import {
   BridgeError,
@@ -27,7 +27,7 @@ import {
   type DocumentName,
   type PicturePlace,
 } from '../../src/core/platform/names.ts';
-import { errorCode, KeyedQueue, renameWithRetry, writeFileAtomic } from './atomicWrite.ts';
+import { errorCode, KeyedQueue, renameWithRetry, writeFileAtomic, type PathCheck } from './atomicWrite.ts';
 
 export interface FileStoreOptions {
   now?: () => number;
@@ -47,6 +47,11 @@ const TEMPORARY_SUFFIX = '.tmp';
  * argument from the renderer is ever used as a path. Nothing below the root may be a link:
  * the renderer cannot make one, but another program or a restored backup can, and following
  * it would read or overwrite a file outside the data directory.
+ *
+ * Every read, write, rename, and removal goes through `io`, which confirms the folder still
+ * resolves to its place under the root right before the call. A program that swaps a checked
+ * folder for a link between that check and the call can still win; see "Storage" in
+ * docs/decisions.md for why that gap stays open.
  */
 export function createFileStore(rootDir: string, options: FileStoreOptions = {}) {
   const root = path.resolve(rootDir);
@@ -55,6 +60,45 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
   const queue = new KeyedQueue();
   /** Profiles whose picture folder has had leftovers from an interrupted save cleared. */
   const recovered = new Set<string>();
+  /** Where the root really is, fixed at the first check so a later swap of the root shows too. */
+  let realRoot: string | undefined;
+
+  /**
+   * Refuses when `dir` resolves anywhere but its own place under the root, which means a folder
+   * on its way became a link after the store checked it. A folder that does not exist yet is
+   * fine: the call that follows makes it, or fails.
+   */
+  async function confirmDir(dir: string): Promise<void> {
+    let actual: string;
+    try {
+      actual = await realpath(dir);
+    } catch (error) {
+      if (errorCode(error) === 'ENOENT') return;
+      throw error;
+    }
+    realRoot ??= await realpath(root);
+    if (actual !== path.join(realRoot, path.relative(root, dir))) throw linkError();
+  }
+
+  const confirmParent: PathCheck = (file) => confirmDir(path.dirname(file));
+
+  /** The only file system calls that read or change the data, each after `confirmDir`. */
+  const io: CheckedIo = {
+    write: (file, data) => writeFileAtomic(file, data, confirmParent),
+    rename: (from, to) => renameWithRetry(from, to, confirmParent),
+    async remove(file, { recursive = false } = {}) {
+      await confirmParent(file);
+      await rmUnchecked(file, { recursive, force: true });
+    },
+    async list(dir) {
+      await confirmDir(dir);
+      return readdirUnchecked(dir);
+    },
+    async read(file, max, label) {
+      await confirmParent(file);
+      return readCappedUnchecked(file, max, label);
+    },
+  };
 
   function inside(segments: string[]): string {
     const resolved = path.resolve(root, ...segments);
@@ -122,10 +166,10 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     const target = await pictureFiles(profileId, to, id);
     await mkdir(path.dirname(target.picture), { recursive: true });
     // Thumbnail first: a picture file without its thumbnail still lists, the reverse does not.
-    await rename(source.thumbnail, target.thumbnail).catch((error: unknown) => {
+    await io.rename(source.thumbnail, target.thumbnail).catch((error: unknown) => {
       if (errorCode(error) !== 'ENOENT') throw error;
     });
-    await rename(source.picture, target.picture);
+    await io.rename(source.picture, target.picture);
     return target.picture;
   }
 
@@ -140,19 +184,19 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     const dir = await unlinked(pictureDirName(profileId, 'gallery'));
     let names: string[];
     try {
-      names = await readdir(dir);
+      names = await io.list(dir);
     } catch (error) {
       if (errorCode(error) !== 'ENOENT') throw error;
       names = [];
     }
     const present = new Set(names);
     for (const name of names) {
-      if (name.endsWith(TEMPORARY_SUFFIX)) await rm(path.join(dir, name), { force: true });
+      if (name.endsWith(TEMPORARY_SUFFIX)) await io.remove(path.join(dir, name));
     }
     for (const name of names) {
       if (!name.endsWith(PICTURE_SUFFIX + STAGED_SUFFIX) || name.endsWith(THUMBNAIL_SUFFIX + STAGED_SUFFIX)) continue;
       const id = name.slice(0, -(PICTURE_SUFFIX + STAGED_SUFFIX).length);
-      await discardStaged({
+      await discardStaged(io, {
         picture: path.join(dir, name),
         thumbnail: path.join(dir, `${id}${THUMBNAIL_SUFFIX}${STAGED_SUFFIX}`),
       });
@@ -162,7 +206,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
       if (!name.endsWith(THUMBNAIL_SUFFIX + STAGED_SUFFIX)) continue;
       const file = path.join(dir, name);
       await unlinked(file);
-      await renameWithRetry(file, file.slice(0, -STAGED_SUFFIX.length));
+      await io.rename(file, file.slice(0, -STAGED_SUFFIX.length));
     }
     recovered.add(profileId);
   }
@@ -189,7 +233,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
         throw new BridgeError('too-large', `The saved ${name} document is over ${MAX_DOCUMENT_BYTES} bytes.`);
       }
       // The file can grow between the size check and the read, so the read is capped as well.
-      const bytes = await readCapped(file, MAX_DOCUMENT_BYTES, `saved ${name} document`);
+      const bytes = await io.read(file, MAX_DOCUMENT_BYTES, `saved ${name} document`);
       return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length).toString('utf8');
     },
 
@@ -198,7 +242,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
       if (utf8ByteLength(text) > MAX_DOCUMENT_BYTES) {
         throw new BridgeError('too-large', `The ${name} document is over ${MAX_DOCUMENT_BYTES} bytes.`);
       }
-      await queue.run(file, async () => writeFileAtomic(await unlinked(file), text));
+      await queue.run(file, async () => io.write(await unlinked(file), text));
     },
 
     async setAside(name) {
@@ -212,14 +256,14 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
           attempt += 1;
           target = path.join(path.dirname(file), setAsideFileName(path.basename(file), stamp, attempt));
         }
-        await rename(file, target);
+        await io.rename(file, target);
         return true;
       });
     },
 
     async removeProfile(profileId) {
       const dir = inside(profileDirSegments(requireId(profileId, 'profileId')));
-      await queue.run(dir, async () => rm(await unlinked(dir), { recursive: true, force: true }));
+      await queue.run(dir, async () => io.remove(await unlinked(dir), { recursive: true }));
     },
   };
 
@@ -233,7 +277,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
           input.id === undefined
             ? await pictureFiles(profileId, 'gallery', id)
             : await requirePicture(profileId, 'gallery', id);
-        await commitPair(files, input.png, input.thumbnail);
+        await commitPair(io, files, input.png, input.thumbnail);
         return summary(files.picture, id);
       });
     },
@@ -243,7 +287,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
         const dir = await unlinked(pictureDirName(profileId, place));
         let names: string[];
         try {
-          names = await readdir(dir);
+          names = await io.list(dir);
         } catch (error) {
           if (errorCode(error) === 'ENOENT') return [];
           throw error;
@@ -265,7 +309,7 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
           const target = (await pictureFiles(profileId, place, id))[file];
           let bytes: Uint8Array;
           try {
-            bytes = await readCapped(
+            bytes = await io.read(
               target,
               file === 'picture' ? MAX_PICTURE_BYTES : MAX_THUMBNAIL_BYTES,
               `saved ${file}`,
@@ -285,16 +329,16 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     async copy(profileId, id) {
       return inPictureQueue(profileId, async () => {
         const source = await requirePicture(profileId, 'gallery', id);
-        const png = await readCapped(source.picture, MAX_PICTURE_BYTES, 'saved picture');
-        const thumbnail = await readCapped(source.thumbnail, MAX_THUMBNAIL_BYTES, 'saved thumbnail').catch(
-          (error: unknown) => {
+        const png = await io.read(source.picture, MAX_PICTURE_BYTES, 'saved picture');
+        const thumbnail = await io
+          .read(source.thumbnail, MAX_THUMBNAIL_BYTES, 'saved thumbnail')
+          .catch((error: unknown) => {
             if (errorCode(error) === 'ENOENT') return null;
             throw error;
-          },
-        );
+          });
         const copyId = newId();
         const target = await pictureFiles(profileId, 'gallery', copyId);
-        await commitPair(target, png, thumbnail);
+        await commitPair(io, target, png, thumbnail);
         return summary(target.picture, copyId);
       });
     },
@@ -313,13 +357,23 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     async purge(profileId, id) {
       await inPictureQueue(profileId, async () => {
         const files = await requirePicture(profileId, 'trash', id);
-        await rm(files.thumbnail, { force: true });
-        await rm(files.picture, { force: true });
+        await io.remove(files.thumbnail);
+        await io.remove(files.picture);
       });
     },
   };
 
   return { root, documents, pictures };
+}
+
+/** File system calls that confirm the path's folder first. See `io` in createFileStore. */
+interface CheckedIo {
+  write(file: string, data: string | Uint8Array): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  /** Removes a file, or a folder with `recursive`. Nothing there is fine. */
+  remove(file: string, options?: { recursive?: boolean }): Promise<void>;
+  list(dir: string): Promise<string[]>;
+  read(file: string, max: number, label: string): Promise<Uint8Array>;
 }
 
 function requireId(value: string, label: string): string {
@@ -334,39 +388,45 @@ function requireId(value: string, label: string): string {
  * once it is gone the staged thumbnail only needs its rename. `recoverPictures` finishes or
  * discards what a stopped commit left.
  */
-async function commitPair(files: Record<PictureFile, string>, png: Uint8Array, thumbnail: Uint8Array | null) {
+async function commitPair(
+  io: CheckedIo,
+  files: Record<PictureFile, string>,
+  png: Uint8Array,
+  thumbnail: Uint8Array | null,
+) {
   const staged = { picture: files.picture + STAGED_SUFFIX, thumbnail: files.thumbnail + STAGED_SUFFIX };
   try {
-    await writeFileAtomic(staged.picture, png);
-    if (thumbnail !== null) await writeFileAtomic(staged.thumbnail, thumbnail);
+    await io.write(staged.picture, png);
+    if (thumbnail !== null) await io.write(staged.thumbnail, thumbnail);
     await syncDirectory(path.dirname(files.picture));
   } catch (error) {
-    await discardStaged(staged);
+    await discardStaged(io, staged);
     throw error;
   }
   try {
-    await renameWithRetry(staged.picture, files.picture);
+    await io.rename(staged.picture, files.picture);
   } catch (error) {
-    await discardStaged(staged);
+    await discardStaged(io, staged);
     throw error;
   }
   if (thumbnail === null) {
-    await rm(files.thumbnail, { force: true });
+    await io.remove(files.thumbnail);
     return;
   }
   await syncDirectory(path.dirname(files.picture));
-  await renameWithRetry(staged.thumbnail, files.thumbnail);
+  await io.rename(staged.thumbnail, files.thumbnail);
 }
 
 /** Removes staged files, the thumbnail first, so a stop halfway still reads as "never committed". */
-async function discardStaged(staged: Record<PictureFile, string>): Promise<void> {
-  await rm(staged.thumbnail, { force: true });
-  await rm(staged.picture, { force: true });
+async function discardStaged(io: CheckedIo, staged: Record<PictureFile, string>): Promise<void> {
+  await io.remove(staged.thumbnail);
+  await io.remove(staged.picture);
 }
 
 /**
  * Flushes a directory's entries, so a rename is on disk before the next one. Windows cannot
- * open a directory for this and orders its own metadata writes, so it skips the flush.
+ * open a directory for this and orders its own metadata writes, so it skips the flush. It
+ * reads and changes no data, so it needs no folder check.
  */
 async function syncDirectory(dir: string): Promise<void> {
   if (process.platform === 'win32') return;
@@ -408,9 +468,10 @@ const NO_FOLLOW = process.platform === 'win32' ? 0 : constants.O_NOFOLLOW;
 
 /**
  * Reads at most `max` bytes. A file over the cap rejects before its bytes are allocated, and a
- * file that grows during the read rejects once it passes the cap.
+ * file that grows during the read rejects once it passes the cap. The store calls it through
+ * `io.read`, which checks the folder first.
  */
-async function readCapped(file: string, max: number, label: string): Promise<Uint8Array> {
+async function readCappedUnchecked(file: string, max: number, label: string): Promise<Uint8Array> {
   const handle = await open(file, constants.O_RDONLY | NO_FOLLOW);
   try {
     const info = await handle.stat();
