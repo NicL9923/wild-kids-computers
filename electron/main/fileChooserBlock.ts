@@ -11,7 +11,7 @@ export interface ChooserDebugger {
  * the Page domain on; a probe on Electron 45.3.2 saw choosers open without it. With `cancel` the
  * input hears a cancel event, as if the child had closed the dialog, and no dialog is shown.
  */
-export const FILE_CHOOSER_COMMANDS: ReadonlyArray<readonly [string, Record<string, unknown> | undefined]> = [
+const FILE_CHOOSER_COMMANDS: ReadonlyArray<readonly [string, Record<string, unknown> | undefined]> = [
   ['Page.enable', undefined],
   ['Page.setInterceptFileChooserDialog', { enabled: true, cancel: true }],
 ];
