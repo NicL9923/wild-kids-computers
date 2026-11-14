@@ -204,6 +204,41 @@
     padding-inline-end: var(--wk-space-container);
   }
 
+  /* A whole-picture effect is on its way. The picture dims and waits for it, so the child sees
+     why a click does nothing. The sparkles pulse gently; with reduced motion they stay still. */
+  .wk-paint-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-item);
+    background: color-mix(in srgb, var(--wk-color-surface) 55%, transparent);
+    color: var(--wk-color-text);
+    font-size: var(--wk-text-small);
+    font-weight: var(--wk-font-weight-bold);
+    pointer-events: none;
+  }
+
+  .wk-paint-busy .wk-paint-emoji {
+    width: calc(var(--wk-target-min) * 1.5);
+    height: calc(var(--wk-target-min) * 1.5);
+    animation: wk-paint-busy-pulse calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite;
+  }
+
+  .wk-paint-busy .wk-reading-text {
+    padding: 0 var(--wk-space-item);
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-color-surface);
+  }
+
+  @keyframes wk-paint-busy-pulse {
+    50% {
+      transform: scale(calc(1 + 0.15 * var(--wk-motion-scale)));
+    }
+  }
+
   /* ---- buttons ---- */
 
   .wk-paint-button {
