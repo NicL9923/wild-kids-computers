@@ -384,19 +384,20 @@ describe('writes', () => {
     await fake.heldWritesReach(1);
     expect(fake.heldWrites[0]?.name).toBe(documentNames.settings(FOX.id));
 
-    // Leave and come back while the write is still in flight. The new read must wait for it.
+    // Leave and come back while the write is still in flight. The file does not have 0.1 yet,
+    // so the settings in memory stay the truth and nothing reads the file.
+    const name = documentNames.settings(FOX.id);
+    const readsBefore = fake.calls.filter((call) => call === `documents.read ${name}`).length;
     store.chooseProfile(OWL.id);
     store.chooseProfile(FOX.id);
     await settle();
-    expect(store.getSnapshot().status).toBe('loading');
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', settings: { voiceVolume: 0.1 } });
     fake.resumeWrites();
-    await until(store, () => store.getSnapshot().status === 'ready');
     await store.flush();
 
     expect(store.getSnapshot().settings.voiceVolume).toBe(0.1);
-    const name = documentNames.settings(FOX.id);
-    const writeAt = fake.calls.indexOf(`documents.write ${name}`);
-    expect(fake.calls.lastIndexOf(`documents.read ${name}`)).toBeGreaterThan(writeAt);
+    expect(saved(fake, name, settingsDocument).voiceVolume).toBe(0.1);
+    expect(fake.calls.filter((call) => call === `documents.read ${name}`)).toHaveLength(readsBefore);
   });
 
   it('applies an update made before the profile finished loading to the saved settings', async () => {
@@ -798,7 +799,7 @@ describe('bridge calls that never answer', () => {
     expect(store.getSnapshot().settings).toMatchObject({ muted: false, voiceVolume: 0.5 });
   });
 
-  it('turns a write that never answers into a save problem, lets the next write through, and ignores the late answer', async () => {
+  it('turns a write that passes its deadline into a save problem, and holds the next write of that document until it ends', async () => {
     const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
     await store.start();
     const name = documentNames.settings(FOX.id);
@@ -816,13 +817,71 @@ describe('bridge calls that never answer', () => {
       message: expect.stringMatching(/did not finish within/),
     });
 
+    // The next write waits: sent now, it could land before the late one, which would then put
+    // the older value back on disk.
     fake.bridge.documents.write = write;
     store.updateSettings({ voiceVolume: 0.5 });
-    await store.flush();
-    expect(store.getSnapshot().saveProblem).toBeNull();
+    const flushed = store.flush();
+    expect(await hasSettled(flushed)).toBe(false);
+    expect(fake.calls).not.toContain(`documents.write ${name}`);
+    expect(store.hasPendingWork()).toBe(true);
+
     hung.failAll(new BridgeError('io', 'disk full'));
-    await settle();
+    await flushed;
+    expect(saved(fake, name, settingsDocument)).toMatchObject({ muted: true, voiceVolume: 0.5 });
     expect(store.getSnapshot().saveProblem).toBeNull();
+  });
+
+  it('refuses to remove a profile while its write past the deadline has not ended, and removes it after', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], FOX.id) });
+    await store.start();
+    const write = fake.bridge.documents.write.bind(fake.bridge.documents);
+    const hung = hangCalls<void>();
+    fake.bridge.documents.write = hung.call;
+    store.updateSettings({ muted: true });
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await settle();
+    fake.bridge.documents.write = write;
+
+    const refused = store.deleteProfile(FOX.id);
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    expect(await refused).toMatchObject({
+      ok: false,
+      error: { code: 'io', message: expect.stringMatching(/before its removal/) },
+    });
+    // Removing now would let the late write put the settings file back.
+    expect(fake.calls).not.toContain(`documents.removeProfile ${FOX.id}`);
+    expect(store.getSnapshot().profiles.map((p) => p.id)).toContain(FOX.id);
+
+    hung.answerAll(undefined);
+    await settle();
+    expect(await store.deleteProfile(FOX.id)).toEqual({ ok: true, value: undefined });
+    expect(store.getSnapshot().profiles.map((p) => p.id)).toEqual([OWL.id]);
+  });
+
+  it.each([
+    ['lands', (hung: ReturnType<typeof hangCalls<void>>) => hung.answerAll(undefined), null],
+    [
+      'fails',
+      (hung: ReturnType<typeof hangCalls<void>>) => hung.failAll(new BridgeError('io', 'disk full')),
+      { code: 'io', message: 'disk full' },
+    ],
+  ] as const)('reports how a write past its deadline really ended when it %s', async (_name, end, problem) => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+    await store.start();
+    const hung = hangCalls<void>();
+    fake.bridge.documents.write = hung.call;
+    store.updateSettings({ muted: true });
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await settle();
+    expect(store.getSnapshot().saveProblem).toMatchObject({ message: expect.stringMatching(/did not finish within/) });
+    end(hung);
+    await store.flush();
+    const target = documentNames.settings(FOX.id);
+    expect(store.getSnapshot().saveProblem).toEqual(problem && { target, operation: 'write', ...problem });
   });
 
   it.each([

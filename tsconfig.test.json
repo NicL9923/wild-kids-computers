@@ -10,6 +10,7 @@
   // same source again without Node types, which keeps Node out of the renderer. The coloring page
   // test shares its rules and mask format with the render tool through tools/coloringPages.ts. The
   // toy desktop checks its menu shortcuts against the main process's block in electron/main/shortcuts.ts.
+  // The session store's file tests run it over the main process's real file store.
   "include": [
     "src",
     "e2e",
@@ -18,6 +19,8 @@
     "tools/tasks/*.task.ts",
     "tools/voiceCheck.ts",
     "tools/voice/spokenList.ts",
-    "electron/main/shortcuts.ts"
+    "electron/main/shortcuts.ts",
+    "electron/main/fileStore.ts",
+    "electron/main/atomicWrite.ts"
   ]
 }

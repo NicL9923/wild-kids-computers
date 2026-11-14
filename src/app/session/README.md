@@ -12,7 +12,8 @@ The session holds the saved documents of the app and of the active profile, and 
 - **A failed write never rejects.** The change stays on screen, and `useStorageProblems().saveProblem` says what failed. The next successful write of the same target clears it.
 - **A bad value throws at once.** Updates are checked against the document's schema before anything changes. A value the schema rejects is a bug in the caller.
 - **Picture calls resolve to a result**, `{ ok: true, value }` or `{ ok: false, error }`, and never reject.
-- **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable for that attempt and sets nothing aside; a timed-out write is a `saveProblem`. A late answer is dropped.
+- **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable for that attempt and sets nothing aside. A late read answer is dropped.
+- **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file. Deleting a profile whose write has not ended fails with `io` after the same deadline and removes nothing.
 - **The app never guesses at the children it has.** When the app or profiles document cannot be read, the status is `unavailable`, nothing is replaced with defaults, and nothing is written until `retryStart()` reads them.
 
 ## Hooks

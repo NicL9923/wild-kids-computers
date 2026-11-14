@@ -67,6 +67,17 @@ describe('documents', () => {
     expect(await documents.read('app')).toBe('3');
   });
 
+  it('reads a document only after the writes called before the read have landed', async () => {
+    const { documents } = store();
+    await documents.write('profile/p1/settings', 'old');
+    // The renderer may read again while a write it gave up waiting for is still committing. The
+    // read must not bring back the older text.
+    const writing = documents.write('profile/p1/settings', 'new');
+    const reading = documents.read('profile/p1/settings');
+    expect(await reading).toBe('new');
+    await writing;
+  });
+
   // Each name fits the DocumentName type, so only the runtime check stops it.
   it.each<[string, DocumentName]>([
     ['a parent segment as the profile', 'profile/../settings'],
