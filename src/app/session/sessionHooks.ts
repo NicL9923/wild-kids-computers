@@ -157,9 +157,20 @@ export function useTestInfo(): TestInfo | null {
  * Play time for the active profile. Nothing here interrupts the child: the activity kit calls
  * `isLimitReached()` between rounds and decides what to show.
  */
-export function useSessionLength(): { isLimitReached: () => boolean; playedMs: () => number } {
+export function useSessionLength(): {
+  isLimitReached: () => boolean;
+  playedMs: () => number;
+  grantPlayTime: (ms: number) => void;
+} {
   const store = useSessionStore();
-  return useMemo(() => ({ isLimitReached: store.isSessionLimitReached, playedMs: store.playedMs }), [store]);
+  return useMemo(
+    () => ({
+      isLimitReached: store.isSessionLimitReached,
+      playedMs: store.playedMs,
+      grantPlayTime: store.grantPlayTime,
+    }),
+    [store],
+  );
 }
 
 /** The newest failed write, and the documents that came back as defaults after a bad load. */

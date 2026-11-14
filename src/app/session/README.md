@@ -28,7 +28,7 @@ The session holds the saved documents of the app and of the active profile, and 
 | `useActivityState(activityId, spec)` | `state`, `loaded`, and `update(fn)` for `profile/<id>/activity/<activity-id>`                                   |
 | `usePictures()`                      | `list`, `read`, `save`, `copy`, `trash`, `restore`, and `purge` for the active profile. Throws with no profile. |
 | `useTestInfo()`                      | The seed, difficulty, band, and activity an end-to-end test passed, or null                                     |
-| `useSessionLength()`                 | `isLimitReached()` and `playedMs()`. Nothing re-renders on time. Call them when you need an answer.             |
+| `useSessionLength()`                 | `isLimitReached()`, `playedMs()`, and `grantPlayTime(ms)`. Nothing re-renders on time. Call them when needed.   |
 | `useStorageProblems()`               | `saveProblem`, the newest failed write, and `loadProblems`, documents that came back as defaults                |
 | `useSessionStore()`                  | The store itself, for `flush()` before quitting                                                                 |
 

@@ -76,30 +76,19 @@
   --wk-text-scale: 1;
   --wk-letter-spacing: 0em;
   --wk-word-spacing: 0em;
-  /* Base sizes per band. Components use the scaled --wk-text-* values below, never these. */
-  --wk-font-small: 20px;
-  --wk-font-body: 24px;
-  --wk-font-title: 32px;
-  --wk-font-display: 44px;
+  /* Base sizes per band are set with the bands below. Components use the scaled --wk-text-* values. */
 
   /* ---- spacing: a 4 px unit, and three steps that grow with grouping ---- */
   --wk-space-unit: 4px;
   --wk-space-item: 12px;
   --wk-space-container: 24px;
   --wk-space-section: 48px;
-  --wk-space-screen-edge: 24px;
-
-  /* ---- targets ---- */
-  --wk-target-min: 72px;
 
   /* ---- shape ---- */
   --wk-radius-small: 10px;
-  --wk-radius-control: 18px;
-  --wk-radius-card: 28px;
+  /* The control and card radii, the press depth, and the screen edge are set per band below. */
   --wk-radius-round: 9999px;
   --wk-border-width: 2px;
-  /* Buttons stand on a darker base, like a key, and press down into it. */
-  --wk-press-depth: 4px;
   --wk-shadow-raised: 0 2px 0 rgb(29 49 36 / 0.1), 0 8px 20px rgb(29 49 36 / 0.1);
   --wk-shadow-overlay: 0 24px 64px rgb(29 49 36 / 0.28);
 
@@ -118,9 +107,22 @@
 
 /* ---- bands ---- */
 
+/*
+ * Every band sets every value that differs between bands, so an element marked with a band inside
+ * another band's page, such as the parent corner's text preview, gets all of its own values.
+ * --wk-press-depth: buttons stand on a darker base, like a key, and press down into it.
+ */
 :root,
 [data-band='band-3-5'] {
   --wk-target-min: 72px;
+  --wk-font-small: 20px;
+  --wk-font-body: 24px;
+  --wk-font-title: 32px;
+  --wk-font-display: 44px;
+  --wk-space-screen-edge: 24px;
+  --wk-radius-control: 18px;
+  --wk-radius-card: 28px;
+  --wk-press-depth: 4px;
 }
 
 [data-band='band-6-8'] {
@@ -129,6 +131,10 @@
   --wk-font-body: 21px;
   --wk-font-title: 28px;
   --wk-font-display: 38px;
+  --wk-space-screen-edge: 24px;
+  --wk-radius-control: 18px;
+  --wk-radius-card: 28px;
+  --wk-press-depth: 4px;
 }
 
 [data-band='band-9-12'] {

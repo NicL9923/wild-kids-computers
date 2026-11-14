@@ -589,6 +589,35 @@ describe('session length', () => {
     expect(store.isSessionLimitReached()).toBe(false);
   });
 
+  it('moves the limit by the time a grown-up grants, until the profile changes', async () => {
+    const { store, clock } = await startSession({
+      documents: savedApp([FOX, OWL], FOX.id, { sessionLengthMinutes: 5 }),
+    });
+    clock.mono += 5 * 60_000;
+    store.grantPlayTime(10 * 60_000);
+    expect(store.isSessionLimitReached()).toBe(false);
+    // Played time stays true to the clock; only the limit moves.
+    expect(store.playedMs()).toBe(5 * 60_000);
+    clock.mono += 10 * 60_000 - 1;
+    expect(store.isSessionLimitReached()).toBe(false);
+    clock.mono += 1;
+    expect(store.isSessionLimitReached()).toBe(true);
+
+    store.chooseProfile(OWL.id);
+    await until(store, () => store.getSnapshot().status === 'ready');
+    store.chooseProfile(FOX.id);
+    await until(store, () => store.getSnapshot().status === 'ready');
+    clock.mono += 5 * 60_000;
+    expect(store.isSessionLimitReached()).toBe(true);
+  });
+
+  it('refuses a grant that is not a positive length of time', async () => {
+    const { store } = await startSession({ documents: savedApp([FOX], FOX.id, { sessionLengthMinutes: 5 }) });
+    for (const ms of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => store.grantPlayTime(ms)).toThrow('positive number');
+    }
+  });
+
   it('follows a limit the parent changes mid-session', async () => {
     const { store, clock } = await startSession({ documents: savedApp([FOX], FOX.id) });
     clock.mono += 6 * 60_000;

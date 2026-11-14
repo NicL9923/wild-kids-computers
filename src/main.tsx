@@ -5,6 +5,7 @@ import { installInputGuards } from './app/inputGuards.ts';
 import { createAppRouter } from './app/router.ts';
 import { SessionProvider } from './app/session/SessionProvider.tsx';
 import { createSessionStore } from './app/session/sessionStore.ts';
+import { createSteppableClock, exposeTestClock } from './app/testClock.ts';
 import { AudioProvider } from './audio/AudioProvider.tsx';
 import { createAppAudio } from './audio/createAppAudio.ts';
 import { exposeAudioTestLog } from './audio/testLog.ts';
@@ -26,7 +27,13 @@ const underTest = await isTestRun(bridge, window.location).catch(() => false);
 const audio = createAppAudio({ underTest });
 if (underTest) exposeAudioTestLog(audio);
 
-const session = createSessionStore({ bridge, audio });
+// A test steps this clock to run out the session length without waiting.
+const clock = underTest
+  ? createSteppableClock({ now: () => Date.now(), monotonic: () => performance.now() })
+  : undefined;
+if (clock !== undefined) exposeTestClock(clock);
+
+const session = createSessionStore({ bridge, audio, clock });
 void session.start();
 
 createRoot(container).render(

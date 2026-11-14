@@ -1,0 +1,56 @@
+/* The parent gate dialog. Every value is a token from src/styles/tokens.css. */
+
+@layer components {
+  .wk-gate-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-container);
+  }
+
+  /* The digits as words, large enough to read across a room and set apart from the prompt. */
+  .wk-gate-words {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wk-space-item);
+    margin: 0;
+    font-size: var(--wk-text-title);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-gate-word {
+    display: inline-block;
+    padding: calc(var(--wk-space-unit) * 2) var(--wk-space-item);
+    border: var(--wk-border-width) solid var(--wk-color-divider);
+    border-radius: var(--wk-radius-small);
+    background: var(--wk-color-surface-sunken);
+  }
+
+  .wk-gate-forgot {
+    color: var(--wk-color-text-muted);
+    font-size: var(--wk-text-small);
+  }
+
+  .wk-gate-forgot summary {
+    display: flex;
+    align-items: center;
+    min-height: var(--wk-target-min);
+    color: var(--wk-color-primary);
+    font-weight: var(--wk-font-weight-bold);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .wk-gate-forgot p {
+    margin: 0 0 var(--wk-space-item);
+  }
+
+  .wk-gate-folder {
+    display: block;
+    padding: var(--wk-space-item);
+    border-radius: var(--wk-radius-small);
+    background: var(--wk-color-surface-sunken);
+    color: var(--wk-color-text);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+}

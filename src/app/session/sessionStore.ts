@@ -186,6 +186,11 @@ export interface SessionStore {
   readonly playedMs: () => number;
   /** Whether the parent's session length is used up. False when no limit is set or no profile is active. */
   readonly isSessionLimitReached: () => boolean;
+  /**
+   * Adds play time to the active profile's limit, for "a little more time" from the closing
+   * screen. It lasts until the profile changes or the app restarts. Does nothing with no profile.
+   */
+  readonly grantPlayTime: (ms: number) => void;
 }
 
 const systemClock: SessionClock = {
@@ -225,6 +230,8 @@ interface ActiveProfile {
   readonly progress: Cell<ProgressDocument>;
   readonly activityStates: Map<string, Cell<ActivityStateDocument<unknown>>>;
   readonly startedAt: number;
+  /** Extra play time a grown-up gave from the closing screen, added to the limit. */
+  grantedMs: number;
 }
 
 function isCellOf<S>(
@@ -418,6 +425,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       progress: new Cell(documentNames.progress(profileId), progressDocument),
       activityStates: new Map(),
       startedAt: clock.monotonic(),
+      grantedMs: 0,
     };
     load(active.settings);
     load(active.progress);
@@ -619,7 +627,13 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
     isSessionLimitReached() {
       if (active === null) return false;
-      return isSessionLimitReached(clock.monotonic() - active.startedAt, active.settings.value.sessionLengthMinutes);
+      const played = clock.monotonic() - active.startedAt;
+      return isSessionLimitReached(played - active.grantedMs, active.settings.value.sessionLengthMinutes);
+    },
+
+    grantPlayTime(ms) {
+      if (!Number.isFinite(ms) || ms <= 0) throw new RangeError('Granted play time must be a positive number of ms.');
+      if (active !== null) active.grantedMs += ms;
     },
   };
 }

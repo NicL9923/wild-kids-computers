@@ -1,30 +1,31 @@
 import { useCallback } from 'react';
+import { useParentGate } from '../../app/parent-gate/ParentGate.tsx';
 import { useSettings } from '../../app/session/sessionHooks.ts';
 
 /**
- * The seam between the studio's export and print buttons and the parent gate.
+ * The seam between the studio's export and print buttons and the app shell's parent gate.
  *
- * The buttons call `requestParentGate(reason)` and act only when it resolves true. The app shell
- * builds the real gate, `useParentGate()`, which asks the adult and resolves true when they pass.
- * Until that is connected here, the default resolves true only when the profile's settings say
- * export and print need no gate, so nothing a child taps can export or print by default.
- *
- * To connect the real gate, change only `useRequestParentGate` below so it returns the shell's
- * function when `outputNeedsParentGate` is true.
+ * The buttons call `requestParentGate(reason)` and act only when it resolves true. When the
+ * profile's settings say export and print need the gate, the default, it asks the adult through
+ * the shell's `useParentGate()`. When a parent turned that off, it opens at once.
  */
 
 export type ParentGateReason = 'export' | 'print';
 
 export type RequestParentGate = (reason: ParentGateReason) => Promise<boolean>;
 
-/** The default gate, apart from React: open only when no gate is needed. */
-export function defaultParentGate(outputNeedsParentGate: () => boolean): RequestParentGate {
-  return () => Promise.resolve(!outputNeedsParentGate());
+/** The rule apart from React: ask the adult only while the settings say output needs the gate. */
+export function outputGate(outputNeedsParentGate: () => boolean, askParent: RequestParentGate): RequestParentGate {
+  return (reason) => (outputNeedsParentGate() ? askParent(reason) : Promise.resolve(true));
 }
 
 /** The gate the export and print buttons use. */
 export function useRequestParentGate(): RequestParentGate {
   const { settings } = useSettings();
+  const askParent = useParentGate();
   const needsGate = settings.outputNeedsParentGate;
-  return useCallback<RequestParentGate>((reason) => defaultParentGate(() => needsGate)(reason), [needsGate]);
+  return useCallback<RequestParentGate>(
+    (reason) => outputGate(() => needsGate, askParent)(reason),
+    [needsGate, askParent],
+  );
 }
