@@ -5,6 +5,8 @@ import { strings as activityShellStrings } from '../../src/activityShell/strings
 import { ACTIVITY_PATH } from '../../src/activityShell/paths.ts';
 import { ACTIVITY_LOAD_DEADLINE_MS } from '../../src/activityShell/timing.ts';
 import { strings as homeStrings } from '../../src/app/home/strings.ts';
+import { strings as gateStrings } from '../../src/app/parent-gate/strings.ts';
+import { strings as choiceStrings } from '../../src/app/profile-choice/strings.ts';
 import { SCREEN_LOAD_DEADLINE_MS } from '../../src/app/lazyScreen.ts';
 import { strings as shellStrings } from '../../src/app/shell/strings.ts';
 import { strings as startStrings } from '../../src/app/start/strings.ts';
@@ -140,6 +142,7 @@ for (const band of BANDS) {
 }
 
 const profilesFile = (dataDir: string) => path.join(dataDir, 'profiles.json');
+const settingsFile = (dataDir: string) => path.join(dataDir, 'profile', FIXTURE_PROFILE.id, 'settings.json');
 
 test('when the saved profiles cannot be read, the app says so calmly, keeps them, and opens them on try again', async () => {
   launched = await launchApp(
@@ -172,4 +175,35 @@ test('when the saved profiles cannot be read, the app says so calmly, keeps them
   );
   await page.getByRole('button', { name: shellStrings.tryAgain.text }).click();
   await expect(homeMap(page)).toBeVisible();
+});
+
+test('when one child cannot be opened, the profile choice says so and a grown-up reaches the parent corner by keyboard', async () => {
+  launched = await launchApp(
+    { band: 'band-6-8' },
+    {
+      // A folder where the child's settings should be: the main process refuses to read it.
+      prepare: async (dataDir) => {
+        await rm(settingsFile(dataDir));
+        await mkdir(settingsFile(dataDir));
+      },
+    },
+  );
+  const { page } = launched;
+  await expect(page.getByRole('heading', { level: 1, name: choiceStrings.heading.text })).toBeVisible();
+  await expect(page.getByText(startStrings.unavailable.text)).toBeVisible();
+  await expectSpoken(page, startStrings.unavailable.id);
+  await expectTargets(page, 'band-3-5');
+  await expectAccessible(page);
+  for (const size of WINDOW_SIZES) {
+    await resizeWindow(launched, size);
+    await saveScreen(page, 'band-3-5', 'shell-profile-not-opened');
+  }
+
+  const grownUps = page.getByRole('button', { name: shellStrings.grownUps.text });
+  for (let presses = 0; presses < 5 && !(await grownUps.evaluate((el) => el === document.activeElement)); presses++) {
+    await page.keyboard.press('Tab');
+  }
+  await expect(grownUps).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: gateStrings['title-parent-corner'].text })).toBeVisible();
 });
