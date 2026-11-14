@@ -27,6 +27,14 @@ test.afterEach(async () => {
   await launched.close();
 });
 
+/**
+ * The status after a wrong answer: "waiting" for the first second, then "no match". A loaded
+ * machine can miss the one-second window, so the test accepts either and then waits for the
+ * second. The unit test in src/app/parent-gate pins the timing.
+ */
+const literal = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+const refused = new RegExp(`^(${literal(gateStrings.waiting.text)}|${literal(gateStrings.noMatch.text)})$`);
+
 /** A wrong answer that cannot be right: the right one with its first digit changed. */
 const wrongFor = (answer: string) => `${(Number(answer[0]) + 1) % 10}${answer.slice(1)}`;
 
@@ -44,7 +52,7 @@ test('the word gate refuses a wrong answer with a neutral message and opens on t
   await saveScreen(page, 'band-3-5', 'shell-gate-words');
 
   await answerGate(page, wrongFor(answer));
-  await expect(gate.getByRole('status')).toHaveText(gateStrings.waiting.text);
+  await expect(gate.getByRole('status')).toHaveText(refused);
   await expect(gate.getByLabel(gateStrings.wordLabel.text)).toHaveAttribute('aria-invalid', 'true');
   await expect(parentCornerHeading(page)).toHaveCount(0);
   await saveScreen(page, 'band-3-5', 'shell-gate-wrong');
@@ -83,7 +91,7 @@ test('a parent PIN replaces the word gate, and a forgotten PIN is removed by del
   await saveScreen(page, 'band-6-8', 'shell-gate-pin');
 
   await answerGate(page, '111111', 'pin');
-  await expect(gate.getByRole('status')).toHaveText(gateStrings.waiting.text, { timeout: 10_000 });
+  await expect(gate.getByRole('status')).toHaveText(refused, { timeout: 10_000 });
   await expect(gate.getByRole('status')).toHaveText(gateStrings.noMatch.text, { timeout: 3_000 });
   await answerGate(page, '482916', 'pin');
   await expect(parentCornerHeading(page)).toBeVisible({ timeout: 10_000 });
