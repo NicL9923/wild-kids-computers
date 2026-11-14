@@ -117,6 +117,22 @@ describe('parent corner', () => {
     expect(harness.fake.calls).toContain(`documents.removeProfile ${OWL.id}`);
   });
 
+  it('moves the settings to the next child after deleting the active one, and to first launch after the last', async () => {
+    const harness = await openCorner();
+    fireEvent.click(within(rowOf(FOX.id)).getByRole('button', { name: strings.delete.text }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: strings.deleteConfirm.text }),
+    );
+    await waitFor(() => expect(harness.store.getSnapshot().activeProfile?.id).toBe(OWL.id));
+    expect(screen.getByRole('region', { name: strings.settings.text })).toBeTruthy();
+
+    fireEvent.click(within(rowOf(OWL.id)).getByRole('button', { name: strings.delete.text }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: strings.deleteConfirm.text }),
+    );
+    await waitFor(() => expect(harness.router.state.location.pathname).toBe('/'));
+  }, 15_000);
+
   it('says so and keeps the profile when the deletion fails', async () => {
     const harness = await openCorner();
     harness.fake.failNext('removeProfile', OWL.id, new Error('disk full'));

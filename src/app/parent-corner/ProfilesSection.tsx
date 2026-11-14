@@ -21,7 +21,7 @@ import {
   colorName,
   colorOptions,
 } from '../profiles/profileChoices.tsx';
-import { useProfiles } from '../session/sessionHooks.ts';
+import { useProfiles, useSessionStore } from '../session/sessionHooks.ts';
 import type { NewProfile } from '../session/sessionStore.ts';
 import { strings } from './strings.ts';
 
@@ -200,7 +200,8 @@ function ProfileEditor({ editing, onDone }: { editing: Editing; onDone: () => vo
  * Enter by habit keeps it. The dialog stays open until the deletion finishes or fails.
  */
 function DeleteProfile({ profile, onDone }: { profile: Profile; onDone: () => void }) {
-  const { deleteProfile } = useProfiles();
+  const { deleteProfile, chooseProfile } = useProfiles();
+  const store = useSessionStore();
   const returnFocus = useReturnFocus();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -210,8 +211,16 @@ function DeleteProfile({ profile, onDone }: { profile: Profile; onDone: () => vo
     setFailed(false);
     const result = await deleteProfile(profile.id);
     setBusy(false);
-    if (result.ok) onDone();
-    else setFailed(true);
+    if (!result.ok) {
+      setFailed(true);
+      return;
+    }
+    // Deleting the active child leaves none active. Only now, with the profile gone from the
+    // list, can the settings move to the first child left without picking the deleted one.
+    const { activeProfile, profiles } = store.getSnapshot();
+    const next = profiles[0];
+    if (activeProfile === null && next !== undefined) chooseProfile(next.id);
+    onDone();
   };
 
   return (

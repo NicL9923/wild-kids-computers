@@ -2,11 +2,11 @@ import type { ProgressDocument } from '../../core/storage/schemas.ts';
 import type { ActivityGoal } from '../../registry/activityGoals.ts';
 
 /** The areas in the order the parent corner lists them, then everything it cannot place. */
-export const SKILL_AREAS = ['computer-skills', 'toy-desktop', 'early-learning', 'robot-painter', 'other'] as const;
+const SKILL_AREAS = ['computer-skills', 'toy-desktop', 'early-learning', 'robot-painter', 'other'] as const;
 
-export type SkillArea = (typeof SKILL_AREAS)[number];
+type SkillArea = (typeof SKILL_AREAS)[number];
 
-export interface PracticedSkill {
+interface PracticedSkill {
   readonly activityId: string;
   /** The activity's goal in plain words. Null when no definition in this build has the id. */
   readonly goal: string | null;

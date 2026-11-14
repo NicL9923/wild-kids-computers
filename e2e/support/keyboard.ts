@@ -5,7 +5,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * system window for focus, which an Electron window under a virtual display without a window
  * manager never gets.
  */
-export async function isFocused(locator: Locator): Promise<boolean> {
+async function isFocused(locator: Locator): Promise<boolean> {
   return locator.evaluate((element) => element === document.activeElement);
 }
 

@@ -10,7 +10,7 @@ import { settle } from '../support/screens.ts';
 
 const DIGIT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
-export const json = (value: unknown): string => JSON.stringify(value);
+const json = (value: unknown): string => JSON.stringify(value);
 
 /** Saved documents for profiles that exist, first launch done, and `active` chosen last time. */
 export function savedProfiles(
