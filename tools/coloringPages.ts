@@ -84,6 +84,45 @@ const BLACK = new Set(['#000', '#000000', 'black']);
  */
 const TRANSFORM_STEP = /\s*(translate|rotate|scale)\(([^)]*)\)\s*/y;
 
+export interface RenderArgs {
+  /** Render every selected page, not only those whose source changed. */
+  all: boolean;
+  /** Where to write previews, as given, or null for none. */
+  previewDir: string | null;
+  /** The pages to consider, sorted. Every page when no id was named. */
+  ids: string[];
+}
+
+/**
+ * Reads the render tool's command line: `--all`, `--preview <folder>`, and page ids in any order.
+ * Throws on an unknown option, a preview flag without a folder, or an id with no source, so a
+ * typo never quietly renders every page or none.
+ */
+export function parseRenderArgs(args: readonly string[], pageIds: readonly string[]): RenderArgs {
+  let all = false;
+  let previewDir: string | null = null;
+  const named: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? '';
+    if (arg === '--all') {
+      all = true;
+    } else if (arg === '--preview') {
+      const folder = args[i + 1];
+      if (folder === undefined || folder.startsWith('--')) throw new Error('--preview needs a folder.');
+      previewDir = folder;
+      i++;
+    } else if (arg.startsWith('--')) {
+      throw new Error(`Unknown option: ${arg}`);
+    } else {
+      named.push(arg);
+    }
+  }
+  const missing = named.filter((id) => !pageIds.includes(id));
+  if (missing.length > 0) throw new Error(`No coloring page source for: ${missing.join(', ')}`);
+  const ids = (named.length === 0 ? [...pageIds] : pageIds.filter((id) => named.includes(id))).toSorted();
+  return { all, previewDir, ids };
+}
+
 export interface SourceProblem {
   rule: string;
   detail: string;

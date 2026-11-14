@@ -7,7 +7,9 @@ import {
   MIN_STROKE_WIDTH,
   PAGE_HEIGHT,
   PAGE_WIDTH,
+  parseRenderArgs,
   readSourceHash,
+  type RenderArgs,
   sourceHash,
 } from './coloringPages.ts';
 
@@ -30,17 +32,18 @@ const MASK_DIR = path.join(root, 'assets/coloring');
 const SHEET_COLUMNS = 5;
 const SHEET_CELL = { width: 400, height: 250 };
 
-const args = process.argv.slice(2);
-const all = args.includes('--all');
-const previewAt = args.indexOf('--preview');
-const previewDir = previewAt === -1 ? null : path.resolve(args[previewAt + 1] ?? '');
-const named = args.filter((arg, i) => !arg.startsWith('--') && i !== previewAt + 1);
-
-const ids = readdirSync(SOURCE_DIR)
+const pageIds = readdirSync(SOURCE_DIR)
   .filter((file) => file.endsWith('.svg'))
-  .map((file) => file.slice(0, -4))
-  .filter((id) => named.length === 0 || named.includes(id))
-  .toSorted();
+  .map((file) => file.slice(0, -4));
+let parsed: RenderArgs;
+try {
+  parsed = parseRenderArgs(process.argv.slice(2), pageIds);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+const { all, ids } = parsed;
+const previewDir = parsed.previewDir === null ? null : path.resolve(parsed.previewDir);
 
 // Bands are checked per page by the tests. Here every page must at least meet the thinnest band rule.
 const floor = Math.min(...Object.values(MIN_STROKE_WIDTH));
