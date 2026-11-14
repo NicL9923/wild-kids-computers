@@ -23,7 +23,8 @@ function problems(level: MeadowLevel): string[] {
     if (bud.x - r < EDGE_MARGIN || bud.x + r > MEADOW.width - EDGE_MARGIN) found.push(`${bud.id} leaves sideways`);
     if (bud.y - r < EDGE_MARGIN || bud.y + r > MEADOW.height - EDGE_MARGIN) found.push(`${bud.id} leaves the meadow`);
     for (const other of level.buds.slice(index + 1)) {
-      if (Math.hypot(bud.x - other.x, bud.y - other.y) < level.size) found.push(`${bud.id} touches ${other.id}`);
+      // A quarter of a bud between neighbors, so each one opens on its own.
+      if (Math.hypot(bud.x - other.x, bud.y - other.y) < level.size * 1.25) found.push(`${bud.id} crowds ${other.id}`);
     }
   });
   if (level.needed >= level.buds.length) found.push('every last bud is needed');
@@ -96,6 +97,14 @@ describe('generateLevel', () => {
     expect(generateLevel(42, 4, 'band-3-5')).toEqual(generateLevel(42, 4, 'band-3-5'));
   });
 
+  it('nudges each bud up, down, left, and right of its cell center across seeds', () => {
+    const firsts = SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5').buds[0]);
+    const xs = new Set(firsts.map((bud) => bud?.x));
+    const ys = new Set(firsts.map((bud) => bud?.y));
+    expect(xs.size).toBeGreaterThan(10);
+    expect(ys.size).toBeGreaterThan(10);
+  });
+
   it('opens every kind of flower across meadows', () => {
     const kinds = new Set(
       SEEDS.slice(0, 40).flatMap((seed) => generateLevel(seed, 6, 'band-3-5').buds.map((bud) => bud.flower)),
@@ -122,8 +131,11 @@ describe('distanceToSegment', () => {
     expect(distanceToSegment({ x: 3, y: 4 }, { x: 0, y: 0 }, { x: 0, y: 0 })).toBe(5);
   });
 
-  it('works along a slanted segment', () => {
-    expect(distanceToSegment({ x: 0, y: 10 }, { x: 0, y: 0 }, { x: 10, y: 10 })).toBeCloseTo(Math.SQRT2 * 5, 6);
+  it('works along a slanted segment away from the origin', () => {
+    expect(distanceToSegment({ x: 100, y: 210 }, { x: 100, y: 200 }, { x: 110, y: 210 })).toBeCloseTo(
+      Math.SQRT2 * 5,
+      6,
+    );
   });
 });
 

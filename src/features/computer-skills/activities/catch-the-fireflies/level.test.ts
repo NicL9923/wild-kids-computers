@@ -122,10 +122,11 @@ describe('generateLevel', () => {
         expect(firefly.phase).toBeLessThan(2 * Math.PI);
       }
     }
-    const places = new Set(
-      levels.map((level) => `${String(level.fireflies[0]?.cx)},${String(level.fireflies[0]?.cy)}`),
-    );
-    expect(places.size).toBeGreaterThan(20);
+    // Starting places cover the whole loop, not one part of it.
+    const allPhases = levels.flatMap((level) => level.fireflies.map((firefly) => firefly.phase));
+    expect(Math.max(...allPhases)).toBeGreaterThan(1.5 * Math.PI);
+    // Loops sit higher or lower in their part of the sky from round to round.
+    expect(new Set(levels.map((level) => level.fireflies[0]?.cy)).size).toBeGreaterThan(20);
   });
 
   it.each([0, MAX_FIREFLY_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {

@@ -116,12 +116,13 @@ export function smoothPath(controls: readonly Point[]): Point[] {
 
 /** The distance along a polyline to each of its points. */
 export function measure(points: readonly Point[]): number[] {
-  const along = [0];
-  for (let index = 1; index < points.length; index += 1) {
-    const before = points[index - 1];
-    const point = points[index];
-    if (before === undefined || point === undefined) continue;
-    along.push((along[index - 1] ?? 0) + Math.hypot(point.x - before.x, point.y - before.y));
+  const along: number[] = [];
+  let total = 0;
+  let previous: Point | null = null;
+  for (const point of points) {
+    if (previous !== null) total += Math.hypot(point.x - previous.x, point.y - previous.y);
+    along.push(total);
+    previous = point;
   }
   return along;
 }
@@ -189,19 +190,17 @@ export interface Walk {
 export function walkTo(level: Pick<TrailLevel, 'points' | 'along' | 'width'>, progress: number, pointer: Point): Walk {
   const { points, along, width } = level;
   let best: { distance: number; at: number } | null = null;
-  for (let index = 1; index < points.length; index += 1) {
+  for (const [index, to] of points.entries()) {
+    const from = points[index - 1];
+    if (from === undefined) continue;
     const start = along[index - 1] ?? 0;
     const end = along[index] ?? 0;
-    // Only the stretch of path around the bug counts.
-    if (end < progress - width || start > progress + width) continue;
-    const from = points[index - 1];
-    const to = points[index];
-    if (from === undefined || to === undefined) continue;
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const span = dx * dx + dy * dy;
     const t = span === 0 ? 0 : Math.min(1, Math.max(0, ((pointer.x - from.x) * dx + (pointer.y - from.y) * dy) / span));
     const at = start + t * (end - start);
+    // Only the stretch of path around the bug counts.
     if (at < progress - width || at > progress + width) continue;
     const distance = Math.hypot(pointer.x - (from.x + t * dx), pointer.y - (from.y + t * dy));
     if (best === null || distance < best.distance) best = { distance, at };

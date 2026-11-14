@@ -97,8 +97,8 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
   const cellHeight = (SKY.height - 2 * EDGE_MARGIN) / CELLS.rows;
   const rx = step.loop;
   const ry = Math.round(step.loop * LOOP_SHAPE);
-  // How far a loop's center can move inside its cell and keep the whole loop in the cell.
-  const slackX = Math.max(0, Math.floor(cellWidth / 2 - rx - step.size / 2 - LOOP_GAP / 2));
+  // How far a loop's center can move up or down inside its cell and keep the whole loop in the
+  // cell. Every step's loop already fills its cell's width, so loops stay centered across.
   const slackY = Math.max(0, Math.floor(cellHeight / 2 - ry - step.size / 2 - LOOP_GAP / 2));
   const cells = random.sample(
     Array.from({ length: CELLS.columns * CELLS.rows }, (_, index) => index),
@@ -109,7 +109,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fi
     const row = Math.floor(cell / CELLS.columns);
     return {
       id: `firefly-${String(index)}`,
-      cx: Math.round(EDGE_MARGIN + (column + 0.5) * cellWidth) + random.int(-slackX, slackX),
+      cx: Math.round(EDGE_MARGIN + (column + 0.5) * cellWidth),
       cy: Math.round(EDGE_MARGIN + (row + 0.5) * cellHeight) + random.int(-slackY, slackY),
       rx,
       ry,

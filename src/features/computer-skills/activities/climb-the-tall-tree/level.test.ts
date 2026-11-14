@@ -74,6 +74,12 @@ describe('generateLevel', () => {
     expect(firstSides.size).toBe(2);
     const findHeights = new Set(levels.map((level) => level.perches.find((perch) => perch.id === level.finds[0])?.id));
     expect(findHeights.size).toBeGreaterThan(3);
+    // Branches take turns: each animal sits on the other side of the trunk from the one before.
+    for (const level of levels) {
+      const sides = level.perches.map((perch) => perch.x < TRUNK.left);
+      expect(sides.every((left, index) => index === 0 || left !== sides[index - 1])).toBe(true);
+    }
+    expect(new Set(levels.map((level) => level.perches[0]?.y)).size).toBeGreaterThan(20);
     const animals = new Set(levels.flatMap((level) => level.perches.map((perch) => perch.animal)));
     expect(animals.size).toBe(ANIMALS.length);
   });

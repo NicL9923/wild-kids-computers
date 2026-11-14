@@ -52,6 +52,9 @@ function problems(level: PicnicLevel): string[] {
     if (homes.length !== 1) found.push(`${piece.id} has ${String(homes.length)} places`);
   }
   if (new Set(level.pieces.map((piece) => piece.food)).size !== level.pieces.length) found.push('a food repeats');
+  if (new Set(level.places.map((place) => place.id)).size !== level.places.length) found.push('a place id repeats');
+  // A place has room around the food, so it is easy to land on.
+  for (const place of level.places) if (place.size <= level.size) found.push(`${place.id} is no bigger than the food`);
   return found;
 }
 
@@ -90,6 +93,14 @@ describe('generateLevel', () => {
       level.places.some((place, index) => place.takes !== `piece-${String(index)}`),
     );
     expect(shuffled.length).toBeGreaterThan(50);
+  });
+
+  it('moves food and places a little from round to round', () => {
+    const levels = SEEDS.slice(0, 80).map((seed) => generateLevel(seed, 6, 'band-6-8'));
+    for (const pick of [(level: PicnicLevel) => level.pieces[0], (level: PicnicLevel) => level.places[0]]) {
+      expect(new Set(levels.map((level) => pick(level)?.x)).size).toBeGreaterThan(5);
+      expect(new Set(levels.map((level) => pick(level)?.y)).size).toBeGreaterThan(5);
+    }
   });
 
   it('uses every food across rounds', () => {

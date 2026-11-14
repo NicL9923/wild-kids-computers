@@ -35,6 +35,7 @@ function problems(level: KnockLevel): string[] {
     if (next !== undefined && next.paint === door.paint) found.push(`${door.id} and ${next.id} share a paint`);
   });
   if (new Set(level.doors.map((door) => door.guest)).size !== level.doors.length) found.push('a guest repeats');
+  if (new Set(level.doors.map((door) => door.id)).size !== level.doors.length) found.push('a door id repeats');
   return found;
 }
 
@@ -87,7 +88,7 @@ describe('generateLevel', () => {
 
 describe('isDoubleClick', () => {
   it.each([
-    ['the first click', null, 5000, false],
+    ['the first click, even early on the clock', null, 500, false],
     ['a second click at the same moment', 5000, 5000, true],
     ['a second click exactly at the window', 5000, 5800, true],
     ['a second click one millisecond late', 5000, 5801, false],

@@ -97,6 +97,15 @@ describe('chooseButtons', () => {
     },
   );
 
+  it.each([
+    ['left', 0.1, ['left', 'left', 'right', 'right', 'right', 'right']],
+    ['right', 0.9, ['right', 'right', 'left', 'left', 'left', 'left']],
+  ] as const)('takes a run that starts with %s and gives one button exactly a third', (_first, next, expected) => {
+    // Six things and one change after the second: the first button gets exactly the two it needs.
+    const afterTwo: Random = { ...lopsided, next: () => next, sample: (items, count) => items.slice(1, 1 + count) };
+    expect(chooseButtons(afterTwo, { count: 6, switches: 1 })).toEqual(expected);
+  });
+
   it('falls back to the even spread for six things with two changes', () => {
     expect(chooseButtons(lopsided, { count: 6, switches: 2 })).toEqual([
       'left',

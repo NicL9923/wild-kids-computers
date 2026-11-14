@@ -99,16 +99,16 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Kn
   const guests = random.sample(GUESTS, step.count);
   const slot = (STREET.width - 2 * EDGE_MARGIN) / step.count;
   // Each door gets a paint unlike the door before it.
-  const paints: (typeof PAINTS)[number][] = [];
-  for (let index = 0; index < step.count; index += 1) {
-    paints.push(random.pick(PAINTS.filter((paint) => paint !== paints[index - 1])));
+  const doors: Door[] = [];
+  for (const [index, guest] of guests.entries()) {
+    const before = doors.at(-1)?.paint;
+    doors.push({
+      id: `door-${String(index)}`,
+      x: Math.round(EDGE_MARGIN + (index + 0.5) * slot),
+      guest,
+      paint: random.pick(PAINTS.filter((paint) => paint !== before)),
+    });
   }
-  const doors = guests.map((guest, index) => ({
-    id: `door-${String(index)}`,
-    x: Math.round(EDGE_MARGIN + (index + 0.5) * slot),
-    guest,
-    paint: paints[index] ?? PAINTS[0],
-  }));
   return { doors, width: step.width, windowMs: step.windowMs };
 }
 

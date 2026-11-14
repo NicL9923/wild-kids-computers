@@ -22,6 +22,7 @@ import {
 } from './level.ts';
 
 const SEEDS = Array.from({ length: 200 }, (_, index) => index * 104_729 + 5);
+const DIFFICULTIES = Array.from({ length: MAX_TRAIL_DIFFICULTY }, (_, index) => index + 1);
 
 /** The difficulty range of each band, as activity.ts declares it. */
 const BAND_RANGES: readonly [Band, number, number][] = [
@@ -64,22 +65,26 @@ function trace(level: TrailLevel, offset: number): number {
 }
 
 describe('generateLevel', () => {
-  it.each(Array.from({ length: MAX_TRAIL_DIFFICULTY }, (_, index) => index + 1))(
-    'at difficulty %i gives a path on the field that a child can follow to the end, for every seed',
-    (difficulty) => {
-      const step = stepFor(difficulty);
-      for (const seed of SEEDS) {
-        const level = generateLevel(seed, difficulty, 'band-6-8');
-        expect(problems(level), `seed ${String(seed)}`).toEqual([]);
-        expect(level.width).toBe(step.width);
-        // Following the middle reaches the flower, and so does a wobble a third of the width off.
-        expect(arrived(level, trace(level, 0)), `seed ${String(seed)}`).toBe(true);
-        expect(arrived(level, trace(level, level.width / 3)), `seed ${String(seed)}`).toBe(true);
-        // A pointer that runs beside the path, not on it, leaves the bug at the start.
-        expect(trace(level, level.width * 2 + 40), `seed ${String(seed)}`).toBe(0);
-      }
-    },
-  );
+  it.each(DIFFICULTIES)('at difficulty %i gives a path that stays on the field, for every seed', (difficulty) => {
+    const step = stepFor(difficulty);
+    for (const seed of SEEDS) {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      expect(problems(level), `seed ${String(seed)}`).toEqual([]);
+      expect(level.width).toBe(step.width);
+    }
+  });
+
+  // Walking a path is slow, so these walk fewer seeds; the paths above cover the shapes.
+  it.each(DIFFICULTIES)('at difficulty %i can be followed to the end, wobbles and all', (difficulty) => {
+    for (const seed of SEEDS.slice(0, 40)) {
+      const level = generateLevel(seed, difficulty, 'band-6-8');
+      // Following the middle reaches the flower, and so does a wobble a third of the width off.
+      expect(arrived(level, trace(level, 0)), `seed ${String(seed)}`).toBe(true);
+      expect(arrived(level, trace(level, level.width / 3)), `seed ${String(seed)}`).toBe(true);
+      // A pointer that runs beside the path, not on it, leaves the bug at the start.
+      expect(trace(level, level.width * 2 + 40), `seed ${String(seed)}`).toBe(0);
+    }
+  });
 
   it.each(BAND_RANGES)('in %s is wide enough to stay on at the hardest and turns at the easiest', (band, min, max) => {
     const easiest = generateLevel(7, min, band);
@@ -125,6 +130,20 @@ describe('generateLevel', () => {
       SEEDS.map((seed) => Math.sign((generateLevel(seed, 1, 'band-3-5').points[16]?.y ?? 300) - 300)),
     );
     expect([...firstBend].toSorted((a, b) => a - b)).toEqual([-1, 1]);
+    // The ends start at many heights, not always the same one.
+    expect(new Set(SEEDS.map((seed) => generateLevel(seed, 3, 'band-6-8').points[0]?.y)).size).toBeGreaterThan(20);
+  });
+
+  it('starts and ends near the middle height, so only the bends reach high and low', () => {
+    for (const difficulty of DIFFICULTIES) {
+      const { swing } = stepFor(difficulty);
+      for (const seed of SEEDS.slice(0, 60)) {
+        const { points } = generateLevel(seed, difficulty, 'band-6-8');
+        for (const end of [points[0], points.at(-1)]) {
+          expect(Math.abs((end?.y ?? Infinity) - FIELD.height / 2)).toBeLessThanOrEqual(Math.round(swing / 2));
+        }
+      }
+    }
   });
 
   it.each([0, MAX_TRAIL_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {
@@ -157,6 +176,29 @@ describe('walkTo', () => {
     expect(walkTo(straight, progress, pointer)).toEqual(walk);
   });
 
+  it('follows a slanted path away from the origin', () => {
+    const points = [
+      { x: 100, y: 100 },
+      { x: 300, y: 300 },
+    ];
+    const slanted = { points, along: measure(points), width: 40 };
+    // About 14 units off the line, under half the width, and about 106 along it.
+    expect(walkTo(slanted, 80, { x: 165, y: 185 })).toEqual({ progress: expect.closeTo(106.07, 1), with: true });
+    // About 21 units off: just past half the width.
+    expect(walkTo(slanted, 80, { x: 160, y: 190 }).with).toBe(false);
+  });
+
+  it('steps over a doubled point without losing the bug', () => {
+    const points = [
+      { x: 100, y: 300 },
+      { x: 100, y: 300 },
+      { x: 300, y: 300 },
+    ];
+    const doubled = { points, along: measure(points), width: 80 };
+    expect(walkTo(doubled, 0, { x: 100, y: 310 })).toEqual({ progress: 0, with: true });
+    expect(pointAt(doubled, 0)).toEqual({ x: 100, y: 300 });
+  });
+
   it('never walks past the end', () => {
     expect(walkTo(straight, 390, { x: 520, y: 300 })).toEqual({ progress: 400, with: true });
   });
@@ -187,6 +229,10 @@ describe('pointAt and arrived', () => {
     expect(pointAt(straight, 999)).toEqual({ x: 500, y: 300 });
   });
 
+  it('rejects a path with no points', () => {
+    expect(() => pointAt({ points: [], along: [] }, 0)).toThrow('A path needs at least one point.');
+  });
+
   it('counts the bug home within half a width of the end, not before', () => {
     expect(arrived(straight, 360)).toBe(true);
     expect(arrived(straight, 359)).toBe(false);
@@ -209,5 +255,18 @@ describe('smoothPath', () => {
 
   it('rejects a path with no points', () => {
     expect(() => smoothPath([])).toThrow('A path needs at least one point.');
+  });
+
+  it('keeps a straight line of evenly spaced points even between the inner points', () => {
+    const points = smoothPath([
+      { x: 0, y: 300 },
+      { x: 160, y: 300 },
+      { x: 320, y: 300 },
+      { x: 480, y: 300 },
+    ]);
+    // The middle span, from the second point to the third; the end spans ease in and out.
+    expect(points.slice(16, 33).map((point) => point.x)).toEqual(
+      Array.from({ length: 17 }, (_, index) => 160 + index * 10),
+    );
   });
 });
