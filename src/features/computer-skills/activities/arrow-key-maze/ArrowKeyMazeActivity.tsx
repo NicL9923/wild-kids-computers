@@ -44,6 +44,9 @@ const same = (a: Cell, b: Cell) => a.x === b.x && a.y === b.y;
  * A maze, a critter, and its snack. The arrow keys move the critter one cell. A wall stops it
  * with a little wobble and nothing else. After two bumps the arrow that leads on lights up on
  * the picture of the arrow keys, and other keys light all four arrows.
+ *
+ * Keys can come faster than the screen draws, so the key handler reads and writes the place, the
+ * bumps, the other keys, and the arrival in one live record, never the values of the last render.
  */
 export default function ArrowKeyMazeActivity({ level, kit }: ActivityProps<MazeLevel>) {
   const [at, setAt] = useState<Cell>(level.start);
@@ -54,6 +57,7 @@ export default function ArrowKeyMazeActivity({ level, kit }: ActivityProps<MazeL
   const [arrived, setArrived] = useState(false);
   const critter = useRef<HTMLDivElement>(null);
   const helpedAt = useRef<string | null>(null);
+  const live = useRef({ at, bumps, otherKeys, arrived });
 
   const nextStep = waysFrom(level.cells, at).get(`${String(level.goal.x)},${String(level.goal.y)}`)?.[0] ?? null;
   const showNext = bumps >= BUMPS_BEFORE_HELP && nextStep !== null && !arrived;
@@ -72,32 +76,38 @@ export default function ArrowKeyMazeActivity({ level, kit }: ActivityProps<MazeL
   }
 
   useActivityKeys(kit, (event) => {
-    if (arrived || event.repeat) return;
+    const { at: from, bumps: bumped, otherKeys: others, arrived: done } = live.current;
+    if (done || event.repeat) return;
     const direction = KEY_DIRECTIONS[event.key];
     if (direction === undefined) {
       if (event.key.length !== 1) return;
-      const count = otherKeys + 1;
+      const count = others + 1;
+      live.current = { ...live.current, otherKeys: count };
       setOtherKeys(count);
       if (count >= OTHER_KEYS_BEFORE_HELP) help('other-keys', strings.arrowKeys);
       return;
     }
     event.preventDefault();
     press(direction);
+    live.current = { ...live.current, otherKeys: 0 };
     setOtherKeys(0);
-    const to = neighbor(at, direction, level.columns, level.rows);
-    if (to === null || !canMove(level.cells, at, direction)) {
+    const to = neighbor(from, direction, level.columns, level.rows);
+    if (to === null || !canMove(level.cells, from, direction)) {
       // A bump is harmless: a wobble and a quiet ring, and the critter stays where it is.
       setWobble((count) => count + 1);
       kit.feedback.wrong({ at: critter.current ?? undefined, silent: true });
-      const count = bumps + 1;
+      const count = bumped + 1;
+      live.current = { ...live.current, bumps: count };
       setBumps(count);
-      if (count >= BUMPS_BEFORE_HELP) help(`${String(at.x)},${String(at.y)}`, strings.thisWay);
+      if (count >= BUMPS_BEFORE_HELP) help(`${String(from.x)},${String(from.y)}`, strings.thisWay);
       return;
     }
+    const arriving = same(to, level.goal);
+    live.current = { at: to, bumps: 0, otherKeys: 0, arrived: arriving };
     setAt(to);
     setBumps(0);
     kit.play('tap');
-    if (same(to, level.goal)) {
+    if (arriving) {
       setArrived(true);
       kit.feedback.correct({ at: critter.current ?? undefined });
       kit.scope.setTimeout(() => kit.roundComplete(), ARRIVE_PAUSE_MS);
