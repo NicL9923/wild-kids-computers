@@ -1,7 +1,8 @@
 import { Navigate, useNavigate } from '@tanstack/react-router';
 import { Download, Printer } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useBand, usePictures, useSessionStatus } from '../../../app/session/sessionHooks.ts';
+import { useBand, useSessionStatus } from '../../../app/session/sessionHooks.ts';
+import { useBoundedPictures } from '../boundedPictures.ts';
 import type { ProfilePictures } from '../../../app/session/sessionStore.ts';
 import { useAudio, useMute } from '../../../audio/AudioProvider.tsx';
 import { IconButton } from '../../../components/ui/IconButton.tsx';
@@ -51,7 +52,7 @@ export default function PaintGallery() {
 }
 
 function GalleryScreen() {
-  const pictures = usePictures();
+  const pictures = useBoundedPictures();
   const band = useBand();
   const audio = useAudio();
   const [muted, toggleMute] = useMute();

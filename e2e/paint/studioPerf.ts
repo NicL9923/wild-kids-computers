@@ -1,10 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { cpus, platform, release, totalmem } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { Page } from '@playwright/test';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
 import { PAINT_STUDIO_PATH } from '../../src/features/paint-studio/paths.ts';
+import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH } from '../../src/core/paint/document.ts';
+import type { PaintEffect } from '../../src/core/paint/types.ts';
 
 /**
  * Paint studio timings in the real Electron app at 1920 by 1080: npm run perf, after the engine
@@ -14,6 +17,8 @@ import { PAINT_STUDIO_PATH } from '../../src/features/paint-studio/paths.ts';
  * - Time from a fill click to the filled pixels being on the canvas.
  * - Renderer and total memory each minute of continuous strokes, for WKC_PERF_MINUTES (default 5).
  * - Time from process start to the studio being ready.
+ * - Round trips to the picture worker: starting it, each whole-picture effect, and encoding a
+ *   picture for the gallery. The worker's deadlines in worker/effectRunner.ts come from these.
  *
  * It prints numbers and the machine, and gates nothing. Run `npm run build` first; `npm run perf`
  * does. Without a display it restarts itself under Xvfb.
@@ -194,6 +199,95 @@ async function measureFill(page: Page): Promise<Stats> {
   return stats(samples);
 }
 
+interface WorkerTimings {
+  start: number;
+  effects: { id: string; ms: number }[];
+  encode: Stats;
+}
+
+function isEffectModule(value: unknown): value is { default: PaintEffect } {
+  return typeof value === 'object' && value !== null && 'default' in value;
+}
+
+/** The whole-picture effects, found the way the registry finds them: one directory each under effects/. */
+async function wholePictureEffectIds(): Promise<string[]> {
+  const dir = path.join(projectRoot, 'src/core/paint/effects');
+  const ids: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true }).toSorted((a, b) => a.name.localeCompare(b.name))) {
+    if (!entry.isDirectory()) continue;
+    const module: unknown = await import(pathToFileURL(path.join(dir, entry.name, 'index.ts')).href);
+    if (!isEffectModule(module)) throw new Error(`${entry.name} has no default export.`);
+    if (module.default.group === 'whole-picture') ids.push(module.default.id);
+  }
+  return ids;
+}
+
+/**
+ * Starts the bundled picture worker in the page and times its round trips at the document size.
+ * The encode picture is noise, the hardest picture for PNG, so it is the slowest save there is.
+ */
+async function measureWorker(page: Page): Promise<WorkerTimings> {
+  const file = readdirSync(path.join(projectRoot, 'dist/renderer/assets')).find((name) =>
+    /^pictureEffect\.worker-.*\.js$/.test(name),
+  );
+  if (file === undefined) throw new Error('The picture worker is not in the build.');
+  const effectIds = await wholePictureEffectIds();
+  return page
+    .evaluate(
+      async ({ url, effects: wholePicture, width, height }) => {
+        const worker = new Worker(new URL(url, window.location.href), { type: 'module' });
+        let nextId = 1;
+        const ask = (request: Record<string, unknown>, transfer: Transferable[]): Promise<number> => {
+          const id = nextId++;
+          const started = performance.now();
+          return new Promise((resolve, reject) => {
+            const onMessage = (event: MessageEvent<{ id: number; kind: string; message?: string }>): void => {
+              if (event.data.id !== id) return;
+              worker.removeEventListener('message', onMessage);
+              if (event.data.kind === 'error') reject(new Error(event.data.message));
+              else resolve(performance.now() - started);
+            };
+            worker.addEventListener('message', onMessage);
+            worker.postMessage({ ...request, id }, transfer);
+          });
+        };
+        const painted = (): Uint8ClampedArray => {
+          const pixels = new Uint8ClampedArray(width * height * 4);
+          let seed = 7;
+          for (let i = 0; i < pixels.length; i += 4) {
+            seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
+            pixels[i] = seed & 255;
+            pixels[i + 1] = (seed >>> 8) & 255;
+            pixels[i + 2] = (seed >>> 16) & 255;
+            pixels[i + 3] = 255;
+          }
+          return pixels;
+        };
+        try {
+          const start = await ask({ kind: 'warm' }, []);
+          const effects: { id: string; ms: number }[] = [];
+          for (const effectId of wholePicture) {
+            const pixels = painted();
+            effects.push({
+              id: effectId,
+              ms: await ask({ kind: 'apply', effectId, width, height, pixels }, [pixels.buffer]),
+            });
+          }
+          const encodes: number[] = [];
+          for (let i = 0; i < 5; i++) {
+            const paint = painted();
+            encodes.push(await ask({ kind: 'encode', width, height, paint, mask: null, pageId: null }, [paint.buffer]));
+          }
+          return { start, effects, encodes };
+        } finally {
+          worker.terminate();
+        }
+      },
+      { url: `assets/${file}`, effects: effectIds, width: DOCUMENT_WIDTH, height: DOCUMENT_HEIGHT },
+    )
+    .then(({ start, effects, encodes }) => ({ start, effects, encode: stats(encodes) }));
+}
+
 interface MemorySample {
   minute: number;
   rendererKb: number;
@@ -262,6 +356,15 @@ try {
   const fill = await measureFill(page);
   console.log(
     `Fill click to pixels on screen, 10 full-canvas fills: median ${ms(fill.median)}, p95 ${ms(fill.p95)}, max ${ms(fill.max)}`,
+  );
+
+  const worker = await measureWorker(page);
+  console.log('');
+  console.log(`Picture worker at ${DOCUMENT_WIDTH} by ${DOCUMENT_HEIGHT}, round trips from the page:`);
+  console.log(`Start and load the effects: ${ms(worker.start)}`);
+  for (const effect of worker.effects) console.log(`Whole picture: ${effect.id.padEnd(15)} ${ms(effect.ms)}`);
+  console.log(
+    `Encode a noise picture for the gallery, 5 times: median ${ms(worker.encode.median)}, max ${ms(worker.encode.max)}`,
   );
 
   console.log('');

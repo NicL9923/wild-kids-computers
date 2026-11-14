@@ -10,6 +10,8 @@ One Web Audio engine plays voice clips and synthesized sound effects. Voice and 
 
 A new `speak` stops the clip that is playing, so a replay button pressed twice never stacks voices. A missing clip plays nothing, and the test log still records the string.
 
+Every speech promise ends, and `speechSettled()` with it, because activities wait for it before the next round. Cancelling, newer speech, muting, and `dispose` settle everything waiting at once, a clip still loading included. A clip that takes longer than `CLIP_LOAD_DEADLINE_MS` to fetch and decode counts as missing. While sound is muted, speech plays nothing and resolves at once; the test log still records it.
+
 ## Play a sound
 
 - A short effect: `audio.play('pop')`. The names are in [sfx/sfxNames.ts](sfx/sfxNames.ts): `pop`, `chime`, `nudge`, `pick-up`, `put-down`, `tap`, `whoosh`, `sparkle`, `page-turn`, `key-tap`, `open`, `close`, `bloom`, `stamp`, `fill`, `snap`, and the music box notes `note-1` to `note-5`, lowest first.

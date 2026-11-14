@@ -9,6 +9,8 @@ import round from '../../../core/paint/tips/round.ts';
 import brush from '../../../core/paint/tools/brush/index.ts';
 import { BridgeError } from '../../../core/platform/bridge.ts';
 import { appDocument } from '../../../core/storage/schemas.ts';
+import { PICTURE_CALL_DEADLINE_MS, boundedPictures } from '../boundedPictures.ts';
+import { WORKER_DEADLINES, createEffectRunner, type WorkerLike } from '../worker/effectRunner.ts';
 import { Autosaver, type AutosaveOptions, type EncodedPicture, type KeptPicture } from './autosave.ts';
 import { StudioDocument } from './studioDocument.ts';
 
@@ -243,6 +245,17 @@ describe('Autosaver', () => {
       expect(await gallery()).toEqual([{ id: expect.any(String), red: 5 }]);
     });
 
+    it('treats a save call that throws as a failed save, so leaving never sticks', async () => {
+      const picture = blank();
+      const { saver, failing } = await setup(picture, {
+        save: () => Promise.reject(new Error('the bridge went away')),
+      });
+      paintAll(picture.studio, 3);
+      expect(await saver.keep()).toBe(false);
+      expect(failing).toEqual([true]);
+      expect(saver.hasUnsavedChanges).toBe(true);
+    });
+
     it('treats a picture it cannot encode as unsaved, without throwing', async () => {
       const picture = blank();
       let broken = true;
@@ -282,4 +295,102 @@ describe('Autosaver', () => {
       await settle();
     }
   });
+});
+
+/**
+ * The studio's whole save chain without the screen: the real effect runner encodes, and the
+ * real session store saves through bounded calls. Only the worker, this thread's encoder, and the
+ * bridge are fakes, and each can be made to never answer. This is what the route blocker awaits.
+ */
+async function chain(options: { worker: 'silent' | 'none'; encodeHere: 'works' | 'hangs'; bridge: 'works' | 'hangs' }) {
+  const fake = createFakeBridge({
+    documents: {
+      app: JSON.stringify({ ...appDocument.defaults(), firstLaunchDone: true, lastActiveProfileId: PROFILE.id }),
+      profiles: JSON.stringify({ version: 1, profiles: [PROFILE] }),
+    },
+  });
+  if (options.bridge === 'hangs') fake.bridge.pictures.save = () => new Promise(() => undefined);
+  const store = createSessionStore({ bridge: fake.bridge });
+  await store.start();
+  const realTime = createManualScheduler({ wall: 0 });
+  const pictures = boundedPictures(store.pictures(), realTime);
+  const silentWorker: WorkerLike = {
+    postMessage: noop,
+    addEventListener: noop,
+    terminate: noop,
+  };
+  const runner = createEffectRunner(
+    () => (options.worker === 'silent' ? silentWorker : null),
+    (doc) =>
+      options.encodeHere === 'hangs'
+        ? new Promise(() => undefined)
+        : Promise.resolve({ png: new Uint8Array([doc.paint.data[0] ?? 0]), thumbnail: new Uint8Array([1]) }),
+    realTime,
+  );
+  const failing: boolean[] = [];
+  const picture = blank();
+  const saver = new Autosaver(
+    {
+      scope: createScope(createManualScheduler({ wall: 0 })),
+      delayMs: 1500,
+      encode: (owner) => runner.encode(owner.doc, owner.pageId),
+      save: pictures.save,
+      onFailingChange: (now) => failing.push(now),
+    },
+    picture,
+  );
+  /** Moves real time on in steps, letting each step's promises run, as the event loop would. */
+  const wait = async (ms: number): Promise<void> => {
+    for (let passed = 0; passed < ms; passed += 1000) {
+      await settle();
+      realTime.advance(1000);
+    }
+    await settle();
+  };
+  return { saver, picture, failing, wait, pictures };
+}
+
+describe('a save whose worker or main process never answers', () => {
+  it('saves through this thread once the worker misses its deadline', async () => {
+    const { saver, picture, failing, wait, pictures } = await chain({
+      worker: 'silent',
+      encodeHere: 'works',
+      bridge: 'works',
+    });
+    paintAll(picture.studio, 6);
+    const kept = saver.keep();
+    await wait(WORKER_DEADLINES.encode);
+    expect(await kept).toBe(true);
+    expect(failing).toEqual([]);
+    const listed = await pictures.list('gallery');
+    if (!listed.ok) throw listed.error;
+    const read = await pictures.read(listed.value[0]?.id ?? '', 'picture');
+    expect(read.ok && [...read.value]).toEqual([6]);
+  });
+
+  it.each([
+    {
+      worker: 'silent',
+      encodeHere: 'hangs',
+      bridge: 'works',
+      within: WORKER_DEADLINES.encode + WORKER_DEADLINES.encodeHere,
+    },
+    { worker: 'none', encodeHere: 'works', bridge: 'hangs', within: PICTURE_CALL_DEADLINE_MS },
+  ] as const)(
+    'gives up and keeps the picture when the worker is $worker, this thread $encodeHere, and the bridge $bridge',
+    async (options) => {
+      const { saver, picture, failing, wait } = await chain(options);
+      paintAll(picture.studio, 6);
+      let outcome: boolean | 'waiting' = 'waiting';
+      void saver.keep().then((kept) => (outcome = kept));
+      await wait(options.within - 1000);
+      expect(outcome).toBe('waiting');
+      await wait(1000);
+      // The screen releases input and says the picture is not saved yet when keep ends false.
+      expect(outcome).toBe(false);
+      expect(failing).toEqual([true]);
+      expect(saver.studio).toBe(picture.studio);
+      expect(saver.hasUnsavedChanges).toBe(true);
+    },
+  );
 });

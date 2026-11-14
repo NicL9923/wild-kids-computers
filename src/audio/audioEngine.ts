@@ -1,5 +1,7 @@
 import type { SpokenHandle } from '../core/strings/defineStrings.ts';
 import { voiceClipName } from '../core/strings/voice.ts';
+import { withDeadline } from '../core/activityKit/deadline.ts';
+import { systemScheduler } from '../core/activityKit/scheduler.ts';
 import type { ContinuousSfxName, SfxName } from './sfx/sfxNames.ts';
 
 /**
@@ -14,6 +16,11 @@ import type { ContinuousSfxName, SfxName } from './sfx/sfxNames.ts';
  *
  * Nothing here throws on a missing clip, a decode failure, or a missing sound device. A missing
  * clip plays nothing and is still recorded in the test log.
+ *
+ * Every speech promise ends. Cancelling, newer speech, muting, and dispose settle what is waiting
+ * at once, even a clip still loading, and a clip that takes longer than CLIP_LOAD_DEADLINE_MS to
+ * load counts as missing. Activities wait for speech before the next round, so a stuck clip must
+ * never hold a child on a finished round.
  */
 
 export interface AudioLogEntry {
@@ -75,11 +82,11 @@ export interface AudioEngineOptions {
 }
 
 export interface AudioEngine {
-  /** Speaks one string. Resolves when the clip ends, is cancelled, or cannot play. */
+  /** Speaks one string. Resolves when the clip ends, is cancelled or muted, or cannot play. */
   speak(handle: SpokenHandle): Promise<void>;
   /** Speaks strings one after another, such as "Find the letter" then "b". */
   speakSequence(handles: readonly SpokenHandle[]): Promise<void>;
-  /** Stops the voice that is speaking and any sequence in progress. */
+  /** Stops the voice that is speaking and any sequence in progress, a clip still loading included. */
   cancelSpeech(): void;
   /**
    * Resolves once no speech is in progress: the newest sequence ended, was cancelled, or could
@@ -102,6 +109,17 @@ export interface AudioEngine {
 
 /** How long after a clip's length to stop waiting for its end event. */
 const END_MARGIN_SECONDS = 1;
+
+/**
+ * How long fetching and decoding one clip may take before it counts as missing. A clip is a few
+ * kilobytes of Opus read from the app's own files, which takes milliseconds even on a slow laptop.
+ */
+export const CLIP_LOAD_DEADLINE_MS = 5_000;
+
+/** Real time for the load deadline: loading runs in real time even when a test pins the kit clock. */
+const realTime = systemScheduler();
+
+const NOTHING = (): void => undefined;
 
 const SILENT_CONTINUOUS: ContinuousSound = Object.freeze({ set: () => undefined, stop: () => undefined });
 
@@ -129,6 +147,8 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
   const running = new Set<ContinuousSound>();
   // Bumped by every speak and cancel, so a sequence or a slow decode knows it was superseded.
   let speechGeneration = 0;
+  /** Ends the newest sequence's wait at once, whatever its clip is doing. */
+  let abortSpeech: () => void = NOTHING;
   /** The newest sequence while it runs, so speechSettled can wait for it. */
   let speaking: Promise<void> | null = null;
 
@@ -172,19 +192,23 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
   }
 
   function decode(target: Graph, clip: string, url: string): Promise<AudioBuffer | null> {
-    let pending = decoded.get(clip);
-    if (pending === undefined) {
-      pending = environment
-        .fetchClip(url)
-        .then((bytes) => target.context.decodeAudioData(bytes))
-        .catch(() => {
-          // Forget the failure so a later call can try again.
-          decoded.delete(clip);
-          return null;
-        });
-      decoded.set(clip, pending);
-    }
-    return pending;
+    const cached = decoded.get(clip);
+    if (cached !== undefined) return cached;
+    const loading: Promise<AudioBuffer | null> = withDeadline(
+      Promise.resolve(url)
+        .then((from) => environment.fetchClip(from))
+        .then((bytes) => target.context.decodeAudioData(bytes)),
+      CLIP_LOAD_DEADLINE_MS,
+      realTime,
+      `Loading the clip ${clip}`,
+    ).catch(() => {
+      // Forget the failure so a later call can try again. A load that timed out may still finish;
+      // nothing waits for it, and the next call starts its own.
+      decoded.delete(clip);
+      return null;
+    });
+    decoded.set(clip, loading);
+    return loading;
   }
 
   function stopCurrent(): void {
@@ -199,11 +223,19 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     playing.finish();
   }
 
+  /** Ends the speech in progress: the clip playing, the clip loading, and the rest of the sequence. */
+  function silence(): void {
+    speechGeneration += 1;
+    stopCurrent();
+    abortSpeech();
+  }
+
   async function speakOne(handle: SpokenHandle, generation: number): Promise<void> {
     const clip = voiceClipName(handle.speech);
     const url = environment.clipUrl(clip);
     record({ kind: 'voice', name: handle.id, clip, found: url !== undefined });
-    if (url === undefined) return;
+    // A muted voice has nothing to wait for: no one would hear it.
+    if (url === undefined || volume.muted) return;
     const target = ensureGraph();
     if (target === null) return;
     resume(target);
@@ -241,13 +273,17 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     },
 
     async speakSequence(handles) {
-      stopCurrent();
-      speechGeneration += 1;
+      silence();
       const generation = speechGeneration;
+      const aborted = new Promise<void>((resolve) => {
+        abortSpeech = resolve;
+      });
       const run = (async () => {
         for (const handle of handles) {
           if (generation !== speechGeneration) return;
-          await speakOne(handle, generation);
+          // A clip still loading when speech stops is left to finish on its own; it sees the newer
+          // generation and plays nothing.
+          await Promise.race([speakOne(handle, generation), aborted]);
         }
       })();
       speaking = run;
@@ -268,8 +304,7 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     },
 
     cancelSpeech() {
-      speechGeneration += 1;
-      stopCurrent();
+      silence();
     },
 
     play(name) {
@@ -307,6 +342,8 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
 
     setVolume(change) {
       volume = { ...volume, ...change };
+      // Muting ends speech in progress. Speech asked for while muted plays nothing; see speakOne.
+      if (volume.muted) silence();
       if (graph) applyVolume(graph);
       for (const listener of listeners) listener(volume);
     },
