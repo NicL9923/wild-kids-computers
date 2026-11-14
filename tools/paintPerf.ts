@@ -102,14 +102,24 @@ function isEffectModule(value: unknown): value is { default: PaintEffect } {
   return typeof value === 'object' && value !== null && 'default' in value;
 }
 
-async function measureEffects(): Promise<{ id: string; first: number; steady: number }[]> {
+/** Every effect, found the way the registry finds them: one directory each under effects/. */
+async function loadEffects(): Promise<PaintEffect[]> {
   const dir = path.join(process.cwd(), 'src/core/paint/effects');
+  const effects: PaintEffect[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true }).toSorted((a, b) => a.name.localeCompare(b.name))) {
+    if (!entry.isDirectory()) continue;
+    const module: unknown = await import(pathToFileURL(path.join(dir, entry.name, 'index.ts')).href);
+    if (!isEffectModule(module)) throw new Error(`${entry.name} has no default export.`);
+    effects.push(module.default);
+  }
+  return effects;
+}
+
+function measureEffects(effects: readonly PaintEffect[]): { id: string; first: number; steady: number }[] {
   const results: { id: string; first: number; steady: number }[] = [];
-  for (const id of readdirSync(dir).toSorted()) {
-    const module: unknown = await import(pathToFileURL(path.join(dir, id, 'index.ts')).href);
-    if (!isEffectModule(module)) throw new Error(`${id} has no default export.`);
-    const effect = module.default;
+  for (const effect of effects) {
     if (effect.group !== 'whole-picture') continue;
+    const id = effect.id;
     const doc = createDocument();
     const source = cloneSurface(doc.paint);
     const target = cloneSurface(doc.paint);
@@ -155,7 +165,19 @@ for (const [label, tip, size] of [
   );
 }
 
-for (const effect of await measureEffects()) {
+const effects = await loadEffects();
+
+// Paint-on effects follow the pointer like a brush, so they get the same fast scribble.
+const PAINT_ON_BUDGET_MS = 4;
+for (const effect of effects) {
+  if (effect.group !== 'paint-on') continue;
+  const stroke = measureStroke(round, 120, 60, effect);
+  console.log(
+    `Paint on: ${effect.id.padEnd(20)}per frame median ${ms(stroke.median)}, p95 ${ms(stroke.p95)}, max ${ms(stroke.max)}  (budget ${ms(PAINT_ON_BUDGET_MS)} at 120 px)`,
+  );
+}
+
+for (const effect of measureEffects(effects)) {
   console.log(
     `Whole picture: ${effect.id.padEnd(15)} first ${ms(effect.first)} (builds its map), then ${ms(effect.steady)}`,
   );
