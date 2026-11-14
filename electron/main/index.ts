@@ -62,9 +62,9 @@ async function start(): Promise<void> {
     clearTimeout: (timer) => clearTimeout(timer),
   });
   // A crashed renderer cannot show the parent gate, and the system must be able to shut down.
-  window.webContents.on('render-process-gone', () => windowControl.allowClose());
-  window.on('session-end', () => windowControl.allowClose());
-  powerMonitor.on('shutdown', () => windowControl.allowClose());
+  window.webContents.on('render-process-gone', () => windowControl.forceClose());
+  window.on('session-end', () => windowControl.forceClose());
+  powerMonitor.on('shutdown', () => windowControl.forceClose());
 
   const store = createFileStore(path.join(app.getPath('userData'), 'data'));
   const bridge: BridgeImplementation = {

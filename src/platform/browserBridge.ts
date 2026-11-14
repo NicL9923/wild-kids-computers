@@ -96,6 +96,11 @@ function requirePlace(value: unknown): PicturePlace {
   return value;
 }
 
+function requireBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') throw new BridgeError('invalid-argument', `${label} must be true or false.`);
+  return value;
+}
+
 function requirePng(bytes: unknown, max: number, label: string): Uint8Array {
   if (!(bytes instanceof Uint8Array)) throw new BridgeError('invalid-argument', `The ${label} must be bytes.`);
   if (bytes.length > max) throw new BridgeError('too-large', `The ${label} is over ${max} bytes.`);
@@ -285,11 +290,12 @@ export function createBrowserBridge(options: BrowserBridgeOptions): PlatformBrid
     window: {
       getState: async () => windowState(),
       async setFullscreen(on) {
+        requireBoolean(on, 'fullscreen');
         if (!kioskLock) await setFullscreen(on);
         return windowState();
       },
       async setKioskLock(on) {
-        kioskLock = on;
+        kioskLock = requireBoolean(on, 'kioskLock');
         await setFullscreen(on);
         return windowState();
       },

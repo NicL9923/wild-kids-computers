@@ -4,7 +4,7 @@ import { createWindowControl, type LockableWindow } from './windowControl.ts';
 /** A window that records what happens to it. A close goes through its close listeners first. */
 function fakeWindow() {
   let closeListener: ((event: { preventDefault(): void }) => void) | undefined;
-  const state = { fullscreen: false, kiosk: false, closed: false };
+  const state = { fullscreen: false, kiosk: false, closed: false, destroyed: false };
   const window: LockableWindow = {
     on: (_event, listener) => {
       closeListener = listener;
@@ -13,6 +13,10 @@ function fakeWindow() {
       let prevented = false;
       closeListener?.({ preventDefault: () => void (prevented = true) });
       if (!prevented) state.closed = true;
+    },
+    destroy: () => {
+      state.closed = true;
+      state.destroyed = true;
     },
     isDestroyed: () => state.closed,
     isFullScreen: () => state.fullscreen,
@@ -78,7 +82,8 @@ describe('window control', () => {
     timers.advance(2_999);
     expect(state.closed).toBe(false);
     timers.advance(1);
-    expect(state.closed).toBe(true);
+    // Destroyed, not closed, because a hung page never finishes its unload handlers.
+    expect(state).toMatchObject({ closed: true, destroyed: true });
   });
 
   it('keeps the app open once the renderer answers, until it confirms the quit', () => {
@@ -89,7 +94,15 @@ describe('window control', () => {
     timers.advance(60_000);
     expect(state.closed).toBe(false);
     control.allowClose();
-    expect(state.closed).toBe(true);
+    expect(state).toMatchObject({ closed: true, destroyed: false });
+  });
+
+  it('force-closes a locked window at once, for a crashed renderer or a system shutdown', () => {
+    const { state, timers, control } = setup();
+    control.setKioskLock(true);
+    control.forceClose();
+    expect(state).toMatchObject({ closed: true, destroyed: true });
+    expect(timers.pendingCount()).toBe(0);
   });
 
   it('needs a fresh answer for every close attempt, so a renderer that hangs later still closes', () => {

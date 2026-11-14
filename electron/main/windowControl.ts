@@ -7,6 +7,8 @@ export const CLOSE_ACK_TIMEOUT_MS = 3_000;
 export interface LockableWindow {
   on(event: 'close', listener: (event: { preventDefault(): void }) => void): unknown;
   close(): void;
+  /** Closes without running the page's unload handlers, which a hung page never finishes. */
+  destroy(): void;
   isDestroyed(): boolean;
   isFullScreen(): boolean;
   isKiosk(): boolean;
@@ -39,10 +41,16 @@ export function createWindowControl<Timer>(window: LockableWindow, options: Wind
     pendingAck = undefined;
   }
 
-  function forceClose(): void {
+  function allowClose(): void {
     closeAllowed = true;
     clearPending();
     if (!window.isDestroyed()) window.close();
+  }
+
+  function forceClose(): void {
+    closeAllowed = true;
+    clearPending();
+    if (!window.isDestroyed()) window.destroy();
   }
 
   window.on('close', (event) => {
@@ -80,7 +88,10 @@ export function createWindowControl<Timer>(window: LockableWindow, options: Wind
       clearPending();
     },
 
-    /** The renderer confirmed the quit, or the system is shutting down. */
-    allowClose: forceClose,
+    /** The renderer confirmed the quit. */
+    allowClose,
+
+    /** The renderer is gone or hung, or the system is shutting down. */
+    forceClose,
   };
 }
