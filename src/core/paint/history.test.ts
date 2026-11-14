@@ -90,7 +90,8 @@ describe('History', () => {
     expect(history.bytes).toBeLessThanOrEqual(DEFAULT_BYTE_CAP);
     for (let step = 0; step < 30; step++) history.undo();
     expect(doc.paint.data).toEqual(first);
-  });
+    // About 200 MB of tiles. Instrumented runs, such as mutation testing, need longer than the default.
+  }, 60_000);
 
   it('drops the oldest steps once the byte cap is reached, keeping the newest', () => {
     const tile = TILE_SIZE * TILE_SIZE * 4;

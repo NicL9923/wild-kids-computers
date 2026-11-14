@@ -68,8 +68,8 @@ function reduce(x: number): { r: number; q: number } {
   return { r, q: ((k % 4) + 4) % 4 };
 }
 
+// sin and cos of infinity or NaN come out NaN without a guard: the reduction gives NaN.
 export function sin(x: number): number {
-  if (!Number.isFinite(x)) return Number.NaN;
   const { r, q } = reduce(x);
   switch (q) {
     case 0:
@@ -84,7 +84,6 @@ export function sin(x: number): number {
 }
 
 export function cos(x: number): number {
-  if (!Number.isFinite(x)) return Number.NaN;
   const { r, q } = reduce(x);
   switch (q) {
     case 0:
@@ -100,6 +99,8 @@ export function cos(x: number): number {
 
 /** Series for atan on |t| <= tan(pi/12). The first omitted term is below 2e-17. */
 function atanKernel(t: number): number {
+  // Keep the sign of zero, which the sum below would lose.
+  if (t === 0) return t;
   const z = t * t;
   let sum = 0;
   // t^29 / 29 is the last term kept. Summing smallest first keeps the rounding error low.
@@ -107,10 +108,10 @@ function atanKernel(t: number): number {
   return t + t * sum;
 }
 
+/** NaN falls through every branch to the series, which returns NaN. Infinity reaches atan(0). */
 export function atan(x: number): number {
-  if (Number.isNaN(x)) return Number.NaN;
   if (x < 0) return -atan(-x);
-  if (x > 1) return x === Number.POSITIVE_INFINITY ? HALF_PI : HALF_PI - atan(1 / x);
+  if (x > 1) return HALF_PI - atan(1 / x);
   if (x > TAN_PI_OVER_12) return PI_OVER_6 + atanKernel((x * SQRT3 - 1) / (x + SQRT3));
   return atanKernel(x);
 }
@@ -118,13 +119,10 @@ export function atan(x: number): number {
 /** The angle of the point (x, y) from the positive x axis, in (-pi, pi]. */
 export function atan2(y: number, x: number): number {
   if (Number.isNaN(x) || Number.isNaN(y)) return Number.NaN;
-  if (x === 0) {
-    if (y === 0) return 0;
-    return y > 0 ? HALF_PI : -HALF_PI;
-  }
-  const base = atan(Math.abs(y / x));
-  if (x > 0) return y < 0 ? -base : base;
-  return y < 0 ? base - PI : PI - base;
+  if (x > 0) return atan(y / x);
+  if (x < 0) return y < 0 ? atan(y / x) - PI : atan(y / x) + PI;
+  if (y === 0) return 0;
+  return y > 0 ? HALF_PI : -HALF_PI;
 }
 
 // A little-endian view for building and splitting doubles bit by bit. Both directions are exact.
@@ -153,7 +151,8 @@ export function scaleByPowerOfTwo(x: number, k: number): number {
 }
 
 export function exp(x: number): number {
-  if (Number.isNaN(x)) return Number.NaN;
+  // Past these limits the result overflows or underflows anyway. Returning early also handles
+  // infinity and keeps scaleByPowerOfTwo from looping on huge exponents. NaN falls through to NaN.
   if (x > 709.782712893384) return Number.POSITIVE_INFINITY;
   if (x < -745.1332191019411) return 0;
   const k = Math.round(x * INV_LN2);
@@ -194,11 +193,12 @@ export function log(x: number): number {
   return exponent * LN2 + 2 * (s + s * sum);
 }
 
-/** x raised to y. Integer powers multiply exactly by squaring. Other powers use exp and log. */
+/**
+ * x raised to y. Integer powers multiply by squaring, in at most 53 rounds. Other powers use
+ * exp and log, which also give NaN for a negative base and the right limit for a zero base.
+ */
 export function pow(x: number, y: number): number {
-  if (y === 0) return 1;
-  if (Number.isNaN(x) || Number.isNaN(y)) return Number.NaN;
-  if (Number.isInteger(y) && Math.abs(y) <= 1024) {
+  if (Number.isInteger(y)) {
     let base = y < 0 ? 1 / x : x;
     let n = Math.abs(y);
     let result = 1;
@@ -209,8 +209,6 @@ export function pow(x: number, y: number): number {
     }
     return result;
   }
-  if (x < 0) return Number.NaN;
-  if (x === 0) return y > 0 ? 0 : Number.POSITIVE_INFINITY;
   return exp(y * log(x));
 }
 
@@ -219,9 +217,7 @@ export function hypot(x: number, y: number): number {
 }
 
 export function clamp(value: number, low: number, high: number): number {
-  if (value < low) return low;
-  if (value > high) return high;
-  return value;
+  return Math.min(high, Math.max(low, value));
 }
 
 /** Hermite smoothstep from 0 at edge0 to 1 at edge1. */

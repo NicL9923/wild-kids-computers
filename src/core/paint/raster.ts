@@ -42,54 +42,35 @@ class Accumulator {
     this.cells = accumulationBuffer(this.stride * height);
   }
 
-  /** Adds an edge in local coordinates, clipping it to the rows and clamping it to the columns. */
+  /**
+   * Adds an edge in local coordinates. addLine skips rows outside the buffer, so only the
+   * columns need care: the edge is split where it crosses x = 0 or x = width, and a part left of
+   * the buffer becomes a vertical edge on its left side, which covers every pixel to its right
+   * just as the real edge does. A part right of the buffer lands in a column nothing reads.
+   */
   addEdge(x0: number, y0: number, x1: number, y1: number): void {
     if (y0 === y1) return;
-    const h = this.height;
-    if ((y0 <= 0 && y1 <= 0) || (y0 >= h && y1 >= h)) return;
-    // Clip to 0 <= y <= h. Rows outside the buffer never read these parts.
-    let ax = x0;
-    let ay = y0;
-    let bx = x1;
-    let by = y1;
-    const slope = (x1 - x0) / (y1 - y0);
-    if (ay < 0) {
-      ax += (0 - ay) * slope;
-      ay = 0;
-    } else if (ay > h) {
-      ax += (h - ay) * slope;
-      ay = h;
-    }
-    if (by < 0) {
-      bx += (0 - by) * slope;
-      by = 0;
-    } else if (by > h) {
-      bx += (h - by) * slope;
-      by = h;
-    }
-    // Split where the edge crosses x = 0 or x = width. A part left of the buffer becomes a
-    // vertical edge on its left side, which covers every pixel to its right, as the real edge does.
     const w = this.width;
     const cuts: number[] = [0, 1];
-    if (ax !== bx) {
-      for (const boundary of [0, w]) {
-        const t = (boundary - ax) / (bx - ax);
-        if (t > 0 && t < 1) cuts.push(t);
-      }
+    // A vertical edge divides by zero here, which gives a t outside (0, 1) and no cut.
+    for (const boundary of [0, w]) {
+      const t = (boundary - x0) / (x1 - x0);
+      if (t > 0 && t < 1) cuts.push(t);
     }
     cuts.sort((p, q) => p - q);
     for (let i = 0; i + 1 < cuts.length; i++) {
       const t0 = cuts[i] ?? 0;
       const t1 = cuts[i + 1] ?? 1;
-      const px = Math.min(w, Math.max(0, ax + (bx - ax) * t0));
-      const py = ay + (by - ay) * t0;
-      const qx = Math.min(w, Math.max(0, ax + (bx - ax) * t1));
-      const qy = ay + (by - ay) * t1;
-      this.addLine(px, py, qx, qy);
+      this.addLine(
+        Math.min(w, Math.max(0, x0 + (x1 - x0) * t0)),
+        y0 + (y1 - y0) * t0,
+        Math.min(w, Math.max(0, x0 + (x1 - x0) * t1)),
+        y0 + (y1 - y0) * t1,
+      );
     }
   }
 
-  /** Adds an edge that lies inside the buffer: 0 <= x <= width and 0 <= y <= height. */
+  /** Adds an edge with 0 <= x <= width. Rows outside the buffer are skipped. */
   private addLine(x0: number, y0: number, x1: number, y1: number): void {
     if (y0 === y1) return;
     let direction = 1;
@@ -107,7 +88,7 @@ class Accumulator {
     const dxdy = (bottomX - topX) / (bottomY - topY);
     const cells = this.cells;
     const lastRow = Math.min(this.height, Math.ceil(bottomY));
-    for (let row = Math.floor(topY); row < lastRow; row++) {
+    for (let row = Math.max(0, Math.floor(topY)); row < lastRow; row++) {
       const rowTop = Math.max(row, topY);
       const rowBottom = Math.min(row + 1, bottomY);
       const dy = rowBottom - rowTop;
@@ -160,8 +141,8 @@ class Accumulator {
         if (row < minY) minY = row;
         maxY = row;
       }
+      // Edges clamped to the right side add to column width. Column width + 1 only ever gets zero.
       cells[base + this.width] = 0;
-      cells[base + this.width + 1] = 0;
     }
     if (minX > maxX) return EMPTY_RECT;
     return { x: originX + minX, y: originY + minY, width: maxX - minX + 1, height: maxY - minY + 1 };

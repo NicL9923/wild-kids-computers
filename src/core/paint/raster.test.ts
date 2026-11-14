@@ -1,3 +1,4 @@
+/* oxlint-disable no-restricted-properties, wkc/no-exponent-operator -- the reference coverage below uses plain floating-point math on purpose. */
 import { describe, expect, it } from 'vitest';
 import { cos, sin, TAU } from './math.ts';
 import { Path } from './path.ts';
@@ -34,6 +35,23 @@ describe('rasterizePath', () => {
       Math.abs((37.7 - 3.3) * (27.9 - 2.1) - (11.2 - 3.3) * (9.4 - 2.1)) / 2,
       1,
     );
+  });
+
+  it('returns the rectangle of pixels it covered, which can start inside the bounds', () => {
+    // The left column and top row are covered by less than half a 255th, so they round to nothing.
+    expect(rasterizePath(square(2.999, 3.999, 6, 6), CLIP, () => undefined)).toEqual({
+      x: 3,
+      y: 4,
+      width: 3,
+      height: 2,
+    });
+    expect(rasterizePath(square(7, 8, 8, 9), CLIP, () => undefined)).toEqual({ x: 7, y: 8, width: 1, height: 1 });
+  });
+
+  it('visits nothing for a zero-area sliver that spans a large box', () => {
+    let visits = 0;
+    expect(rasterizePath(new Path().polygon([5, 5, 25, 20, 5, 5]), CLIP, () => (visits += 1)).width).toBe(0);
+    expect(visits).toBe(0);
   });
 
   it('returns the covered rectangle, or an empty one for a shape with no area', () => {
@@ -74,6 +92,62 @@ function stroke(polylines: number[][], width: number, closed: boolean): number[]
   });
   return grid;
 }
+
+/** Shapes with slanted edges that cross every side of CLIP, and one inside it. */
+const CROSSING = [
+  new Path().polygon([-12.3, -7.1, 22.6, 4.4, 3.7, 18.9]),
+  new Path().polygon([28.2, 9.5, 51.7, 14.2, 44.4, 41.8, 21.9, 27.3]),
+  new Path().polygon([-6, 26, 18, 22.5, 9, 37]),
+  new Path(0.05).ellipse(20, 15, 26, 11),
+  new Path().polygon([12.5, 6.25, 30.75, 8.5, 18, 20.2]),
+];
+const WIDE = { x: -60, y: -60, width: 160, height: 140 };
+
+/** Coverage inside CLIP, computed with the given clip. */
+function within(
+  draw: (clip: typeof CLIP, visit: (x: number, y: number, c: number) => void) => void,
+  clip: typeof CLIP,
+): number[][] {
+  const grid = Array.from({ length: CLIP.height }, () => Array.from({ length: CLIP.width }, () => 0));
+  draw(clip, (x, y, value) => {
+    const row = grid[y];
+    if (row !== undefined && x >= 0 && x < CLIP.width) row[x] = value;
+  });
+  return grid;
+}
+
+describe('clipping', () => {
+  it.each(CROSSING.map((path, i) => [i, path] as const))(
+    'gives shape %i the same coverage whether or not the clip cuts it',
+    (_i, path) => {
+      const draw = (clip: typeof CLIP, visit: (x: number, y: number, c: number) => void) =>
+        rasterizePath(path, clip, visit);
+      expect(within(draw, CLIP)).toEqual(within(draw, WIDE));
+    },
+  );
+
+  it('gives a stroke the same coverage whether or not the clip cuts it', () => {
+    const points = [-8.2, 3.1, 25.4, -4.7, 47.9, 19.3, 14.6, 35.2, -5.5, 22.8];
+    const draw = (clip: typeof CLIP, visit: (x: number, y: number, c: number) => void) =>
+      rasterizeStroke([points], 5, true, clip, visit);
+    expect(within(draw, CLIP)).toEqual(within(draw, WIDE));
+  });
+
+  it('leaves nothing behind in its buffers for the next shape', () => {
+    // A different buffer width from the shapes before it, so leftovers would land on its pixels.
+    const laterClip = { x: 0, y: 0, width: 30, height: 30 };
+    const later = new Path().polygon([1.5, 0.5, 29.5, 3.5, 11.5, 29.5]);
+    const fresh = coverage(later, laterClip);
+    for (const path of CROSSING) rasterizePath(path, CLIP, () => undefined);
+    rasterizeStroke([[-5, 5, 45, 25]], 6, false, CLIP, () => undefined);
+    expect(coverage(later, laterClip)).toEqual(fresh);
+    const freshStroke = within((clip, visit) => rasterizeStroke([[3, 3, 12, 20]], 3, false, clip, visit), CLIP);
+    rasterizeStroke([[-5, 5, 45, 25]], 9, false, WIDE, () => undefined);
+    expect(within((clip, visit) => rasterizeStroke([[3, 3, 12, 20]], 3, false, clip, visit), CLIP)).toEqual(
+      freshStroke,
+    );
+  });
+});
 
 describe('rasterizeStroke', () => {
   it('draws a disc for a single point or a zero-length line', () => {
@@ -130,6 +204,44 @@ describe('rasterizeStroke', () => {
       const y = Math.floor(15 + 10 * sin(angle));
       expect(ring[y]?.[x], `angle ${i}`).toBeGreaterThan(200);
     }
+  });
+
+  it('matches the coverage computed from the distance to the nearest segment, pixel by pixel', () => {
+    const points = [3.2, 4.7, 31.9, 9.3, 24.4, 26.1, 6.8, 21.5];
+    const radius = 2.6;
+    const distance = (px: number, py: number, i: number): number => {
+      const ax = points[2 * i] ?? 0;
+      const ay = points[2 * i + 1] ?? 0;
+      const bx = points[(2 * i + 2) % points.length] ?? 0;
+      const by = points[(2 * i + 3) % points.length] ?? 0;
+      const t = Math.min(
+        1,
+        Math.max(0, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)),
+      );
+      return Math.hypot(px - (ax + (bx - ax) * t), py - (ay + (by - ay) * t));
+    };
+    const expected = Array.from({ length: CLIP.height }, (_, y) =>
+      Array.from({ length: CLIP.width }, (_cell, x) => {
+        const d = Math.min(...[0, 1, 2, 3].map((i) => distance(x + 0.5, y + 0.5, i)));
+        return Math.round(Math.min(1, Math.max(0, radius - d + 0.5)) * 255);
+      }),
+    );
+    expect(stroke([points], radius * 2, true)).toEqual(expected);
+  });
+
+  it('returns the rectangle of pixels it covered, down to a single pixel', () => {
+    expect(rasterizeStroke([[5.5, 5.5]], 0.6, false, CLIP, () => undefined)).toEqual({
+      x: 5,
+      y: 5,
+      width: 1,
+      height: 1,
+    });
+    expect(rasterizeStroke([[10.5, 10.5, 20.5, 10.5]], 2, false, CLIP, () => undefined)).toEqual({
+      x: 9,
+      y: 9,
+      width: 13,
+      height: 3,
+    });
   });
 
   it('draws nothing for zero width or no points', () => {

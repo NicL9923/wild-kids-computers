@@ -35,13 +35,13 @@ function worstError(ours: (x: number) => number, reference: (x: number) => numbe
 }
 
 describe('engine math', () => {
-  // Paint tools work within a few turns of zero. 1e-14 is a few units in the last place of a
-  // double near 1, and a million times finer than one 8-bit color step.
+  // Paint tools work within a few turns of zero. 3e-16 is about one unit in the last place of a
+  // double near 1. Every term of the series matters at this tolerance.
   it.each([
     ['sin', sin, Math.sin],
     ['cos', cos, Math.cos],
-  ] as const)('%s stays within 1e-14 of the reference from -20 to 20 radians', (_name, ours, reference) => {
-    expect(worstError(ours, reference, samples(-20, 20, 40001))).toBeLessThan(1e-14);
+  ] as const)('%s stays within 3e-16 of the reference from -20 to 20 radians', (_name, ours, reference) => {
+    expect(worstError(ours, reference, samples(-20, 20, 40001))).toBeLessThan(3e-16);
   });
 
   it('sin and cos hit the exact values at their key angles', () => {
@@ -93,7 +93,11 @@ describe('engine math', () => {
       -3 * (PI / 4),
     ]);
     expect(atan2(Number.NaN, 1)).toBeNaN();
+    expect(atan2(Number.NaN, 0)).toBeNaN();
     expect(atan2(1, Number.NaN)).toBeNaN();
+    // The sign of zero follows y, as in the reference.
+    expect(atan2(0, 1)).toBe(0);
+    expect(atan2(-0, 1)).toBe(-0);
   });
 
   it('exp stays within 2e-15 relative error from -700 to 700', () => {
@@ -109,6 +113,8 @@ describe('engine math', () => {
     expect(exp(709.7)).toBeLessThan(Number.POSITIVE_INFINITY);
     expect(exp(-746)).toBe(0);
     expect(exp(-745)).toBeGreaterThan(0);
+    expect(exp(Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY);
+    expect(exp(Number.NEGATIVE_INFINITY)).toBe(0);
     expect(exp(Number.NaN)).toBeNaN();
   });
 
@@ -141,6 +147,9 @@ describe('engine math', () => {
     expect(pow(1.5, 2.5)).toBeCloseTo(Math.pow(1.5, 2.5), 14);
     expect(pow(2, 0.5)).toBeCloseTo(Math.SQRT2, 15);
     expect(pow(2, 2000)).toBe(Number.POSITIVE_INFINITY);
+    expect(pow(-2, 2001)).toBe(Number.NEGATIVE_INFINITY);
+    expect(pow(-0.5, 3000)).toBe(0);
+    expect(pow(Number.NaN, 0)).toBe(1);
     let worst = 0;
     for (const base of samples(0.01, 4, 101)) {
       for (const power of samples(-3.3, 3.3, 61))

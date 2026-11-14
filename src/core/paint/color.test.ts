@@ -33,11 +33,14 @@ describe('blendPixel', () => {
     expect([...data]).toEqual([200, 100, 50, 64]);
   });
 
-  it('over a half-transparent pixel, weights each color by its share of the result', () => {
-    const data = pixel(0, 0, 255, 128);
-    blendPixel(data, 0, 255, 0, 0, 128);
-    // Source weight 128, destination weight 128 * 127 / 255 = 63.75, total alpha about 192.
-    expect([...data]).toEqual([170, 0, 85, 192]);
+  it('over a half-transparent pixel, follows the textbook straight-alpha "over" formula', () => {
+    const data = pixel(40, 80, 200, 128);
+    blendPixel(data, 0, 200, 10, 60, 100);
+    const sa = 100 / 255;
+    const da = 128 / 255;
+    const outA = sa + da * (1 - sa);
+    const over = (s: number, d: number) => Math.round((s * sa + d * da * (1 - sa)) / outA);
+    expect([...data]).toEqual([over(200, 40), over(10, 80), over(60, 200), Math.round(outA * 255)]);
   });
 });
 
@@ -52,6 +55,7 @@ describe('colors', () => {
     expect(mixColors(black, white, 0.5)).toEqual(rgba(128, 128, 128));
     expect(mixColors(black, white, 2)).toEqual(white);
     expect(mixColors(black, white, -1)).toEqual(black);
+    expect(mixColors(rgba(0, 0, 0, 40), rgba(0, 0, 0, 240), 0.25).a).toBe(90);
   });
 
   it.each([
@@ -80,5 +84,7 @@ describe('colors', () => {
       expect(hsv(hue, saturation, value)).toEqual(color);
     }
     expect(toHsv(128, 128, 128)).toEqual({ hue: 0, saturation: 0, value: 128 / 255 });
+    // A pink past magenta has a hue just under a full turn, never a negative one.
+    expect(toHsv(255, 0, 128).hue).toBeCloseTo(1 - 128 / 255 / 6, 12);
   });
 });
