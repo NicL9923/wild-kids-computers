@@ -124,7 +124,7 @@ describe('undo and redo difficulty', () => {
   });
 
   it('hides Clear, which would undo the whole tune at once', () => {
-    expect(withDefaults(generateLevel(1, 2, 'band-6-8').parts).hiddenCommands).toEqual(['clear']);
+    expect(withDefaults(generateLevel(1, 2, 'band-6-8').parts).hiddenCommands).toEqual(['clear', 'close']);
   });
 });
 
@@ -214,7 +214,7 @@ describe('undo and redo layout', () => {
       resize: false,
       openMaximized: false,
       systemSound: false,
-      hiddenCommands: ['clear'],
+      hiddenCommands: ['clear', 'close'],
     });
   });
 

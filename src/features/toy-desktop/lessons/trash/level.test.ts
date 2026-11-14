@@ -153,6 +153,21 @@ describe('trash steps', () => {
     expect(steps[2]?.hint?.(picked.state)).toEqual({ kind: 'command', command: 'restore' });
   });
 
+  it('counts the picture as deleted when its whole folder goes in the trash, and points at the folder to restore', () => {
+    const played = playSteps(level.desktop, steps, [
+      () => ({ type: 'open-folder', folderId: HOME_ID }),
+      () => ({ type: 'explorer', windowId: 'w2', action: { type: 'move', nodeId: level.folderId, toId: TRASH_ID } }),
+      () => ({ type: 'explorer', windowId: 'w2', action: { type: 'open-node', nodeId: TRASH_ID } }),
+    ]);
+    expect(played).toMatchObject({ done: 2, wrong: 0, rejected: [] });
+    expect(steps[2]?.hint?.(played.state)).toEqual({ kind: 'key', key: `item:${level.folderId}` });
+    const restored = playSteps(played.state, steps.slice(2), [
+      () => ({ type: 'explorer', windowId: 'w2', action: { type: 'select', nodeId: level.folderId } }),
+      () => ({ type: 'command', windowId: 'w2', command: 'restore' }),
+    ]);
+    expect(restored).toMatchObject({ done: 1, wrong: 0, rejected: [] });
+  });
+
   it('points at Trash while the trash is not open', () => {
     expect(steps[1]?.hint?.(level.desktop)).toEqual({ kind: 'key', key: `place:${TRASH_ID}` });
     expect(steps[2]?.hint?.(level.desktop)).toEqual({ kind: 'key', key: `place:${TRASH_ID}` });

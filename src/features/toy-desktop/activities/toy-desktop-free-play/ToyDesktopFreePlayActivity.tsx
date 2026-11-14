@@ -3,6 +3,7 @@ import type { ActivityProps } from '../../../../activityShell/kit.ts';
 import { t } from '../../../../core/strings/defineStrings.ts';
 import { strings as shellStrings } from '../../../../activityShell/strings.ts';
 import type { DesktopState } from '../../model/state.ts';
+import { fitForParts, withDefaults } from '../../desktop/parts.ts';
 import { ToyDesktop } from '../../desktop/ToyDesktop.tsx';
 import { useDesktop } from '../../desktop/useDesktop.ts';
 import type { FreePlayLevel } from './level.ts';
@@ -24,7 +25,7 @@ export default function ToyDesktopFreePlayActivity({ level, band, kit }: Props) 
 }
 
 function FreePlay({ level, band, kit }: Props) {
-  const desktop = useDesktop(() => kit.state.value);
+  const desktop = useDesktop(() => fitForParts(kit.state.value, withDefaults(level.parts)));
   const { listen, replace, current: currentState } = desktop;
   const latest = useRef<DesktopState | null>(null);
   const update = kit.state.update;

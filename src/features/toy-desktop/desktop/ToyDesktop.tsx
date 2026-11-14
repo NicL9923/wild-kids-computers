@@ -27,7 +27,7 @@ import './toyDesktop.css';
 import type { DesktopHandle } from './useDesktop.ts';
 import { usePlatformOs } from './usePlatformOs.ts';
 import { DesktopWindow } from './Window.tsx';
-import { byWindowNumber } from './windowOrder.ts';
+import { byWindowNumber, windowNumber } from './windowOrder.ts';
 
 export interface ToyDesktopProps {
   readonly desktop: DesktopHandle;
@@ -114,6 +114,9 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const [notice, setNotice] = useState<Notice | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ windowId: string | null; serial: number } | null>(null);
   const { state, dispatch, listen } = desktop;
+  // Windows numbered from here on were opened on this screen, by the child or the desktop's icons.
+  const [firstOpened] = useState(() => desktop.state.nextWindowId);
+  const openedHere = useCallback((windowId: string) => windowNumber({ id: windowId }) >= firstOpened, [firstOpened]);
   const fit = fitDesktop(space);
   const measured = space.width > 0 && space.height > 0;
 
@@ -227,6 +230,13 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   const open = useCallback(
     (action: OpenAction) => {
       const now = desktop.current();
+      // When every window fills the screen, a second window of an app would hide the first
+      // exactly, and closing one would show another just like it. The open one comes forward.
+      const shown =
+        parts.openMaximized && action.type === 'open-app'
+          ? now.windows.findLast((window) => window.app.kind === action.app)
+          : undefined;
+      if (shown !== undefined) return dispatch({ type: 'activate-window', windowId: shown.id });
       const app =
         action.type === 'open-app'
           ? action.app
@@ -256,8 +266,21 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
   );
 
   const context = useMemo<DesktopContextValue>(
-    () => ({ desktop, kit, band, os, parts, scale: fit.scale, highlight, notice, focusContent, open, sayName }),
-    [desktop, kit, band, os, parts, fit.scale, highlight, notice, focusContent, open, sayName],
+    () => ({
+      desktop,
+      kit,
+      band,
+      os,
+      parts,
+      scale: fit.scale,
+      highlight,
+      notice,
+      openedHere,
+      focusContent,
+      open,
+      sayName,
+    }),
+    [desktop, kit, band, os, parts, fit.scale, highlight, notice, openedHere, focusContent, open, sayName],
   );
 
   /** Menu shortcuts, and typing into the calculator, for the window in front. */

@@ -44,8 +44,9 @@ const PARTS: DesktopParts = {
   windowControls: ['close'],
   resize: false,
   systemSound: false,
-  // Emptying the trash could take the file away for good.
-  hiddenCommands: ['empty-trash'],
+  // Emptying the trash could take the file away for good, and a renamed file no longer answers
+  // to the name the child hears. Renaming is not what this lesson teaches.
+  hiddenCommands: ['empty-trash', 'rename'],
 };
 
 function clampDifficulty(difficulty: number): number {

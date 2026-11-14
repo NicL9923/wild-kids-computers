@@ -21,6 +21,11 @@ export interface DesktopContextValue {
   readonly highlight: HighlightTarget | null;
   /** The gentle sentence about the last refused action, and the window it happened in. */
   readonly notice: Notice | null;
+  /**
+   * True for a window the child opened on this screen, as opposed to one the desktop started
+   * with. Such a window always has a close button, whatever the parts say.
+   */
+  readonly openedHere: (windowId: string) => boolean;
   /** Moves keyboard focus into a window, to its text or its main control. */
   readonly focusContent: (windowId: string) => void;
   /**

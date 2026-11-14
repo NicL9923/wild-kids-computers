@@ -7,6 +7,7 @@ import type { DesktopAction, Transition } from '../../model/desktop.ts';
 import type { DesktopEvent } from '../../model/events.ts';
 import { MIN_DESKTOP_SIZE, type Size } from '../../model/geometry.ts';
 import type { DesktopState } from '../../model/state.ts';
+import type { TextClipboard } from '../../model/textEditor.ts';
 import type { DesktopParts, HighlightTarget } from '../../desktop/parts.ts';
 
 /**
@@ -41,6 +42,13 @@ export interface LessonStep {
    * gets the kit's neutral nudge and counts toward a hint. Leave it out when nothing is wrong.
    */
   readonly wrong?: (transition: Transition, action: DesktopAction) => boolean;
+  /**
+   * False when the child took away something the step needs and nothing on screen brings it
+   * back, such as the number to copy. The harness then puts the desktop back as it was when the
+   * step began and says the step again. No try is counted. Leave it out when any desktop the
+   * child can reach still lets them finish the step.
+   */
+  readonly possible?: (state: DesktopState, clipboard: TextClipboard) => boolean;
   /** The control to point at after a couple of wrong tries. Counted as a hint. */
   readonly hint?: (state: DesktopState) => HighlightTarget | null;
   /** What a wrong try says. Defaults to "Try another one.", which suits a choice among things. */

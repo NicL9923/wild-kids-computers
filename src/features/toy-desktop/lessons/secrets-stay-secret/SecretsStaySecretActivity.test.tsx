@@ -36,6 +36,23 @@ function silentKit() {
   });
 }
 
+function built() {
+  const level = generateLevel(31, 1, 'band-6-8');
+  const view = render(<SecretsStaySecretActivity level={level} band='band-6-8' kit={silentKit()} />);
+  for (const piece of view.container.querySelectorAll<HTMLElement>('[data-piece]')) fireEvent.click(piece);
+  const output = view.container.querySelector<HTMLElement>('.sss-password');
+  if (output === null) throw new Error('no password on screen');
+  return { output };
+}
+
+function copy(target: Element, select: (range: Range) => void): void {
+  const range = document.createRange();
+  select(range);
+  document.getSelection()?.removeAllRanges();
+  document.getSelection()?.addRange(range);
+  fireEvent(target, new Event('copy', { bubbles: true, cancelable: true }));
+}
+
 describe('the pretend password', () => {
   let clipboard: ToyClipboard;
   let uninstall: () => void;
@@ -49,23 +66,6 @@ describe('the pretend password', () => {
     uninstall();
     cleanup();
   });
-
-  function built() {
-    const level = generateLevel(31, 1, 'band-6-8');
-    const view = render(<SecretsStaySecretActivity level={level} band='band-6-8' kit={silentKit()} />);
-    for (const piece of view.container.querySelectorAll<HTMLElement>('[data-piece]')) fireEvent.click(piece);
-    const output = view.container.querySelector<HTMLElement>('.sss-password');
-    if (output === null) throw new Error('no password on screen');
-    return { output };
-  }
-
-  function copy(target: Element, select: (range: Range) => void): void {
-    const range = document.createRange();
-    select(range);
-    document.getSelection()?.removeAllRanges();
-    document.getSelection()?.addRange(range);
-    fireEvent(target, new Event('copy', { bubbles: true, cancelable: true }));
-  }
 
   it.each([
     ['the password alone', (output: HTMLElement) => (range: Range) => range.selectNodeContents(output)],

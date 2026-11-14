@@ -7,10 +7,13 @@ import { createScope } from '../../../../core/activityKit/scope.ts';
 import type { SpokenHandle } from '../../../../core/strings/defineStrings.ts';
 import { feedback } from '../../../../core/strings/shared/index.ts';
 import type { FeedbackOptions } from '../../../../activityShell/kit.ts';
+import { generateLevel as copyPasteLevel } from '../copy-and-paste/level.ts';
+import { copyPasteSay, copyPasteSteps } from '../copy-and-paste/steps.ts';
 import { generateLevel } from '../open-and-close/level.ts';
 import { openCloseSteps } from '../open-and-close/steps.ts';
 import { strings } from '../open-and-close/strings.ts';
-import { HINT_AFTER_TRIES, LESSON_DONE_PAUSE_MS, LessonDesktop, type LessonKit } from './LessonDesktop.tsx';
+import { LESSON_DONE_PAUSE_MS, LessonDesktop, type LessonKit } from './LessonDesktop.tsx';
+import { HINT_AFTER_TRIES } from './stepWalk.ts';
 
 /** What the kit was asked to do, in order. The kit is the lesson's edge to the shell. */
 type KitCall =
@@ -131,6 +134,14 @@ describe('the lesson harness, running open and close', () => {
     expect(calls.at(-1)).toEqual({ call: 'correct', say: feedback.youDidIt.id });
   });
 
+  it('brings the open window forward when the youngest child taps its icon again', async () => {
+    const young = generateLevel(31, 1, 'band-3-5');
+    const { container } = await start(young, 'band-3-5');
+    fireEvent.click(icon(container, young.app));
+    fireEvent.click(icon(container, young.app));
+    expect(container.querySelectorAll(`[data-app="${young.app}"]`)).toHaveLength(1);
+  });
+
   it('ends the round after the last step, once the child has seen it land', async () => {
     const { calls, container } = await start();
     fireEvent.click(icon(container, level.app));
@@ -143,5 +154,42 @@ describe('the lesson harness, running open and close', () => {
     // Nothing the child does after the last step counts.
     fireEvent.click(icon(container, other));
     expect(calls.filter((entry) => entry.call === 'wrong')).toEqual([]);
+  });
+});
+
+describe('the lesson harness, when the child takes away what a step needs', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('puts the desktop back as the step began and says the step again, counting nothing', async () => {
+    const round = copyPasteLevel(31, 1, 'band-6-8');
+    const fake = fakeKit(createManualScheduler({ wall: Date.UTC(2026, 10, 14) }));
+    const { container } = render(
+      <LessonDesktop level={round} band='band-6-8' kit={fake.kit} steps={copyPasteSteps(round, 'linux')} />,
+    );
+    await act(() => Promise.resolve());
+    const display = () => container.querySelector('[data-calculator-display]')?.textContent;
+    expect(display()).toBe(round.number);
+    const clear = container.querySelector<HTMLElement>('[data-calculator-key="C"]');
+    if (clear === null) throw new Error('no clear key');
+    fireEvent.click(clear);
+    expect(display()).toBe(round.number);
+    expect(fake.calls.filter((entry) => entry.call !== 'instruction')).toEqual([]);
+    expect(fake.calls.at(-1)).toEqual({
+      call: 'instruction',
+      ids: [copyPasteSay('calculatorCopy', 'menu', 'linux').id],
+    });
   });
 });

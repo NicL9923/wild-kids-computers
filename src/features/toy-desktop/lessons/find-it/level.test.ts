@@ -126,7 +126,7 @@ describe('find it difficulty', () => {
   });
 
   it('keeps Empty trash away', () => {
-    expect(withDefaults(generateLevel(1, 1, 'band-9-12').parts).hiddenCommands).toEqual(['empty-trash']);
+    expect(withDefaults(generateLevel(1, 1, 'band-9-12').parts).hiddenCommands).toEqual(['empty-trash', 'rename']);
   });
 });
 
@@ -191,7 +191,7 @@ describe('find it layout and files', () => {
       resize: false,
       openMaximized: false,
       systemSound: false,
-      hiddenCommands: ['empty-trash'],
+      hiddenCommands: ['empty-trash', 'rename'],
     });
   });
 

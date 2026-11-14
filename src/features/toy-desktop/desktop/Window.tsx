@@ -35,7 +35,7 @@ export interface DesktopWindowProps {
  */
 export function DesktopWindow({ window, layer, focused, area }: DesktopWindowProps) {
   const context = useDesktopContext();
-  const { desktop, kit, parts, scale, highlight, sayName } = context;
+  const { desktop, kit, parts, scale, highlight, sayName, openedHere } = context;
   const { state, dispatch } = desktop;
   const frame = windowFrame(state, window);
   const pixels = toPixels(frame, scale);
@@ -152,7 +152,7 @@ export function DesktopWindow({ window, layer, focused, area }: DesktopWindowPro
           {t(strings.moveHint)}
         </span>
         <div className='td-window-controls'>
-          {parts.windowControls.map((kind) => {
+          {windowControls(parts.windowControls, openedHere(windowId)).map((kind) => {
             const { label, run, glyph } = control(kind);
             return (
               <button
@@ -204,6 +204,11 @@ export function DesktopWindow({ window, layer, focused, area }: DesktopWindowPro
       )}
     </section>
   );
+}
+
+/** The title bar buttons. A window the child opened always has a close button. */
+function windowControls(controls: readonly WindowControl[], openedHere: boolean): readonly WindowControl[] {
+  return openedHere && !controls.includes('close') ? [...controls, 'close'] : controls;
 }
 
 function UnsavedMark() {

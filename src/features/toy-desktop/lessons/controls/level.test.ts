@@ -279,7 +279,8 @@ describe('controls desktop', () => {
     const level = generateLevel(1, 1, 'band-6-8');
     expect(level.desktop.windows.map((window) => window.app.kind)).toEqual(['settings']);
     expect(withDefaults(level.parts)).toEqual({
-      hiddenCommands: [],
+      // No close button, so Close leaves the menus and shortcuts too.
+      hiddenCommands: ['close'],
       icons: [{ app: 'notepad' }, { app: 'music-box' }],
       menuBar: false,
       taskStrip: false,

@@ -140,6 +140,23 @@ describe('files and folders steps', () => {
   );
   if (otherFolder === undefined) throw new Error('difficulty 4 has three folders');
 
+  const moveFile = explorer({ type: 'move', nodeId: level.fileId, toId: level.folderId });
+  it.each([
+    ['into another folder before the file is in it', [], otherFolder.id, 0],
+    ['into the trash before the file is in it', [], TRASH_ID, 0],
+    ['into another folder once the file is in it', [moveFile], otherFolder.id, 1],
+  ] as const)(
+    'puts the named folder back at home when the child moves it %s, and counts no try',
+    (_label, before, to, done) => {
+      const played = playSteps(level.desktop, steps, [
+        ...before,
+        explorer({ type: 'move', nodeId: level.folderId, toId: to }),
+      ]);
+      expect(played).toMatchObject({ done, wrong: 0, restored: 1, rejected: [] });
+      expect(played.state.fs.nodes[level.folderId]?.parentId).toBe(HOME_ID);
+    },
+  );
+
   it('says each step: move, open, make, name', () => {
     expect(steps.map((step) => step.instruction)).toEqual([
       expect.objectContaining({ id: expect.stringMatching(/files-and-folders\.move/) }),

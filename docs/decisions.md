@@ -70,6 +70,12 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **A click on empty ground in a pointer activity is a quiet mistake:** a ring where the click landed, no sound, and it counts toward easing the level.
 - **Between rounds the stage rests for 1.2 seconds and takes no input.** The child sees the last action land, and the session limit is checked then.
 - **A sequence shows only the steps reached.** Nothing looks locked.
+- **No toy desktop lesson can get stuck.** Without a close button, Close also leaves the menus and shortcuts, and a window the child opens during a round always has a close button. A step whose needed thing the child destroyed, such as the number to copy or the folder to move a file into, puts the desktop back as the step began and says the step again, with no try counted. A random-walk test checks every lesson for a way to finish.
+- **For the youngest band, an app icon brings the app's open window forward.** Every window fills the screen there, so a second window of the same app would hide the first exactly, and closing one would show another just like it.
+- **In the trash lesson, a picture inside a folder that went in the trash counts as deleted**, as on a real computer, and restoring the folder restores it.
+- **Find it hides Rename.** A renamed file no longer answers to the name the child hears, and renaming is not the lesson.
+- **A save or open dialog answers for its window.** The document under it takes no typing or clicks, and the keyboard moves into the dialog however it opened.
+- **Text marked `data-no-copy` is never copied.** The pretend password in Secrets stay secret cannot reach the toy clipboard, even through Select all.
 - **Pop the seed pods draws original seed heads,** not an emoji: no bundled emoji reads as a seed pod. Pods are at least 160 board units, about twice the youngest band's target, and never near the exit corner.
 - **Count the flowers lets a child touch each flower to count it out loud.** Counting is the goal, so the aid serves it. Rows hold at most five, like a ten frame, and distractors are within two of the answer.
 - **Find the letter and sight words keep their choices quiet under the pointer.** Knowing a written letter or word is the goal, so a choice that said its name on hover would turn the round into listening for a match. A wrong pick says its own name instead, so every try still teaches. Other letter choices speak on hover and focus: names where the goal is a sound or an order, and sounds where the goal is spelling.

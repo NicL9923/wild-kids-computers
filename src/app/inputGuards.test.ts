@@ -72,17 +72,18 @@ describe('copy', () => {
   });
 });
 
-describe('text marked data-no-copy', () => {
-  function secret(): HTMLElement {
-    const box = document.createElement('div');
-    box.dataset.noCopy = '';
-    box.textContent = 'Fox*42';
-    const before = document.createElement('p');
-    before.textContent = 'page text';
-    document.body.append(before, box);
-    return box;
-  }
+/** Page text marked as never to be copied, after some ordinary text. */
+function secret(): HTMLElement {
+  const box = document.createElement('div');
+  box.dataset.noCopy = '';
+  box.textContent = 'Fox*42';
+  const before = document.createElement('p');
+  before.textContent = 'page text';
+  document.body.append(before, box);
+  return box;
+}
 
+describe('text marked data-no-copy', () => {
   it.each([
     ['the marked text', (box: HTMLElement) => box],
     ['the whole page, as Select all does', () => document.body],

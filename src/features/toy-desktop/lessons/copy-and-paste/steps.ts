@@ -3,6 +3,7 @@ import type { SpokenHandle } from '../../../../core/strings/defineStrings.ts';
 import type { HighlightTarget } from '../../desktop/parts.ts';
 import { hasEvent, isWindowFocused } from '../../model/goals.ts';
 import { findWindow, type DesktopState } from '../../model/state.ts';
+import type { TextClipboard } from '../../model/textEditor.ts';
 import type { LessonStep } from '../harness/lesson.ts';
 import { CALCULATOR_WINDOW, NOTEPAD_WINDOW, type CopyPasteLevel, type Route } from './level.ts';
 import { strings } from './strings.ts';
@@ -55,6 +56,12 @@ function noteSelection(state: DesktopState): string {
   return text.slice(Math.min(anchor, caret), Math.max(anchor, caret));
 }
 
+/** The whole text of the note. */
+function noteText(state: DesktopState): string {
+  const app = findWindow(state, NOTEPAD_WINDOW)?.app;
+  return app?.kind === 'notepad' ? app.editor.text : '';
+}
+
 function calculatorShows(state: DesktopState, number: string): boolean {
   const app = findWindow(state, CALCULATOR_WINDOW)?.app;
   return app?.kind === 'calculator' && app.display === number;
@@ -88,11 +95,16 @@ export function copyPasteSteps({ direction, route, number }: CopyPasteLevel, os:
     ({ events }) =>
       hasEvent(events, 'copied', (event) => event.windowId !== from || event.text.trim() !== number);
 
+  // The number is only where the round put it. A child who clears the calculator or deletes the
+  // number from the note cannot know it again, so the step starts over with the number back.
+  const onClipboard = (clipboard: TextClipboard) => clipboard.read()?.text.trim() === number;
   if (direction === 'calculator-to-note') {
+    const inCalculator = (state: DesktopState) => calculatorShows(state, number);
     return [
       {
         instruction: say('calculatorCopy'),
         done: copied(CALCULATOR_WINDOW),
+        possible: inCalculator,
         wrong: copiedElse(CALCULATOR_WINDOW),
         hint: pointIn(CALCULATOR_WINDOW),
       },
@@ -101,20 +113,24 @@ export function copyPasteSteps({ direction, route, number }: CopyPasteLevel, os:
         done: (_state, events) =>
           hasEvent(events, 'pasted', (event) => event.windowId === NOTEPAD_WINDOW && event.text.includes(number)),
         wrong: pastedElse(NOTEPAD_WINDOW),
+        possible: (state, clipboard) => onClipboard(clipboard) || inCalculator(state),
         hint: pointIn(NOTEPAD_WINDOW),
       },
     ];
   }
+  const inNote = (state: DesktopState) => noteText(state).includes(number);
   return [
     {
       instruction: say('noteSelect'),
       done: (state) => noteSelection(state).trim() === number,
+      possible: inNote,
       hint: pointIn(NOTEPAD_WINDOW),
     },
     {
       instruction: say('noteCopy'),
       done: copied(NOTEPAD_WINDOW),
       wrong: copiedElse(NOTEPAD_WINDOW),
+      possible: inNote,
       hint: pointIn(NOTEPAD_WINDOW),
     },
     {
@@ -122,6 +138,7 @@ export function copyPasteSteps({ direction, route, number }: CopyPasteLevel, os:
       done: (state, events) =>
         hasEvent(events, 'pasted', (event) => event.windowId === CALCULATOR_WINDOW) && calculatorShows(state, number),
       wrong: pastedElse(CALCULATOR_WINDOW),
+      possible: (state, clipboard) => onClipboard(clipboard) || inNote(state),
       hint: pointIn(CALCULATOR_WINDOW),
     },
   ];
