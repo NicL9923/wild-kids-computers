@@ -9,7 +9,7 @@ export default defineActivity<MoveResizeLevel>({
   bands: ['band-6-8', 'band-9-12'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'window' },
+  icon: { emoji: 'ruler' },
   kind: 'rounds',
   inputs: ['drag', 'click', 'keyboard'],
   difficulty: {

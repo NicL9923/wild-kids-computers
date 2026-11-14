@@ -13,7 +13,7 @@ export default defineActivity<FreePlayLevel, DesktopState>({
   bands: ['band-3-5', 'band-6-8', 'band-9-12'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'computer' },
+  icon: { emoji: 'laptop' },
   kind: 'free',
   inputs: ['click', 'drag', 'keyboard', 'text-entry'],
   generateLevel,

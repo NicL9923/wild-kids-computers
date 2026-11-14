@@ -9,7 +9,7 @@ export default defineActivity<MenusLevel>({
   bands: ['band-6-8', 'band-9-12'],
   goal: strings.goal,
   title: strings.title,
-  icon: { emoji: 'clipboard' },
+  icon: { emoji: 'notebook' },
   kind: 'rounds',
   inputs: ['click', 'keyboard'],
   difficulty: {
