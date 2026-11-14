@@ -1,7 +1,7 @@
 import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { quitWork } from '../../../app/kiosk/quitWork.ts';
-import { useBand, usePictures, useSessionLength } from '../../../app/session/sessionHooks.ts';
+import { useBand, useSessionLength } from '../../../app/session/sessionHooks.ts';
 import type { ProfilePictures } from '../../../app/session/sessionStore.ts';
 import { useAudio, useMute } from '../../../audio/AudioProvider.tsx';
 import type { ContinuousSound } from '../../../audio/audioEngine.ts';
@@ -27,6 +27,9 @@ import { PAINT_GALLERY_PATH } from '../paths.ts';
 import { clearStartingPicture, paintLines, peekStartingPicture, type StartingPicture } from '../startingPicture.ts';
 import { strings } from '../strings.ts';
 import { createScope, type OwnedScope, type Scope } from '../../../core/activityKit/scope.ts';
+import { withDeadline } from '../../../core/activityKit/deadline.ts';
+import { systemScheduler } from '../../../core/activityKit/scheduler.ts';
+import { useBoundedPictures } from '../boundedPictures.ts';
 import { kitScheduler } from '../../../activityShell/kitTime.ts';
 import { createEffectRunner, startEffectWorker, type EffectRunner } from '../worker/effectRunner.ts';
 import { Autosaver, type KeptPicture } from './autosave.ts';
@@ -66,6 +69,16 @@ import { unflattenUnderMask } from './unflatten.ts';
 const AUTOSAVE_DELAY_MS = 1500;
 /** How long input waits after a save for leaving, in case the route change that asked for it never came. */
 const STALLED_LEAVE_MS = 2000;
+/**
+ * How long decoding a picture or a coloring page mask may take before the studio gives up on it.
+ * Decoding a 1600 by 1000 PNG is faster than encoding one, which `npm run perf` puts under 0.6
+ * seconds even for a picture of pure noise.
+ */
+const DECODE_DEADLINE_MS = 10_000;
+/** How long the text tool's letters may take to load. They are a small file in the app. */
+const FONT_DEADLINE_MS = 10_000;
+/** Real time, for deadlines on work that runs in real time even when a test pins the kit's clock. */
+const realTime = systemScheduler();
 /** Brush speed, in document pixels per millisecond, that makes the brush sound loudest. */
 const LOUDEST_SPEED = 3;
 
@@ -107,9 +120,17 @@ async function openGalleryPicture(pictures: ProfilePictures, id: string): Promis
   const read = await pictures.read(id, 'picture');
   if (!read.ok) return null;
   try {
-    const { picture, pageId } = await decodePicture(read.value);
+    const { picture, pageId } = await withDeadline(
+      decodePicture(read.value),
+      DECODE_DEADLINE_MS,
+      realTime,
+      'Decoding the picture',
+    );
     const page = pageId === null ? undefined : coloringPageById(pageId);
-    const mask = page === undefined ? null : await decodePngUrl(page.mask);
+    const mask =
+      page === undefined
+        ? null
+        : await withDeadline(decodePngUrl(page.mask), DECODE_DEADLINE_MS, realTime, 'Decoding the page');
     const studio = new StudioDocument();
     studio.load(mask === null ? picture : unflattenUnderMask(picture, mask), mask, page?.id ?? null);
     return studio;
@@ -126,7 +147,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   const band = useBand();
   const audio = useAudio();
   const [muted, toggleMute] = useMute();
-  const pictures = usePictures();
+  const pictures = useBoundedPictures();
   const { isLimitReached } = useSessionLength();
   const navigate = useNavigate();
   const youngest = isYoungest(band);
@@ -186,7 +207,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   // when the profile stopped being ready. Every route change has saved it already; see below.
   useEffect(() => {
     const scope = createScope(kitScheduler);
-    const runner = createEffectRunner(startEffectWorker, encodePicture);
+    const runner = createEffectRunner(startEffectWorker, encodePicture, realTime);
     let live = true;
     void (async () => {
       await runner.warm();
@@ -296,8 +317,10 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     let live = true;
     const load = paintFonts.get('meadow-sans');
     void (async () => {
-      const table = await load?.();
-      if (live && table !== undefined) setFont(table);
+      if (load === undefined) return;
+      // Letters that never load leave the text tool quiet, as a missing font file does.
+      const table = await withDeadline(load(), FONT_DEADLINE_MS, realTime, 'Loading the letters').catch(() => null);
+      if (live && table !== null) setFont(table);
     })();
     return () => {
       live = false;
@@ -603,7 +626,13 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     setPanel(null);
     settle();
     say(page.title);
-    const mask = await decodePngUrl(page.mask);
+    let mask: Surface;
+    try {
+      mask = await withDeadline(decodePngUrl(page.mask), DECODE_DEADLINE_MS, realTime, 'Decoding the page');
+    } catch {
+      // The page could not be read, so the picture on screen stays.
+      return;
+    }
     const blank = createSurface(DOCUMENT_WIDTH, DOCUMENT_HEIGHT, PAPER);
     audio.play('page-turn');
     // The picture so far stays in the gallery, and the page starts a new one that undo takes off.

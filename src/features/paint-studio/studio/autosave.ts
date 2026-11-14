@@ -21,8 +21,9 @@ export interface AutosaveOptions {
   readonly scope: Scope;
   /** How long painting must pause before a save, in milliseconds. */
   readonly delayMs: number;
-  /** The picture as gallery files. Take the pixels before the first await. */
+  /** The picture as gallery files. Take the pixels before the first await. Must end, as the effect runner's does. */
   readonly encode: (studio: StudioDocument) => Promise<EncodedPicture>;
+  /** Must end: give it a deadline, as `boundedPictures` does. */
   readonly save: (input: SavePictureInput) => Promise<BridgeResult<PictureSummary>>;
   /** Hears when saving starts failing, and when a save lands again after that. */
   readonly onFailingChange?: (failing: boolean) => void;
@@ -169,7 +170,13 @@ export class Autosaver {
       // The picture could not be turned into files. It stays unsaved, and leaving tries again.
       return false;
     }
-    const result = await this.options.save({ ...(this.id === null ? {} : { id: this.id }), ...files });
+    let result: BridgeResult<PictureSummary>;
+    try {
+      result = await this.options.save({ ...(this.id === null ? {} : { id: this.id }), ...files });
+    } catch {
+      // A save that throws instead of reporting failed the same way.
+      return false;
+    }
     if (!result.ok) return false;
     // Only `switchTo` changes the picture, and it waits for this save, so it is still the one held.
     this.id = result.value.id;

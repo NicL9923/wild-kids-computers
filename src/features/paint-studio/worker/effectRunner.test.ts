@@ -3,8 +3,21 @@ import { rgba } from '../../../core/paint/color.ts';
 import { createSurface, surfaceFromData } from '../../../core/paint/surface.ts';
 import type { PictureEffect } from '../../../core/paint/types.ts';
 import { paintEffects } from '../../../registry/paint.ts';
-import { createEffectRunner, startEffectWorker, type WorkerLike } from './effectRunner.ts';
+import { DeadlineError } from '../../../core/activityKit/deadline.ts';
+import { createManualScheduler } from '../../../core/activityKit/scheduler.ts';
+import {
+  WORKER_DEADLINES,
+  createEffectRunner as createRunner,
+  startEffectWorker,
+  type WorkerLike,
+} from './effectRunner.ts';
 import type { EffectRequest, EffectResponse } from './protocol.ts';
+
+/** Real-time timers for a test that never waits on a deadline. A test that does passes its own. */
+const createEffectRunner = (
+  makeWorker: Parameters<typeof createRunner>[0],
+  encodeHere: Parameters<typeof createRunner>[1],
+) => createRunner(makeWorker, encodeHere, createManualScheduler({ wall: 0 }));
 
 const flip = paintEffects.find((effect): effect is PictureEffect => effect.id === 'flipSideways');
 if (flip === undefined) throw new Error('The flipSideways effect is missing.');
@@ -184,5 +197,219 @@ describe('encoding a picture for the gallery', () => {
     const doc = { ...page, paint: picture(), mask: null };
     expect([...(await createEffectRunner(() => failing.worker, encodeHere).encode(doc, null)).png]).toEqual([7, 7]);
     expect([...(await createEffectRunner(() => null, encodeHere).encode(doc, null)).png]).toEqual([7, 7]);
+  });
+});
+
+/**
+ * A worker that answers only when the test says, the way a stuck or slow one behaves. Posting to it
+ * after it was stopped throws, because the runner must never use a stopped worker.
+ */
+function heldWorker(autoWarm = true) {
+  const received: EffectRequest[] = [];
+  const listeners: { message: ((event: MessageEvent<EffectResponse>) => void)[]; error: ((event: Event) => void)[] } = {
+    message: [],
+    error: [],
+  };
+  let terminated = false;
+  const worker: WorkerLike = {
+    postMessage(message) {
+      if (terminated) throw new Error('Posted to a stopped worker.');
+      received.push(message);
+      if (autoWarm && message.kind === 'warm') queueMicrotask(() => answer({ kind: 'ready', id: message.id }));
+    },
+    addEventListener(type: 'message' | 'error', listener: never) {
+      listeners[type].push(listener);
+    },
+    terminate() {
+      terminated = true;
+    },
+  };
+  function answer(response: EffectResponse): void {
+    for (const listener of listeners.message) listener(new MessageEvent('message', { data: response }));
+  }
+  return {
+    worker,
+    received,
+    answer,
+    crash: () => {
+      for (const listener of listeners.error) listener(new Event('error'));
+    },
+    terminated: () => terminated,
+  };
+}
+
+/** Lets settled promises run their callbacks. */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
+/** Whether a promise settled yet. */
+function track<T>(promise: Promise<T>): { readonly settled: boolean } {
+  const state = { settled: false };
+  promise.then(
+    () => (state.settled = true),
+    () => (state.settled = true),
+  );
+  return state;
+}
+
+describe('a worker that does not answer in time', () => {
+  const page = { width: 4, height: 2 };
+
+  it('encodes on this thread once the deadline passes, and the next request gets a fresh worker', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const workers = [heldWorker(), heldWorker()];
+    let started = 0;
+    const runner = createRunner(() => workers[started++]?.worker ?? null, encodeHere, timers);
+    await runner.warm();
+
+    const encoding = runner.encode({ ...page, paint: picture(), mask: null }, null);
+    const state = track(encoding);
+    timers.advance(WORKER_DEADLINES.encode - 1);
+    await flush();
+    expect(state.settled).toBe(false);
+    timers.advance(1);
+    expect([...(await encoding).png]).toEqual([7, 7]);
+    expect(workers[0]?.terminated()).toBe(true);
+
+    // The next effect starts a new worker, and its answer counts.
+    const running = runner.run(flip, picture());
+    await flush();
+    const sent = workers[1]?.received[0];
+    if (sent?.kind !== 'apply') throw new Error('Expected the fresh worker to get the effect.');
+    workers[1]?.answer({ kind: 'result', id: sent.id, pixels: new Uint8ClampedArray(32).fill(3) });
+    expect([...(await running).subarray(0, 4)]).toEqual([3, 3, 3, 3]);
+    expect(started).toBe(2);
+  });
+
+  it('applies an effect on this thread when the worker holds it past the deadline', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const held = heldWorker();
+    const runner = createRunner(() => held.worker, encodeHere, timers);
+    const running = runner.run(flip, picture());
+    timers.advance(WORKER_DEADLINES.apply);
+    expect([...(await running).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
+    expect(held.terminated()).toBe(true);
+  });
+
+  it('lets the studio get ready when the worker never answers its warm-up', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const runner = createRunner(() => heldWorker(false).worker, encodeHere, timers);
+    const warming = runner.warm();
+    timers.advance(WORKER_DEADLINES.warm);
+    await expect(warming).resolves.toBeUndefined();
+  });
+
+  it('ignores an answer and an error from the stopped worker after this thread already finished', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const late = heldWorker();
+    const fresh = heldWorker();
+    const queue = [late, fresh];
+    const runner = createRunner(() => queue.shift()?.worker ?? null, encodeHere, timers);
+    const encoding = runner.encode({ ...page, paint: picture(), mask: null }, null);
+    timers.advance(WORKER_DEADLINES.encode);
+    const files = await encoding;
+    expect([...files.png]).toEqual([7, 7]);
+
+    // The fresh worker has a request in flight when the old one finally answers and then fails.
+    const running = runner.run(flip, picture());
+    await flush();
+    const first = late.received[0];
+    const second = fresh.received[0];
+    if (first?.kind !== 'encode' || second?.kind !== 'apply') throw new Error('Unexpected requests.');
+    late.answer({ kind: 'encoded', id: first.id, png: new Uint8Array([1]), thumbnail: new Uint8Array([1]) });
+    late.answer({ kind: 'result', id: second.id, pixels: new Uint8ClampedArray(32).fill(9) });
+    late.crash();
+    await flush();
+    expect([...files.png]).toEqual([7, 7]);
+    expect(fresh.terminated()).toBe(false);
+    fresh.answer({ kind: 'result', id: second.id, pixels: new Uint8ClampedArray(32).fill(3) });
+    expect([...(await running).subarray(0, 4)]).toEqual([3, 3, 3, 3]);
+  });
+
+  it('fails the save when this thread cannot encode in time either, so the studio keeps the picture', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const runner = createRunner(
+      () => heldWorker().worker,
+      () => new Promise<never>(() => undefined),
+      timers,
+    );
+    const encoding = runner.encode({ ...page, paint: picture(), mask: null }, null);
+    const state = track(encoding);
+    timers.advance(WORKER_DEADLINES.encode);
+    // This thread's try starts once the worker's failure has passed through.
+    await flush();
+    timers.advance(WORKER_DEADLINES.encodeHere - 1);
+    await flush();
+    expect(state.settled).toBe(false);
+    timers.advance(1);
+    await expect(encoding).rejects.toThrow(
+      new DeadlineError('Encoding the picture on this thread', WORKER_DEADLINES.encodeHere),
+    );
+  });
+
+  it('stays on this thread after three workers in a row miss their deadline', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    let started = 0;
+    const runner = createRunner(
+      () => {
+        started++;
+        return heldWorker().worker;
+      },
+      encodeHere,
+      timers,
+    );
+    for (let i = 0; i < 4; i++) {
+      const running = runner.run(flip, picture());
+      timers.advance(WORKER_DEADLINES.apply);
+      expect([...(await running).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
+    }
+    expect(started).toBe(3);
+  });
+
+  it('counts only stalls in a row: a worker that answers starts the count again', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const workers = Array.from({ length: 6 }, () => heldWorker());
+    let started = 0;
+    const runner = createRunner(() => workers[started++]?.worker ?? null, encodeHere, timers);
+    const stallOnce = async (): Promise<void> => {
+      const running = runner.run(flip, picture());
+      await flush();
+      timers.advance(WORKER_DEADLINES.apply);
+      await running;
+    };
+    await stallOnce();
+    await stallOnce();
+    const answered = runner.run(flip, picture());
+    await flush();
+    const sent = workers[2]?.received[0];
+    if (sent?.kind !== 'apply') throw new Error('Expected the third worker to get the effect.');
+    workers[2]?.answer({ kind: 'result', id: sent.id, pixels: new Uint8ClampedArray(32) });
+    await answered;
+    await stallOnce();
+    await stallOnce();
+    await stallOnce();
+    expect(started).toBe(5);
+  });
+
+  it('encodes on this thread at once when the worker crashes mid-save, without waiting for the deadline', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const held = heldWorker();
+    let started = 0;
+    const runner = createRunner(
+      () => {
+        started++;
+        return held.worker;
+      },
+      encodeHere,
+      timers,
+    );
+    const encoding = runner.encode({ ...page, paint: picture(), mask: null }, null);
+    held.crash();
+    expect([...(await encoding).png]).toEqual([7, 7]);
+    expect(held.terminated()).toBe(true);
+    // A crashed worker is not started again.
+    await runner.encode({ ...page, paint: picture(), mask: null }, null);
+    expect(started).toBe(1);
   });
 });
