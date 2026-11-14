@@ -165,7 +165,7 @@ export interface SessionStore {
   /** Records a finished round. `difficulty` is the next level, from the activity kit. */
   readonly recordRound: (
     activityId: string,
-    outcome: { mistakes: number; hintsUsed: number },
+    outcome: { mistakes: number; hintsUsed: number; level?: number },
     difficulty?: number,
   ) => void;
   /** Records that the child reached a step of a sequence activity. */

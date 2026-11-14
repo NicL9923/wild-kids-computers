@@ -1,0 +1,171 @@
+/*
+ * The activity shell: the stage an activity fills, the instruction beside the replay control,
+ * feedback marks, the area and step choices, and the finish screen. Every value is a token.
+ * Movement multiplies by --wk-motion-scale, so reduced motion leaves only fades.
+ */
+
+@layer components {
+  /* An activity fills the window exactly; nothing scrolls. */
+  .wk-activity-screen > .wk-screen {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .wk-activity-screen .wk-screen-main {
+    display: grid;
+  }
+
+  .wk-activity-stage {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .wk-instruction {
+    display: flex;
+    align-items: center;
+    gap: var(--wk-space-item);
+  }
+
+  .wk-instruction-text {
+    margin: 0;
+    max-width: 46ch;
+    font-size: var(--wk-text-title);
+    font-weight: var(--wk-font-weight-bold);
+    line-height: var(--wk-line-height-tight);
+  }
+
+  /* ---- feedback ---- */
+
+  .wk-feedback-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .wk-feedback-mark {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: calc(var(--wk-target-min) * 1.1);
+    height: calc(var(--wk-target-min) * 1.1);
+    border-radius: var(--wk-radius-round);
+    translate: -50% -50%;
+    animation: wk-feedback-fade 900ms var(--wk-ease-out) forwards;
+  }
+
+  .wk-feedback-mark[data-kind='correct'] {
+    background: var(--wk-color-success);
+    color: var(--wk-color-on-success);
+    box-shadow: var(--wk-shadow-raised);
+  }
+
+  .wk-feedback-mark[data-kind='correct'] svg {
+    width: 60%;
+    height: 60%;
+  }
+
+  /* A wrong action gets an open ring in a quiet color: no red, no cross, no frown. */
+  .wk-feedback-mark[data-kind='wrong'] {
+    border: calc(var(--wk-border-width) * 3) solid var(--wk-color-border);
+    background: transparent;
+  }
+
+  @keyframes wk-feedback-fade {
+    0% {
+      opacity: 0;
+      scale: calc(1 - 0.4 * var(--wk-motion-scale));
+    }
+
+    20% {
+      opacity: 1;
+      scale: 1;
+    }
+
+    70% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+      scale: calc(1 + 0.15 * var(--wk-motion-scale));
+    }
+  }
+
+  /* ---- area and step choices ---- */
+
+  .wk-area-screen .wk-screen {
+    min-height: 100dvh;
+  }
+
+  .wk-area-title {
+    margin: 0 0 var(--wk-space-container);
+    font-size: var(--wk-text-display);
+    text-align: center;
+  }
+
+  .wk-choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    gap: var(--wk-space-container);
+    margin: 0;
+    padding: var(--wk-space-container) 0;
+    list-style: none;
+  }
+
+  .wk-step-number {
+    display: grid;
+    place-items: center;
+    width: calc(var(--wk-target-large) * 0.9);
+    height: calc(var(--wk-target-large) * 0.9);
+    font-size: calc(var(--wk-target-large) * 0.5);
+    font-weight: var(--wk-font-weight-bold);
+    line-height: 1;
+    color: var(--wk-color-primary);
+  }
+
+  /* ---- finish ---- */
+
+  .wk-finish {
+    position: relative;
+  }
+
+  .wk-finish-end {
+    position: absolute;
+    top: var(--wk-space-screen-edge);
+    right: var(--wk-space-screen-edge);
+  }
+
+  /* ---- useCarry: a picked-up item lifts, and places it may go show a dashed edge ---- */
+
+  [data-carry-item] {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  [data-carry-item][data-carried='true'] {
+    position: relative;
+    z-index: 10;
+    cursor: grabbing;
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+    outline: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+    outline-offset: var(--wk-focus-offset);
+    box-shadow: var(--wk-shadow-overlay);
+  }
+
+  [data-carry-target][data-carry-valid='true'] {
+    outline: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+    outline-offset: calc(var(--wk-focus-offset) * -1);
+  }
+
+  /* The place it would land now: a solid, thicker edge and a tint, so it is not color alone. */
+  [data-carry-target][data-carry-over='true'] {
+    outline-style: solid;
+    outline-width: calc(var(--wk-border-width) * 3);
+    background-color: var(--wk-color-selected);
+  }
+}

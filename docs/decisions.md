@@ -65,6 +65,13 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **A session of a rounds activity ends on a calm finish screen with two equal choices**, play again or go back. A neutral choice is not a prompt to keep playing.
 - **Strings have no interpolation.** Sentences are composed from clips, so letters and numbers sound the same everywhere.
 - **Strings are spoken by default.** A silent string must say why.
+- **The difficulty model moves one level at a time:** up after two clean rounds at the current level, down right after a round with three or more mistakes and hints. Each saved round records its level, an optional field, so a raise never counts rounds from the level before. A bad saved level is dropped, not a reason to reset progress.
+- **The kit counts mistakes and hints itself.** `kit.feedback.wrong` and `kit.hint` count, and `kit.roundComplete()` uses the counts, so an activity cannot forget to report them.
+- **A click on empty ground in a pointer activity is a quiet mistake:** a ring where the click landed, no sound, and it counts toward easing the level.
+- **Between rounds the stage rests for 1.2 seconds and takes no input.** The child sees the last action land, and the session limit is checked then.
+- **A sequence shows only the steps reached.** Nothing looks locked.
+- **Pop the seed pods draws original seed heads,** not an emoji: no bundled emoji reads as a seed pod. Pods are at least 160 board units, about twice the youngest band's target, and never near the exit corner.
+- **Count the flowers lets a child touch each flower to count it out loud.** Counting is the goal, so the aid serves it. Rows hold at most five, like a ten frame, and distractors are within two of the answer.
 
 ### Assets
 

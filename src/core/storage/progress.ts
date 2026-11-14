@@ -21,7 +21,7 @@ function emptyActivityProgress(): ActivityProgress {
 export function recordRound(
   progress: ProgressDocument,
   activityId: string,
-  outcome: { mistakes: number; hintsUsed: number },
+  outcome: { mistakes: number; hintsUsed: number; level?: number },
   finishedAt: Date,
   difficulty?: number,
 ): ProgressDocument {

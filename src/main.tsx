@@ -7,6 +7,7 @@ import { SessionProvider } from './app/session/SessionProvider.tsx';
 import { createSessionStore } from './app/session/sessionStore.ts';
 import { AudioProvider } from './audio/AudioProvider.tsx';
 import { createAppAudio } from './audio/createAppAudio.ts';
+import { exposeKitTime } from './activityShell/kitTime.ts';
 import { exposeAudioTestLog } from './audio/testLog.ts';
 import { getBridge } from './platform/getBridge.ts';
 import { installTestHook, isTestRun } from './platform/testHook.ts';
@@ -24,7 +25,10 @@ void installTestHook(bridge, window.location);
 // The audio test log is chosen when the engine is made, so the engine waits for the bridge info.
 const underTest = await isTestRun(bridge, window.location).catch(() => false);
 const audio = createAppAudio({ underTest });
-if (underTest) exposeAudioTestLog(audio);
+if (underTest) {
+  exposeAudioTestLog(audio);
+  exposeKitTime();
+}
 
 const session = createSessionStore({ bridge, audio });
 void session.start();
