@@ -223,7 +223,7 @@ export const strings = defineStrings('emoji', {
   'puzzle-piece': { text: 'puzzle piece' },
   dice: { text: 'dice' },
   present: { text: 'present' },
-  'magic-wand': { text: 'magic wand' },
+  'magic-wand': { text: 'magic wand', allow: ['reference-tool'] },
   carousel: { text: 'carousel' },
   'game-controller': { text: 'game controller' },
   abacus: { text: 'abacus' },

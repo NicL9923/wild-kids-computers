@@ -35,7 +35,7 @@ export const strings = defineStrings('paint-studio', {
   'tool-fill': { text: 'Fill' },
   'tool-text': { text: 'Letters' },
   'tool-stamp': { text: 'Stamps' },
-  'tool-effects': { text: 'Magic' },
+  'tool-effects': { text: 'Effects' },
 
   // Options
   colors: { text: 'Colors' },
@@ -83,7 +83,7 @@ export const strings = defineStrings('paint-studio', {
   smaller: { text: 'Smaller' },
   flip: { text: 'Flip' },
   turn: { text: 'Turn' },
-  chooseEffect: { text: 'Pick some magic' },
+  chooseEffect: { text: 'Pick an effect' },
   chooseTip: { text: 'Pick a brush' },
   textEntry: { text: 'Type your words' },
   placeText: { text: 'Put the words on' },

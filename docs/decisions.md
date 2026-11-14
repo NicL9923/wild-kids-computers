@@ -55,6 +55,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **The fill bucket grows one pixel under line art and unmixes antialiased painted edges.** Neither leaves a pale fringe between the paint and a line.
 - **A change that left every pixel as it was adds no undo step.** A fill in the color already there, or a stamp with no visible pixels, does not cost the child an undo.
 - **The undo cap is 256 MiB and at most 100 steps.** Thirty full-canvas steps take about 197 MB, and the step limit keeps many tiny steps from piling up.
+- **The effects tool is called "Effects", not "Magic".** Tux Paint calls its effects tools "Magic", so hard rule 2 rules the name out. The strings and file name scans flag "magic"; only the magic wand stamp, a real object, allows it. The tool's picture is sparkles, not the wand.
 
 ### Activities
 

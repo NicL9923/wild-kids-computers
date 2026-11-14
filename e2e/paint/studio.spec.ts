@@ -258,7 +258,7 @@ test('a picture put in the trash comes back with one click', async () => {
   expect(await galleryIds(page)).toHaveLength(1);
 });
 
-test('band-3-5 shows only brush, stamps, fill, eraser, and magic, as pictures', async () => {
+test('band-3-5 shows only brush, stamps, fill, eraser, and effects, as pictures', async () => {
   const page = await start('band-3-5');
   const tools = page.getByRole('toolbar', { name: strings.tools.text }).getByRole('button');
   const names = await tools.evaluateAll((buttons) => buttons.map((item) => item.textContent));

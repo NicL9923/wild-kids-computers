@@ -80,7 +80,7 @@ const TOOL_PICTURES: Readonly<Record<StudioToolId, React.ReactNode>> = {
   fill: <EmojiPicture id='bucket' />,
   text: <Glyph name='letters' />,
   stamp: <EmojiPicture id='butterfly' />,
-  effects: <EmojiPicture id='magic-wand' />,
+  effects: <EmojiPicture id='sparkles' />,
 };
 
 function toolById(id: string) {
@@ -734,7 +734,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
             <StudioButton
               className='wk-paint-wide'
               label={t(strings.chooseEffect)}
-              picture={<EmojiPicture id='magic-wand' />}
+              picture={<EmojiPicture id='sparkles' />}
               aria-expanded={panel === 'effects'}
               onClick={() => {
                 setPanel(panel === 'effects' ? null : 'effects');

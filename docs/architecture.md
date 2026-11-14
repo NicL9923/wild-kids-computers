@@ -289,20 +289,20 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 
 ### Hard rule checks
 
-| Rule                                           | Check                                                                                                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| One goal, bands, spoken strings                | Registry test over every definition                                                                                                        |
-| An end-to-end test per activity                | Registry test checks that `e2e/activities/<id>.spec.ts` exists                                                                             |
-| Click before drag                              | Registry test: an activity with `drag` in `inputs` must use `useCarry`, and its end-to-end test must contain a test named "click to place" |
-| Double-click and right-click only where taught | A test scans `src/` for double-click and context-menu handlers outside an allow list                                                       |
-| No manipulative design                         | A test scans every string for banned reward words, with an allow list for false positives such as the star shape                           |
-| Spoken instructions                            | `check:voice`                                                                                                                              |
-| Timers cancelled on exit                       | The lint rule above, plus a kit test that the scope cancels everything                                                                     |
-| Levels are pure                                | Registry test: `generateLevel` gives the same level twice for the same arguments, at each band's lowest and highest difficulty             |
-| Playwright can import an activity              | Registry test: `activity.ts`, `level.ts`, and `strings.ts` import no registry, asset, CSS, React, or `.tsx` file                           |
-| No forgotten sequence step                     | Registry test: the files in `stepsDirectory` equal the ids in `steps`                                                                      |
-| Native drag only in the kit                    | Oxlint rule `wkc/no-native-drag`, with its exemption list `NATIVE_DRAG_EXEMPT` in `tools/oxlintPlugin.ts`                                  |
-| Original work only                             | A test scans strings and file names for the names of the two reference apps and their mascots. This catches only the obvious case.         |
+| Rule                                           | Check                                                                                                                                                                         |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One goal, bands, spoken strings                | Registry test over every definition                                                                                                                                           |
+| An end-to-end test per activity                | Registry test checks that `e2e/activities/<id>.spec.ts` exists                                                                                                                |
+| Click before drag                              | Registry test: an activity with `drag` in `inputs` must use `useCarry`, and its end-to-end test must contain a test named "click to place"                                    |
+| Double-click and right-click only where taught | A test scans `src/` for double-click and context-menu handlers outside an allow list                                                                                          |
+| No manipulative design                         | A test scans every string for banned reward words, with an allow list for false positives such as the star shape                                                              |
+| Spoken instructions                            | `check:voice`                                                                                                                                                                 |
+| Timers cancelled on exit                       | The lint rule above, plus a kit test that the scope cancels everything                                                                                                        |
+| Levels are pure                                | Registry test: `generateLevel` gives the same level twice for the same arguments, at each band's lowest and highest difficulty                                                |
+| Playwright can import an activity              | Registry test: `activity.ts`, `level.ts`, and `strings.ts` import no registry, asset, CSS, React, or `.tsx` file                                                              |
+| No forgotten sequence step                     | Registry test: the files in `stepsDirectory` equal the ids in `steps`                                                                                                         |
+| Native drag only in the kit                    | Oxlint rule `wkc/no-native-drag`, with its exemption list `NATIVE_DRAG_EXEMPT` in `tools/oxlintPlugin.ts`                                                                     |
+| Original work only                             | A test scans strings and file names for the names of the two reference apps, their mascot, and "magic", Tux Paint's name for its effects. This catches only the obvious case. |
 
 ### End-to-end tests
 

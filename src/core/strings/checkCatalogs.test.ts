@@ -27,6 +27,7 @@ describe('contentRulesMatched', () => {
     ['Uh oh.', ['disappointment']],
     ['Made with Tux Paint', ['reference-app']],
     ['Like GCompris', ['reference-app']],
+    ['Pick some magic', ['reference-tool']],
   ])('finds the rule in %j', (text, expected) => {
     expect(contentRulesMatched(text)).toEqual(expected);
   });
@@ -36,6 +37,7 @@ describe('contentRulesMatched', () => {
     ['pointer', 'Move the pointer.'],
     ['badger', 'A badger digs.'],
     ['tuxedo', 'A penguin in a tuxedo.'],
+    ['magician', 'A magician bows.'],
     ['level alone', 'Make the water level.'],
     ['scorer', 'Underscore'],
   ])('ignores a longer word that contains a banned one: %s', (_label, text) => {
