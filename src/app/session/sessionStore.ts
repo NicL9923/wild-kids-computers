@@ -1,10 +1,14 @@
 import type { AudioEngine, VolumeSettings } from '../../audio/audioEngine.ts';
+import { withDeadline } from '../../core/activityKit/deadline.ts';
+import { systemScheduler, type Scheduler } from '../../core/activityKit/scheduler.ts';
 import { DEFAULT_BAND, type Band } from '../../core/bands.ts';
 import {
   BridgeError,
   isBridgeError,
   type BridgeErrorCode,
+  type DocumentStore,
   type PictureFile,
+  type PictureStore,
   type PictureSummary,
   type PlatformBridge,
   type SavePictureInput,
@@ -37,6 +41,9 @@ import { isSessionLimitReached, type SessionClock } from './sessionLength.ts';
  * Every write to one document runs after the earlier ones, and a burst of updates coalesces into
  * the fewest writes that still end with the newest value. A read that started before an update
  * never replaces the updated value. A failed write becomes `saveProblem`, never a rejection.
+ *
+ * Every bridge call has a deadline, so one call that never answers cannot hold its queue, and with
+ * it every later read or write of the same document or pictures, or the start of the app.
  */
 
 export type SessionStatus =
@@ -133,6 +140,8 @@ export interface SessionStoreOptions {
   /** Gets the active profile's volume and mute, and saves changes made through it. */
   audio?: SessionAudio;
   clock?: SessionClock;
+  /** The timers of the bridge call deadline. Real time by default; a test steps a manual scheduler. */
+  timers?: Pick<Scheduler, 'setTimeout'>;
 }
 
 export interface SessionStore {
@@ -193,6 +202,63 @@ export interface SessionStore {
    * screen. It lasts until the profile changes or the app restarts. Does nothing with no profile.
    */
   readonly grantPlayTime: (ms: number) => void;
+}
+
+/**
+ * How long one bridge call of the session may take, in milliseconds. A document is a small JSON
+ * file and a picture a few megabytes, which a slow laptop's disk reads or writes in well under a
+ * second. The paint studio's picture calls use the same bound.
+ */
+export const SESSION_CALL_DEADLINE_MS = 10_000;
+
+/** The part of the bridge the session uses. */
+interface SessionBridge {
+  readonly info: PlatformBridge['info'];
+  readonly documents: DocumentStore;
+  readonly pictures: PictureStore;
+  readonly window: Pick<PlatformBridge['window'], 'setKioskLock'>;
+}
+
+/**
+ * The bridge with a deadline on every call the session makes. A call that does not answer in time
+ * rejects with an `io` BridgeError, the same failure a broken disk gives, so the session handles it
+ * the way it already handles that. A late answer is dropped. The store keeps only this object, and
+ * the types list every method of a store, so a new call cannot skip the deadline.
+ */
+function boundedBridge(bridge: PlatformBridge, timers: Pick<Scheduler, 'setTimeout'>, ms: number): SessionBridge {
+  function bound<A extends unknown[], T>(what: string, call: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+    return (...args) => {
+      let work: Promise<T>;
+      try {
+        work = call(...args);
+      } catch (error) {
+        work = Promise.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      return withDeadline(work, ms, timers, `The bridge call ${what}`).catch((error: unknown) => {
+        throw toBridgeError(error);
+      });
+    };
+  }
+  const { documents, pictures, window } = bridge;
+  return {
+    info: bound('info', () => bridge.info()),
+    documents: {
+      read: bound('documents.read', (name) => documents.read(name)),
+      write: bound('documents.write', (name, text) => documents.write(name, text)),
+      setAside: bound('documents.setAside', (name) => documents.setAside(name)),
+      removeProfile: bound('documents.removeProfile', (profileId) => documents.removeProfile(profileId)),
+    },
+    pictures: {
+      save: bound('pictures.save', (profileId, input) => pictures.save(profileId, input)),
+      list: bound('pictures.list', (profileId, place) => pictures.list(profileId, place)),
+      read: bound('pictures.read', (profileId, id, file) => pictures.read(profileId, id, file)),
+      copy: bound('pictures.copy', (profileId, id) => pictures.copy(profileId, id)),
+      trash: bound('pictures.trash', (profileId, id) => pictures.trash(profileId, id)),
+      restore: bound('pictures.restore', (profileId, id) => pictures.restore(profileId, id)),
+      purge: bound('pictures.purge', (profileId, id) => pictures.purge(profileId, id)),
+    },
+    window: { setKioskLock: bound('window.setKioskLock', (on) => window.setKioskLock(on)) },
+  };
 }
 
 const systemClock: SessionClock = {
@@ -272,7 +338,8 @@ const DEFAULT_SETTINGS = settingsDocument.defaults();
 const EMPTY_PROGRESS = progressDocument.defaults();
 
 export function createSessionStore(options: SessionStoreOptions): SessionStore {
-  const { bridge, audio } = options;
+  const { audio } = options;
+  const bridge = boundedBridge(options.bridge, options.timers ?? systemScheduler(), SESSION_CALL_DEADLINE_MS);
   const clock = options.clock ?? systemClock;
   const queues = createSerialQueues();
   const listeners = new Set<() => void>();
