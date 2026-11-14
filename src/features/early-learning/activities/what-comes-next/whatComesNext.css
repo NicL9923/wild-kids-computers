@@ -1,0 +1,110 @@
+/*
+ * What comes next: the pattern in one row across the stage, the empty box at its end, and the
+ * choices below. Items shrink to fit a long row and grow on a large window. Every value is a token.
+ */
+
+.wn-stage {
+  --wn-gap: var(--wk-space-item);
+  --wn-size: min(
+    calc((100vw - 2 * var(--wk-space-screen-edge) - (var(--wn-slots) - 1) * var(--wn-gap)) / var(--wn-slots)),
+    24vh,
+    200px
+  );
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--wk-space-section);
+  justify-items: center;
+  align-content: center;
+  padding-bottom: var(--wk-space-container);
+}
+
+.wn-row {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  gap: var(--wn-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wn-item {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--wn-size);
+  height: var(--wn-size);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+}
+
+.wn-item > img,
+.wn-item > svg {
+  width: 78%;
+  height: 78%;
+}
+
+/* The empty box: a thick dashed edge and a question mark, until the answer fills it. */
+.wn-next {
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  background: var(--wk-color-surface-sunken);
+}
+
+.wn-next[data-next]:not([data-next='']) {
+  border-style: solid;
+  border-color: var(--wk-color-success);
+  background: var(--wk-color-surface);
+}
+
+.wn-question {
+  fill: var(--wk-color-primary);
+  stroke: var(--wk-color-primary);
+}
+
+.wn-question path {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.wn-question circle {
+  stroke: none;
+}
+
+.wn-stage .lg-choices {
+  --lg-choice: max(var(--wk-target-large), min(26vh, 220px));
+}
+
+/* Shape colors, each named the way the voice says it. */
+.wn-shape-fill {
+  stroke: var(--wk-color-text);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.wn-shape-fill[data-color='red'] {
+  fill: var(--wk-color-danger);
+}
+
+.wn-shape-fill[data-color='blue'] {
+  fill: var(--wk-color-primary);
+}
+
+.wn-shape-fill[data-color='yellow'] {
+  fill: var(--wk-color-accent);
+}
+
+.wn-shape-fill[data-color='green'] {
+  fill: var(--wk-color-success);
+}
+
+.wn-shape-fill[data-color='purple'] {
+  fill: var(--wk-color-focus);
+}
+
+.wn-shape-fill[data-color='orange'] {
+  fill: var(--wk-profile-marigold);
+}

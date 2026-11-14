@@ -1,0 +1,73 @@
+/*
+ * The memory and logic activities share a look for picture choices: big square buttons on white
+ * that stand on a darker base like a key. An activity sets --lg-choice for their size. Every
+ * value is a token.
+ */
+
+.lg-choices {
+  --lg-choice: max(var(--wk-target-large), min(22vh, 14vw));
+  margin: 0;
+  padding: 0 0 var(--wk-press-depth);
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  max-width: 100%;
+}
+
+.lg-choice {
+  display: grid;
+  place-items: center;
+  width: var(--lg-choice);
+  height: var(--lg-choice);
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.lg-choice > img,
+.lg-choice > svg {
+  width: 74%;
+  height: 74%;
+}
+
+.lg-choice:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+/* A choice already tried steps back: dashed edge and faded, so it is not color alone. */
+.lg-choice[data-tried='true'] {
+  border-style: dashed;
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* After two tries the answer stands out with a thick edge and a slow, small grow. */
+.lg-choice[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  animation: lg-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes lg-hint {
+  to {
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+}
+
+.lg-choice[data-answer='true'] {
+  border-color: var(--wk-color-success);
+  border-width: calc(var(--wk-border-width) * 3);
+  background: var(--wk-color-surface);
+}
+
+.lg-choice:disabled:not([data-tried='true'], [data-answer='true']) {
+  opacity: 0.6;
+  cursor: default;
+}
