@@ -25,6 +25,11 @@ function setup(state: KitParts<{ n: number }>['state'] = null) {
     },
     onRoundComplete: (outcome) => outcomes.push(outcome),
     onStepSolved: () => calls.push('step solved'),
+    onCheckpoint: () => calls.push('checkpoint'),
+    onHoldCheckpoint: () => {
+      calls.push('hold');
+      return () => calls.push('release');
+    },
     host: {
       clock: { now: () => 0, monotonic: () => 0 },
       activityId: 'kit-test',
@@ -143,8 +148,18 @@ describe('createKit', () => {
     kit.hint(strings.a);
     kit.roundComplete();
     kit.stepSolved();
+    kit.checkpoint();
+    kit.holdCheckpoint()();
     expect(calls).toEqual([]);
     expect(outcomes).toEqual([]);
+  });
+
+  it('lets go of a session hold when the round ends, once, even if the activity lets go later', () => {
+    const { kit, calls, scope } = setup();
+    const release = kit.holdCheckpoint();
+    scope.dispose();
+    release();
+    expect(calls).toEqual(['hold', 'release']);
   });
 
   it('stops a continuous sound when the round ends', () => {

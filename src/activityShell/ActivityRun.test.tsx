@@ -8,8 +8,8 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { useState } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { useRef, useState } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { SessionProvider } from '../app/session/SessionProvider.tsx';
 import { createSessionStore, type SessionStore } from '../app/session/sessionStore.ts';
@@ -30,7 +30,7 @@ import { ActivityRun } from './ActivityRun.tsx';
 import type { ActivityProps } from './kit.ts';
 import { kitScheduler } from './kitTime.ts';
 import { strings as shellStrings } from './strings.ts';
-import { BETWEEN_ROUNDS_MS } from './timing.ts';
+import { BETWEEN_ROUNDS_MS, IDLE_CHECK_MS } from './timing.ts';
 
 const strings = defineStrings('run-fixture', {
   title: { text: 'Fixture' },
@@ -52,6 +52,9 @@ function Fixture({ level, kit }: ActivityProps<string, { taps: number }>) {
       </button>
       <button type='button' onClick={() => kit.stepSolved()}>
         solved
+      </button>
+      <button type='button' onClick={() => kit.checkpoint()}>
+        checkpoint
       </button>
       <button type='button' onClick={() => kit.feedback.wrong()}>
         wrong
@@ -77,6 +80,27 @@ function StateFixture({ kit }: ActivityProps<string, { taps: number }>) {
     <button type='button' onClick={() => kit.state.update((state) => ({ taps: state.taps + 1 }))}>
       {`taps ${String(kit.state.value.taps)}`}
     </button>
+  );
+}
+
+/** Free play that saves a tap count and calls the session checkpoint and hold when told to. */
+function FreeFixture({ kit }: ActivityProps<string, { taps: number }>) {
+  const release = useRef<(() => void) | null>(null);
+  return (
+    <div>
+      <button type='button' onClick={() => kit.state.update((state) => ({ taps: state.taps + 1 }))}>
+        {`taps ${String(kit.state.value.taps)}`}
+      </button>
+      <button type='button' onClick={() => kit.checkpoint()}>
+        checkpoint
+      </button>
+      <button type='button' onClick={() => (release.current = kit.holdCheckpoint())}>
+        hold
+      </button>
+      <button type='button' onClick={() => release.current?.()}>
+        release
+      </button>
+    </div>
   );
 }
 
@@ -141,6 +165,22 @@ const withState = defineActivity<string, { taps: number }>({
   spoken: [strings.say],
   state: { schema: z.object({ taps: z.int().min(0) }), defaults: () => ({ taps: 0 }) },
   load: () => Promise.resolve({ default: StateFixture }),
+  kind: 'free',
+  generateLevel: () => 'free',
+});
+
+const free = defineActivity<string, { taps: number }>({
+  id: 'run-free',
+  area: 'toy-desktop',
+  order: 1,
+  bands: ['band-3-5'],
+  goal: strings.goal,
+  title: strings.title,
+  icon: { emoji: 'flower' },
+  inputs: ['click'],
+  spoken: [strings.say],
+  state: { schema: z.object({ taps: z.int().min(0) }), defaults: () => ({ taps: 0 }) },
+  load: () => Promise.resolve({ default: FreeFixture }),
   kind: 'free',
   generateLevel: () => 'free',
 });
@@ -449,6 +489,102 @@ describe('a sequence activity', () => {
     expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(2);
     await advance(BETWEEN_ROUNDS_MS);
     expect(await screen.findByRole('button', { name: '3' })).toBeTruthy();
+  });
+});
+
+describe('the session length in free play', () => {
+  const LIMIT_MINUTES = 5;
+  const LIMIT_MS = LIMIT_MINUTES * 60_000;
+
+  async function playFree(): Promise<Harness> {
+    const h = await run(free, { sessionMinutes: LIMIT_MINUTES });
+    await screen.findByRole('button', { name: 'taps 0' });
+    return h;
+  }
+
+  it.each([
+    ['keeps playing at a checkpoint just before the limit', LIMIT_MS - 1, '/play'],
+    ['rests, then shows the closing screen, at a checkpoint once the limit is reached', LIMIT_MS, '/closing'],
+  ])('%s', async (_case, playedMs, path) => {
+    const h = await playFree();
+    h.clock.mono = playedMs;
+    click('checkpoint');
+    await advance(BETWEEN_ROUNDS_MS - 1);
+    expect(h.path()).toBe('/play');
+    await advance(1);
+    expect(h.path()).toBe(path);
+  });
+
+  it('takes no input while it rests before the closing screen, and keeps what the child saved', async () => {
+    const h = await playFree();
+    click('taps 0');
+    h.clock.mono = LIMIT_MS;
+    click('checkpoint');
+    expect(screen.getByText('taps 1').closest('[inert]')).not.toBeNull();
+    await advance(BETWEEN_ROUNDS_MS);
+    await screen.findByText('landed');
+    expect(h.store.getSnapshot().activityStates[free.id]?.state).toEqual({ taps: 1 });
+  });
+
+  it('checks on its own after a while with no input, for an activity that never calls the checkpoint', async () => {
+    const h = await playFree();
+    h.clock.mono = LIMIT_MS;
+    await advance(IDLE_CHECK_MS - 1_000);
+    // The child moves the pointer, so the quiet starts again.
+    fireEvent.pointerMove(window, { clientX: 10, clientY: 10 });
+    await advance(IDLE_CHECK_MS - 1);
+    expect(h.path()).toBe('/play');
+    await advance(1);
+    await advance(BETWEEN_ROUNDS_MS);
+    expect(h.path()).toBe('/closing');
+  });
+
+  it('keeps waiting for quiet whatever fraction of a millisecond the clock starts at', async () => {
+    // The page clock reads fractions. From this start, an idle check that measured the quiet by
+    // subtracting clock readings came out a hair short, and its wait of a hair re-ran forever.
+    const start = vi.spyOn(performance, 'now').mockReturnValue(1002.6694897427832);
+    kitScheduler.pin(1_700_000_000_000);
+    start.mockRestore();
+    const h = await playFree();
+    h.clock.mono = LIMIT_MS;
+    await advance(IDLE_CHECK_MS - 1_000);
+    fireEvent.keyDown(window, { key: 'a' });
+    await advance(IDLE_CHECK_MS);
+    await advance(BETWEEN_ROUNDS_MS);
+    expect(h.path()).toBe('/closing');
+  });
+
+  it('keeps playing after a while with no input while time remains', async () => {
+    const h = await playFree();
+    h.clock.mono = LIMIT_MS - 1;
+    await advance(IDLE_CHECK_MS + BETWEEN_ROUNDS_MS);
+    expect(h.path()).toBe('/play');
+  });
+
+  it('waits for a hold to let go, then closes', async () => {
+    const h = await playFree();
+    h.clock.mono = LIMIT_MS;
+    click('hold');
+    click('checkpoint');
+    await advance(IDLE_CHECK_MS * 2 + BETWEEN_ROUNDS_MS);
+    expect(h.path()).toBe('/play');
+    click('release');
+    await advance(BETWEEN_ROUNDS_MS);
+    expect(h.path()).toBe('/closing');
+  });
+
+  it('throws for a rounds activity, which checks the session between its rounds', async () => {
+    await run(rounds);
+    await level();
+    const errors: unknown[] = [];
+    const onError = (event: ErrorEvent) => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener('error', onError);
+    click('checkpoint');
+    window.removeEventListener('error', onError);
+    expect(String(errors[0])).toMatch(/run-rounds is not free play/);
   });
 });
 

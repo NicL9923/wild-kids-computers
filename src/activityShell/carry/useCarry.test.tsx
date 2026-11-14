@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SfxName } from '../../audio/sfx/sfxNames.ts';
+import { createRandom, type Random } from '../../core/activityKit/random.ts';
 import { createManualScheduler } from '../../core/activityKit/scheduler.ts';
 import { createScope, type OwnedScope } from '../../core/activityKit/scope.ts';
 import { useCarry, type Point } from './useCarry.ts';
@@ -21,7 +22,14 @@ function placeAt(element: Element | null, left: number, top: number, width: numb
 function fakeKit() {
   const sounds: SfxName[] = [];
   const scope: OwnedScope = createScope(createManualScheduler({ wall: 0 }));
-  return { scope, play: (name: SfxName) => sounds.push(name), sounds };
+  const session = { holds: 0 };
+  const holdCheckpoint = () => {
+    session.holds += 1;
+    return () => {
+      session.holds -= 1;
+    };
+  };
+  return { scope, play: (name: SfxName) => sounds.push(name), sounds, holdCheckpoint, session };
 }
 
 type Fruit = 'apple' | 'pear';
@@ -31,11 +39,19 @@ interface Log {
   drops: string[];
 }
 
-function Picnic({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: Log }) {
+/** What the picnic shows: the basket can leave, and can stop taking fruit, while a fruit is carried. */
+interface PicnicScene {
+  readonly basket?: boolean;
+  readonly basketTakes?: boolean;
+  readonly pear?: boolean;
+}
+
+function Picnic({ kit, log, scene = {} }: { kit: ReturnType<typeof fakeKit>; log: Log; scene?: PicnicScene }) {
+  const { basket = true, basketTakes = true, pear = true } = scene;
   const carry = useCarry<Fruit, Place>(kit, {
     kind: 'targets',
     // The plate takes only the pear.
-    accepts: (item, target) => target !== 'plate' || item === 'pear',
+    accepts: (item, target) => (target === 'basket' ? basketTakes : item === 'pear'),
     onDrop: (item, target) => log.drops.push(`${item} -> ${target}`),
   });
   return (
@@ -43,30 +59,54 @@ function Picnic({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: Log }) {
       <button type='button' {...carry.item('apple')}>
         apple
       </button>
-      <button type='button' {...carry.item('pear')}>
-        pear
-      </button>
-      <div {...carry.target('basket')}>basket</div>
+      {pear && (
+        <button type='button' {...carry.item('pear')}>
+          pear
+        </button>
+      )}
+      {basket && <div {...carry.target('basket')}>basket</div>}
       <div {...carry.target('plate')}>plate</div>
     </div>
   );
 }
 
+/** Lays the picnic out again after a rerender put new elements on screen. */
+function layOutPicnic(): void {
+  placeAt(screen.getByText('apple'), 0, 0, 100, 100);
+  const pear = screen.queryByText('pear');
+  if (pear !== null) placeAt(pear, 0, 200, 100, 100);
+  const basket = screen.queryByText('basket');
+  if (basket !== null) placeAt(basket, 400, 0, 200, 200);
+  placeAt(screen.getByText('plate'), 400, 300, 200, 200);
+}
+
 function renderPicnic() {
   const kit = fakeKit();
   const log: Log = { drops: [] };
-  render(<Picnic kit={kit} log={log} />);
-  placeAt(screen.getByText('apple'), 0, 0, 100, 100);
-  placeAt(screen.getByText('pear'), 0, 200, 100, 100);
-  placeAt(screen.getByText('basket'), 400, 0, 200, 200);
-  placeAt(screen.getByText('plate'), 400, 300, 200, 200);
-  return { kit, log, apple: screen.getByText('apple'), basket: screen.getByText('basket') };
+  const view = render(<Picnic kit={kit} log={log} />);
+  layOutPicnic();
+  const rerender = (scene: PicnicScene) => {
+    view.rerender(<Picnic kit={kit} log={log} scene={scene} />);
+    layOutPicnic();
+  };
+  return { kit, log, apple: screen.getByText('apple'), basket: screen.getByText('basket'), rerender };
 }
 
-const down = (element: Element, point: Point, button = 0) =>
-  fireEvent.pointerDown(element, { clientX: point.x, clientY: point.y, button });
-const move = (point: Point) => fireEvent.pointerMove(window, { clientX: point.x, clientY: point.y });
-const up = (point: Point) => fireEvent.pointerUp(window, { clientX: point.x, clientY: point.y });
+/** The mouse unless a test says otherwise. A second finger or pen has another id. */
+const MOUSE = 1;
+
+const down = (element: Element, point: Point, button = 0, pointerId = MOUSE) =>
+  fireEvent.pointerDown(element, { clientX: point.x, clientY: point.y, button, buttons: 1, pointerId });
+/** A move with the button held, as during a drag. */
+const move = (point: Point, pointerId = MOUSE) =>
+  fireEvent.pointerMove(window, { clientX: point.x, clientY: point.y, buttons: 1, pointerId });
+/** A move with no button held, as when a picked-up item follows the pointer. */
+const hover = (point: Point, pointerId = MOUSE) =>
+  fireEvent.pointerMove(window, { clientX: point.x, clientY: point.y, buttons: 0, pointerId });
+const up = (point: Point, pointerId = MOUSE) =>
+  fireEvent.pointerUp(window, { clientX: point.x, clientY: point.y, buttons: 0, pointerId });
+const cancel = (pointerId = MOUSE) => fireEvent.pointerCancel(window, { pointerId });
+const blur = () => fireEvent.blur(window);
 const key = (element: Element, name: string) => fireEvent.keyDown(element, { key: name });
 
 /** A toolbox: a click on the pear acts at once; the apple is carried as usual. */
@@ -158,7 +198,7 @@ describe('useCarry with drop targets', () => {
     // Picked up and waiting, not dropped.
     expect(apple.dataset.carried).toBe('true');
     expect(log.drops).toEqual([]);
-    move({ x: 480, y: 120 });
+    hover({ x: 480, y: 120 });
     expect(apple.style.translate).toBe('430px 70px');
     up({ x: 480, y: 120 });
     expect(log.drops).toEqual(['apple -> basket']);
@@ -180,10 +220,86 @@ describe('useCarry with drop targets', () => {
   it('puts the item back when the browser cancels the press', () => {
     const { log, apple } = renderPicnic();
     down(apple, { x: 50, y: 50 });
-    fireEvent.pointerCancel(window, { clientX: 50, clientY: 50 });
+    cancel();
     expect(apple.dataset.carried).toBe('false');
     up({ x: 450, y: 50 });
     expect(log.drops).toEqual([]);
+  });
+
+  it.each([
+    ['the browser cancels the drag', () => cancel()],
+    ['the window loses focus', blur],
+  ])('puts a dragged item back, and a later release drops nothing, when %s', (_reason, interrupt) => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    interrupt();
+    expect(apple.dataset.carried).toBe('false');
+    expect(apple.style.translate).toBe('');
+    // A release that belongs to some other gesture.
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it('puts a clicked item back when the window loses focus, so a click on return places nothing', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    blur();
+    expect(apple.dataset.carried).toBe('false');
+    down(document.body, { x: 450, y: 50 });
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it('puts a dragged item back when the button was let go outside the window', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    // The release happened outside, where the page could not hear it. The pointer comes back
+    // over the basket with no button held.
+    hover({ x: 460, y: 60 });
+    expect(apple.dataset.carried).toBe('false');
+    up({ x: 460, y: 60 });
+    expect(log.drops).toEqual([]);
+  });
+
+  it('puts a dragged item back when it is released outside the window, away from any target', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    move({ x: -40, y: 50 });
+    up({ x: -40, y: 50 });
+    expect(apple.dataset.carried).toBe('false');
+    expect(log.drops).toEqual([]);
+  });
+
+  it('ignores a second pointer while the first holds an item', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    move({ x: 300, y: 80 });
+    // A second finger presses, moves over the basket, and lets go. It does not own the item.
+    down(document.body, { x: 450, y: 50 }, 0, 2);
+    move({ x: 460, y: 50 }, 2);
+    up({ x: 460, y: 50 }, 2);
+    cancel(2);
+    expect(apple.dataset.carried).toBe('true');
+    expect(apple.style.translate).toBe('250px 30px');
+    expect(log.drops).toEqual([]);
+    // The first pointer still drops it where it lets go.
+    move({ x: 450, y: 50 });
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual(['apple -> basket']);
+  });
+
+  it('click to place: lets another pointer make the placing click, such as a mouse after the trackpad', () => {
+    const { log, apple } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    hover({ x: 470, y: 70 }, 7);
+    down(document.body, { x: 470, y: 70 }, 0, 7);
+    up({ x: 470, y: 70 }, 7);
+    expect(log.drops).toEqual(['apple -> basket']);
   });
 
   it('treats a second press after a lost release as the placing click', () => {
@@ -278,6 +394,68 @@ describe('useCarry with drop targets', () => {
     expect(log.drops).toEqual([]);
   });
 
+  it.each([
+    ['leaves the screen', { basket: false }],
+    ['stops taking the item', { basketTakes: false }],
+  ])('puts a keyboard-carried item back when its chosen target %s before the drop', (_change, scene) => {
+    const { log, apple, rerender } = renderPicnic();
+    key(apple, 'Enter');
+    expect(screen.getByText('basket').dataset.carryOver).toBe('true');
+    rerender(scene);
+    key(apple, 'Enter');
+    expect(log.drops).toEqual([]);
+    expect(apple.dataset.carried).toBe('false');
+  });
+
+  it.each([
+    ['leaves the screen', { basket: false }],
+    ['stops taking the item', { basketTakes: false }],
+  ])('drops nothing when the target under a clicked item %s before the placing click', (_change, scene) => {
+    const { log, apple, rerender } = renderPicnic();
+    down(apple, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    rerender(scene);
+    down(document.body, { x: 450, y: 50 });
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+    expect(apple.dataset.carried).toBe('false');
+  });
+
+  it('lets go of a carried item that leaves the screen, so a later click drops nothing', () => {
+    const { log, rerender } = renderPicnic();
+    const pear = screen.getByText('pear');
+    down(pear, { x: 50, y: 250 });
+    up({ x: 50, y: 250 });
+    rerender({ pear: false });
+    expect(screen.getByText('apple').dataset.carried).toBe('false');
+    down(document.body, { x: 450, y: 50 });
+    up({ x: 450, y: 50 });
+    expect(log.drops).toEqual([]);
+    // The next pick up works as usual.
+    rerender({});
+    key(screen.getByText('pear'), 'Enter');
+    key(screen.getByText('pear'), 'Enter');
+    expect(log.drops).toEqual(['pear -> basket']);
+  });
+
+  it('holds the free-play session check while an item is carried, and lets go when it lands or goes back', () => {
+    const { kit, log, apple } = renderPicnic();
+    const holds: number[] = [];
+    // A drag that lands on the basket.
+    down(apple, { x: 50, y: 50 });
+    move({ x: 450, y: 50 });
+    holds.push(kit.session.holds);
+    up({ x: 450, y: 50 });
+    holds.push(kit.session.holds);
+    // A keyboard carry that goes back.
+    key(apple, 'Enter');
+    holds.push(kit.session.holds);
+    key(apple, 'Escape');
+    holds.push(kit.session.holds);
+    expect(holds).toEqual([1, 0, 1, 0]);
+    expect(log.drops).toEqual(['apple -> basket']);
+  });
+
   it('stops listening once the activity scope is disposed', () => {
     const { kit, log, apple } = renderPicnic();
     down(apple, { x: 50, y: 50 });
@@ -288,7 +466,15 @@ describe('useCarry with drop targets', () => {
   });
 });
 
-function Desk({ kit, placed }: { kit: ReturnType<typeof fakeKit>; placed: Point[] }) {
+function Desk({
+  kit,
+  placed,
+  hasArea = true,
+}: {
+  kit: ReturnType<typeof fakeKit>;
+  placed: Point[];
+  hasArea?: boolean;
+}) {
   const area = useRef<HTMLDivElement | null>(null);
   const [at, setAt] = useState<Point>({ x: 100, y: 100 });
   const carry = useCarry<'window'>(kit, {
@@ -302,7 +488,7 @@ function Desk({ kit, placed }: { kit: ReturnType<typeof fakeKit>; placed: Point[
     },
   });
   return (
-    <div ref={area} data-testid='area'>
+    <div ref={hasArea ? area : undefined} data-testid='area'>
       <button type='button' {...carry.item('window')}>
         window
       </button>
@@ -313,10 +499,11 @@ function Desk({ kit, placed }: { kit: ReturnType<typeof fakeKit>; placed: Point[
 function renderDesk() {
   const kit = fakeKit();
   const placed: Point[] = [];
-  render(<Desk kit={kit} placed={placed} />);
+  const view = render(<Desk kit={kit} placed={placed} />);
   placeAt(screen.getByTestId('area'), 0, 0, 800, 600);
   placeAt(screen.getByText('window'), 100, 100, 200, 150);
-  return { placed, item: screen.getByText('window') };
+  const loseArea = () => view.rerender(<Desk kit={kit} placed={placed} hasArea={false} />);
+  return { placed, item: screen.getByText('window'), loseArea };
 }
 
 describe('useCarry with free positions', () => {
@@ -346,6 +533,28 @@ describe('useCarry with free positions', () => {
     expect(placed).toEqual([{ x: 120, y: 110 }]);
   });
 
+  it.each([
+    ['a drag', (item: Element) => (down(item, { x: 150, y: 120 }), move({ x: 350, y: 220 }))],
+    ['the keyboard', (item: Element) => (key(item, 'Enter'), key(item, 'ArrowRight'))],
+  ])('places nothing when the area leaves the screen during %s', (_how, pickUp) => {
+    const { placed, item, loseArea } = renderDesk();
+    pickUp(item);
+    loseArea();
+    up({ x: 350, y: 220 });
+    key(item, 'Enter');
+    expect(placed).toEqual([]);
+  });
+
+  it('places nothing when the window loses focus during a drag', () => {
+    const { placed, item } = renderDesk();
+    down(item, { x: 150, y: 120 });
+    move({ x: 350, y: 220 });
+    blur();
+    up({ x: 350, y: 220 });
+    expect(placed).toEqual([]);
+    expect(item.style.translate).toBe('');
+  });
+
   it('places nothing when Escape cancels', () => {
     const { placed, item } = renderDesk();
     key(item, 'Enter');
@@ -355,7 +564,7 @@ describe('useCarry with free positions', () => {
   });
 });
 
-function Dial({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: string[] }) {
+function Dial({ kit, log, hasTrack = true }: { kit: ReturnType<typeof fakeKit>; log: string[]; hasTrack?: boolean }) {
   const track = useRef<HTMLDivElement | null>(null);
   const [value, setValue] = useState(40);
   const carry = useCarry<'knob'>(kit, {
@@ -373,7 +582,7 @@ function Dial({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: string[] }) 
     onDrop: (_item, final) => log.push(`drop ${String(final)}`),
   });
   return (
-    <div ref={track} data-testid='track'>
+    <div ref={hasTrack ? track : undefined} data-testid='track'>
       <button type='button' {...carry.item('knob')}>
         {`knob ${String(value)}`}
       </button>
@@ -384,9 +593,10 @@ function Dial({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: string[] }) 
 function renderDial() {
   const kit = fakeKit();
   const log: string[] = [];
-  render(<Dial kit={kit} log={log} />);
+  const view = render(<Dial kit={kit} log={log} />);
   placeAt(screen.getByTestId('track'), 100, 0, 500, 50);
-  return { log, knob: () => screen.getByRole('button') };
+  const loseTrack = () => view.rerender(<Dial kit={kit} log={log} hasTrack={false} />);
+  return { log, knob: () => screen.getByRole('button'), loseTrack };
 }
 
 describe('useCarry along an axis', () => {
@@ -416,6 +626,30 @@ describe('useCarry along an axis', () => {
     expect(log).toEqual(['change 50', 'change 60', 'change 50', 'change 40', 'change 30', 'drop 30']);
   });
 
+  it.each([
+    ['the browser cancels the drag', () => cancel()],
+    ['the window loses focus', blur],
+  ])('puts the value back where it started when %s', (_reason, interrupt) => {
+    const { log, knob } = renderDial();
+    down(knob(), { x: 300, y: 25 });
+    move({ x: 362, y: 25 });
+    expect(knob().textContent).toBe('knob 50');
+    interrupt();
+    expect(knob().textContent).toBe('knob 40');
+    up({ x: 500, y: 25 });
+    expect(log).toEqual(['change 50', 'change 40']);
+  });
+
+  it('puts the value back where it started when the track leaves the screen before the release', () => {
+    const { log, knob, loseTrack } = renderDial();
+    down(knob(), { x: 300, y: 25 });
+    move({ x: 362, y: 25 });
+    loseTrack();
+    up({ x: 500, y: 25 });
+    expect(knob().textContent).toBe('knob 40');
+    expect(log).toEqual(['change 50', 'change 40']);
+  });
+
   it('puts the value back where it started when Escape cancels', () => {
     const { log, knob } = renderDial();
     key(knob(), ' ');
@@ -424,4 +658,140 @@ describe('useCarry along an axis', () => {
     expect(knob().textContent).toBe('knob 40');
     expect(log).toEqual(['change 50', 'change 40']);
   });
+});
+
+/** A picnic whose drops check, as they happen, that the target is on screen and takes the item. */
+function CheckedPicnic({ kit, scene, events }: { kit: ReturnType<typeof fakeKit>; scene: PicnicScene; events: Log }) {
+  const { basket = true, basketTakes = true, pear = true } = scene;
+  const takes = (item: Fruit, target: Place) => (target === 'basket' ? basketTakes : item === 'pear');
+  const carry = useCarry<Fruit, Place>(kit, {
+    kind: 'targets',
+    accepts: takes,
+    onDrop: (item, target) => {
+      const onScreen = screen.queryByText(target) !== null;
+      events.drops.push(`${item} -> ${target}${onScreen && takes(item, target) ? '' : ' (not a valid target)'}`);
+    },
+  });
+  return (
+    <div>
+      <button type='button' {...carry.item('apple')}>
+        apple
+      </button>
+      {pear && (
+        <button type='button' {...carry.item('pear')}>
+          pear
+        </button>
+      )}
+      {basket && <div {...carry.target('basket')}>basket</div>}
+      <div {...carry.target('plate')}>plate</div>
+    </div>
+  );
+}
+
+const fruitOnScreen = () => screen.queryAllByText(/^(apple|pear)$/);
+const carriedNames = () =>
+  fruitOnScreen()
+    .filter((item) => item.dataset.carried === 'true')
+    .map((item) => item.textContent ?? '');
+
+/** What one input broke of the carry rules, given what was carried before and after and what dropped. */
+function brokenRules(before: readonly string[], after: readonly string[], drops: readonly string[]): string[] {
+  const broken: string[] = [];
+  if (after.length > 1) broken.push(`${String(after.length)} items carried at once`);
+  if (drops.length > 1) broken.push(`${String(drops.length)} drops from one input`);
+  for (const drop of drops) {
+    if (drop.endsWith('(not a valid target)')) broken.push(`dropped where it may not land: ${drop}`);
+    if (!before.some((name) => drop.startsWith(`${name} -> `))) broken.push(`dropped an item not carried: ${drop}`);
+    if (after.length > 0) broken.push(`still carrying after a drop: ${drop}`);
+  }
+  // An item that is not carried is back in its place.
+  for (const item of fruitOnScreen()) {
+    if (item.dataset.carried !== 'true' && item.style.translate !== '') {
+      broken.push(`${item.textContent ?? ''} left at ${item.style.translate}`);
+    }
+  }
+  return broken;
+}
+
+interface Input {
+  readonly text: string;
+  /** The pointer that made the input, or null for a key, a blur, or a change on screen. */
+  readonly pointer: number | null;
+  /** A press on a fruit. */
+  readonly pressed?: boolean;
+  /**
+   * A release, a cancel, a move with no button held, or another press: each ends the pointer's
+   * press. A second press by the holder means its release was lost, so it becomes the placing click.
+   */
+  readonly ends?: boolean;
+}
+
+describe('useCarry under random pointer and keyboard input', () => {
+  const KEYS = ['Enter', ' ', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a'];
+
+  /** One random input, and the pointer that made it. Points range past the window's edges. */
+  function randomInput(random: Random, rerender: (scene: PicnicScene) => void): Input {
+    const at = { x: random.int(-60, 700), y: random.int(-60, 600) };
+    const pointer = random.pick([MOUSE, MOUSE, 2]);
+    const where = `${JSON.stringify(at)} #${String(pointer)}`;
+    const kind = random.int(0, 9);
+    if (kind === 0) {
+      const element = random.pick(['apple', 'pear', 'basket', 'plate'].flatMap((name) => screen.queryAllByText(name)));
+      down(element, at, 0, pointer);
+      const name = element.textContent ?? '';
+      return { text: `down ${name} ${where}`, pointer, pressed: name === 'apple' || name === 'pear', ends: true };
+    }
+    if (kind === 1) return (move(at, pointer), { text: `move ${where}`, pointer });
+    if (kind === 2) return (hover(at, pointer), { text: `hover ${where}`, pointer, ends: true });
+    if (kind === 3) return (up(at, pointer), { text: `up ${where}`, pointer, ends: true });
+    if (kind === 4) return (cancel(pointer), { text: `cancel #${String(pointer)}`, pointer, ends: true });
+    if (kind === 5) return (blur(), { text: 'blur', pointer: null });
+    if (kind === 6) {
+      const scene = { basket: random.int(0, 3) > 0, basketTakes: random.int(0, 3) > 0, pear: random.int(0, 3) > 0 };
+      return (rerender(scene), { text: `scene ${JSON.stringify(scene)}`, pointer: null });
+    }
+    const fruit = random.pick(fruitOnScreen());
+    const name = random.pick(KEYS);
+    key(fruit, name);
+    return { text: `key ${JSON.stringify(name)} on ${fruit.textContent ?? ''}`, pointer: null };
+  }
+
+  it.each(Array.from({ length: 40 }, (_, index) => index * 7919 + 1))(
+    'keeps at most one item carried and lands each on a valid target or puts it back, seed %i',
+    (seed) => {
+      const random = createRandom(seed);
+      const kit = fakeKit();
+      const events: Log = { drops: [] };
+      const view = render(<CheckedPicnic kit={kit} scene={{}} events={events} />);
+      const rerender = (scene: PicnicScene) => {
+        view.rerender(<CheckedPicnic kit={kit} scene={scene} events={events} />);
+        layOutPicnic();
+      };
+      layOutPicnic();
+      const steps: string[] = [];
+      // The pointer whose press picked the item up, until that press ends.
+      let holder: number | null = null;
+      for (let step = 0; step < 80; step += 1) {
+        const before = carriedNames();
+        const placesBefore = fruitOnScreen().map((item) => item.style.translate);
+        const dropsBefore = events.drops.length;
+        const input = randomInput(random, rerender);
+        steps.push(input.text);
+        const after = carriedNames();
+        const drops = events.drops.slice(dropsBefore);
+        const broken = brokenRules(before, after, drops);
+        const placesAfter = fruitOnScreen().map((item) => item.style.translate);
+        const changed =
+          drops.length > 0 || after.join() !== before.join() || placesAfter.join() !== placesBefore.join();
+        if (holder !== null && input.pointer !== null && input.pointer !== holder && changed) {
+          broken.push(`pointer ${String(input.pointer)} moved or dropped the item pointer ${String(holder)} holds`);
+        }
+        expect(broken, steps.join('\n')).toEqual([]);
+        if (before.length === 0 && after.length === 1 && input.pressed === true) holder = input.pointer;
+        else if (after.length === 0 || input.pointer === null || (input.pointer === holder && input.ends === true)) {
+          holder = null;
+        }
+      }
+    },
+  );
 });

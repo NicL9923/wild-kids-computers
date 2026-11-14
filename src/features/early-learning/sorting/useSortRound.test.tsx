@@ -45,6 +45,8 @@ function fakeKit(): { kit: ActivityKit; calls: KitCall[] } {
     hint: (say) => calls.push({ call: 'hint', say: say?.id ?? null }),
     roundComplete: () => calls.push({ call: 'round-complete' }),
     stepSolved: unexpected('stepSolved'),
+    checkpoint: unexpected('checkpoint'),
+    holdCheckpoint: () => () => undefined,
     get state(): never {
       throw new Error('The sort round has no state');
     },

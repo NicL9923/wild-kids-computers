@@ -4,7 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
 import type { Band } from '../../src/core/bands.ts';
 import type { SpokenHandle } from '../../src/core/strings/defineStrings.ts';
 import { readAudioLog } from './audioLog.ts';
-import { launchApp, type LaunchedApp } from './launchApp.ts';
+import { documentNames } from '../../src/core/platform/names.ts';
+import { settingsDocument } from '../../src/core/storage/schemas.ts';
+import { FIXTURE_PROFILE, launchApp, type LaunchedApp, type LaunchSetup } from './launchApp.ts';
 import { SCREENS_DIR } from './screens.ts';
 import { ACTIVITY_PATH } from '../../src/activityShell/paths.ts';
 
@@ -33,6 +35,15 @@ export interface OpenActivityOptions {
   readonly size?: { readonly width: number; readonly height: number };
   /** Pins the kit clock at this wall time before the activity opens. Step it with `kitTime`. */
   readonly pinClockAt?: number;
+  /** The parent's session length in minutes. Run it out with `advanceClock`. */
+  readonly sessionMinutes?: number;
+}
+
+/** Saved settings for the ready profile with a session length, for `launchApp`'s setup. */
+export function sessionLengthSetup(minutes: number | undefined): LaunchSetup {
+  if (minutes === undefined) return {};
+  const settings = { ...settingsDocument.defaults(), sessionLengthMinutes: minutes };
+  return { documents: { [documentNames.settings(FIXTURE_PROFILE.id)]: JSON.stringify(settings) } };
 }
 
 /**
@@ -65,12 +76,15 @@ export async function goToActivity(page: Page, activityId: string): Promise<void
 }
 
 export async function openActivity(options: OpenActivityOptions): Promise<LaunchedApp> {
-  const launched = await launchApp({
-    band: options.band,
-    seed: options.seed,
-    ...(options.difficulty === undefined ? {} : { difficulty: options.difficulty }),
-    activity: options.activity,
-  });
+  const launched = await launchApp(
+    {
+      band: options.band,
+      seed: options.seed,
+      ...(options.difficulty === undefined ? {} : { difficulty: options.difficulty }),
+      activity: options.activity,
+    },
+    sessionLengthSetup(options.sessionMinutes),
+  );
   try {
     // Always set the size: a virtual display's default screen is smaller than the app's window.
     await resizeWindow(launched, options.size ?? DEFAULT_SIZE);

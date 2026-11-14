@@ -97,6 +97,21 @@ export interface ActivityKit<S = never> {
    * for any other kind of activity.
    */
   readonly stepSolved: () => void;
+  /**
+   * For a `free` activity, which has no rounds to end: a calm moment, such as a finished action
+   * with nothing moving, half typed, or open. When the parent's session length is used up, the
+   * stage rests as it does between rounds and the closing screen follows. While a hold is on, the
+   * check waits until the last hold lets go. The shell also checks after a while with no input,
+   * so a forgotten checkpoint still ends the session. Throws for any other kind of activity,
+   * which the kit checks between rounds.
+   */
+  readonly checkpoint: () => void;
+  /**
+   * Keeps the session check off while something the child started is still going, such as a
+   * robot run or a carried item, and returns the release. Leaving the round releases it too.
+   * Outside free play it does nothing, since the session ends only between rounds there.
+   */
+  readonly holdCheckpoint: () => () => void;
   /** The activity's saved state. Throws when the definition declares no `state`. */
   readonly state: KitState<S>;
   /** The profile's gallery pictures, for activities that use them, such as a jigsaw. */
@@ -145,6 +160,10 @@ export interface KitParts<S> {
   readonly onRoundComplete: RoundCompleteHandler;
   /** Saves that the step after this one is open. Throws outside a sequence. */
   readonly onStepSolved: () => void;
+  /** A calm moment in free play. Throws outside free play. */
+  readonly onCheckpoint: () => void;
+  /** Holds the free-play session check off, and returns the release. */
+  readonly onHoldCheckpoint: () => () => void;
   /** The saved state now, or null when the definition declares none. */
   readonly state: KitState<S> | null;
   readonly reducedMotion: boolean;
@@ -209,6 +228,13 @@ export function createKit<S>(parts: KitParts<S>): ActivityKit<S> {
     },
     stepSolved() {
       if (!scope.disposed) parts.onStepSolved();
+    },
+    checkpoint() {
+      if (!scope.disposed) parts.onCheckpoint();
+    },
+    holdCheckpoint() {
+      if (scope.disposed) return () => undefined;
+      return scope.own(parts.onHoldCheckpoint());
     },
     roundComplete(outcome) {
       if (scope.disposed || tally.complete) return;

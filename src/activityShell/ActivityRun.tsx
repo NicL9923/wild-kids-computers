@@ -40,7 +40,7 @@ import { AREA_PATH } from './paths.ts';
 import { ExitControl, InstructionControl, MuteControl } from './ShellControls.tsx';
 import { StepPicker } from './StepPicker.tsx';
 import { strings } from './strings.ts';
-import { BETWEEN_ROUNDS_MS, FEEDBACK_MARK_MS } from './timing.ts';
+import { BETWEEN_ROUNDS_MS, FEEDBACK_MARK_MS, IDLE_CHECK_MS } from './timing.ts';
 import { useScope } from './useScope.ts';
 import { WithActivityState } from './WithActivityState.tsx';
 
@@ -259,6 +259,7 @@ function Round({
   player,
   onRoundComplete,
   onStepSolved,
+  session,
 }: {
   definition: ActivityDefinition;
   band: Band;
@@ -266,6 +267,8 @@ function Round({
   player: Player;
   onRoundComplete: RoundCompleteHandler;
   onStepSolved?: () => void;
+  /** Free play's session checkpoint and hold. Other kinds check between rounds. */
+  session?: FreeSession;
 }) {
   const scope = useScope();
   const [tally] = useState(createTally);
@@ -273,10 +276,23 @@ function Round({
   // Stable across renders: a new handler would rebuild the kit, and an activity effect that
   // depends on the kit would run again on every render.
   const stepSolved = useMemo(() => onStepSolved ?? noSteps(definition.id), [onStepSolved, definition.id]);
+  const { checkpoint, hold } = useMemo(() => session ?? betweenRoundsOnly(definition.id), [session, definition.id]);
   // Rebuilt when the saved state, motion, or pictures change; the tally keeps the round's counts.
   const kit = useMemo(
-    () => createKit({ scope, host, tally, onRoundComplete, onStepSolved: stepSolved, state, reducedMotion, pictures }),
-    [scope, host, tally, onRoundComplete, stepSolved, state, reducedMotion, pictures],
+    () =>
+      createKit({
+        scope,
+        host,
+        tally,
+        onRoundComplete,
+        onStepSolved: stepSolved,
+        onCheckpoint: checkpoint,
+        onHoldCheckpoint: hold,
+        state,
+        reducedMotion,
+        pictures,
+      }),
+    [scope, host, tally, onRoundComplete, stepSolved, checkpoint, hold, state, reducedMotion, pictures],
   );
 
   useEffect(() => {
@@ -291,6 +307,22 @@ function Round({
 function noSteps(activityId: string): () => void {
   return () => {
     throw new Error(`Activity ${activityId} has no steps: stepSolved is for sequence activities.`);
+  };
+}
+
+/** What free play gives the kit for the session length. */
+interface FreeSession {
+  readonly checkpoint: () => void;
+  readonly hold: () => () => void;
+}
+
+/** The session handlers of an activity that ends its session between rounds. */
+function betweenRoundsOnly(activityId: string): FreeSession {
+  return {
+    checkpoint() {
+      throw new Error(`Activity ${activityId} is not free play: the kit checks the session length between its rounds.`);
+    },
+    hold: () => () => undefined,
   };
 }
 
@@ -503,9 +535,83 @@ function FreeRun({
   const onRoundComplete = useCallback(() => {
     throw new Error(`Activity ${definition.id} is free play, which has no rounds to complete.`);
   }, [definition.id]);
+  const { session, closing } = useFreeSession(player);
   return (
-    <Frame definition={definition} player={player} resting={false}>
-      <Round definition={definition} band={band} level={level} player={player} onRoundComplete={onRoundComplete} />
+    <Frame definition={definition} player={player} resting={closing}>
+      <Round
+        definition={definition}
+        band={band}
+        level={level}
+        player={player}
+        onRoundComplete={onRoundComplete}
+        session={session}
+      />
     </Frame>
   );
+}
+
+/** Input that shows the child is still playing. */
+const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel'] as const;
+
+/**
+ * Free play has no rounds to end, so the session length is checked at calm moments: when the
+ * activity calls `kit.checkpoint()`, and after IDLE_CHECK_MS with no input, so an activity that
+ * forgets to call it still ends on time. A hold, such as a robot run or a carried item, makes the
+ * check wait until the last hold lets go. When the limit is reached the stage rests, as between
+ * rounds, and the closing screen follows. Leaving unmounts the activity, which saves its state.
+ */
+function useFreeSession(player: Player): { session: FreeSession; closing: boolean } {
+  const navigate = useNavigate();
+  const { isLimitReached } = useSessionLength();
+  const { visit, afterRest } = player;
+  const [closing, setClosing] = useState(false);
+  const gate = useRef({ holds: 0, waiting: false, closing: false });
+
+  const checkpoint = useCallback(() => {
+    const now = gate.current;
+    if (now.closing || visit.disposed) return;
+    if (now.holds > 0) {
+      now.waiting = true;
+      return;
+    }
+    now.waiting = false;
+    if (!isLimitReached()) return;
+    now.closing = true;
+    setClosing(true);
+    afterRest(() => void navigate({ to: CLOSING_PATH }));
+  }, [afterRest, isLimitReached, navigate, visit]);
+
+  const hold = useCallback(() => {
+    gate.current.holds += 1;
+    let held = true;
+    return () => {
+      if (!held) return;
+      held = false;
+      gate.current.holds -= 1;
+      if (gate.current.holds === 0 && gate.current.waiting) checkpoint();
+    };
+  }, [checkpoint]);
+
+  // The shell's own check after a while with no input. Each input starts the wait again. No
+  // clock arithmetic: the page clock reads fractions, and a quiet time measured a hair short of
+  // the wait once scheduled a wait of a hair that ran again at the same instant forever.
+  useEffect(() => {
+    let cancel = (): void => undefined;
+    const wait = (): void => {
+      cancel();
+      cancel = visit.setTimeout(() => {
+        checkpoint();
+        wait();
+      }, IDLE_CHECK_MS);
+    };
+    const stops = INPUT_EVENTS.map((type) => visit.listen(window, type, wait, { capture: true, passive: true }));
+    wait();
+    return () => {
+      for (const stop of stops) stop();
+      cancel();
+    };
+  }, [checkpoint, visit]);
+
+  const session = useMemo(() => ({ checkpoint, hold }), [checkpoint, hold]);
+  return { session, closing };
 }

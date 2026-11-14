@@ -10,7 +10,7 @@ import { toDraft, type Block, type BlockDraft, type Program } from '../../src/fe
 import type { ToolboxItem } from '../../src/features/robot-painter/engine/toolbox.ts';
 import type { ValidProgram } from '../../src/features/robot-painter/engine/validate.ts';
 import { stepPause } from '../../src/features/robot-painter/timing.ts';
-import { goToActivity, kitTime, resizeWindow } from './activity.ts';
+import { goToActivity, kitTime, resizeWindow, sessionLengthSetup } from './activity.ts';
 import { FIXTURE_PROFILE, launchApp, type LaunchedApp } from './launchApp.ts';
 
 /**
@@ -27,6 +27,8 @@ export interface OpenRobotOptions {
   /** Opens this step through the step picker, as a child who reached it would. */
   readonly step?: number;
   readonly size?: { readonly width: number; readonly height: number };
+  /** The parent's session length in minutes. */
+  readonly sessionMinutes?: number;
 }
 
 async function progressText(activity: string, furthestStep: number): Promise<string> {
@@ -51,10 +53,12 @@ async function progressText(activity: string, furthestStep: number): Promise<str
  * picks it.
  */
 export async function openRobot(options: OpenRobotOptions): Promise<LaunchedApp> {
-  const documents =
-    options.step === undefined || options.step === 0
+  const documents = {
+    ...sessionLengthSetup(options.sessionMinutes).documents,
+    ...(options.step === undefined || options.step === 0
       ? {}
-      : { [documentNames.progress(FIXTURE_PROFILE.id)]: await progressText(options.activity, options.step) };
+      : { [documentNames.progress(FIXTURE_PROFILE.id)]: await progressText(options.activity, options.step) }),
+  };
   const launched = await launchApp({ band: options.band, seed: 7, activity: options.activity }, { documents });
   try {
     await resizeWindow(launched, options.size ?? { width: 1280, height: 800 });

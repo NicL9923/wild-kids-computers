@@ -115,6 +115,12 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
   const penColors = PEN_COLORS.filter((color) => toolbox.some((item) => item.kind === 'color' && item.color === color));
   const running = runner.status === 'running';
 
+  // Free play ends at the parent's session length only at a calm moment: after a direct move or a
+  // finished program, never part way through a run, even one paused by "one step".
+  const free = puzzle === null;
+  const midRun = runner.status === 'running' || runner.status === 'paused';
+  useEffect(() => (free && midRun ? kit.holdCheckpoint() : undefined), [free, midRun, kit]);
+
   const stopResultPause = () => {
     cancelResult.current?.();
     cancelResult.current = null;
@@ -134,7 +140,11 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
   };
 
   const ended = (result: RunResult) => {
-    if (puzzle === null) return;
+    if (puzzle === null) {
+      // The run's hold lets go when the screen shows it ended; the check waits for that.
+      kit.checkpoint();
+      return;
+    }
     const check = checkRun(puzzle, result);
     if (check.solved) {
       markSolved();
@@ -201,7 +211,8 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
     if (program === null) return;
     kit.play('tap');
     const run = runner.show(program);
-    if (puzzle !== null && checkRun(puzzle, run).solved) markSolved();
+    if (puzzle === null) kit.checkpoint();
+    else if (checkRun(puzzle, run).solved) markSolved();
   };
 
   /** The youngest children's plan: an arrow goes into the next place. */

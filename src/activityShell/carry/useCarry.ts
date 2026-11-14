@@ -18,6 +18,13 @@ import type { ActivityKit } from '../kit.ts';
  * move, Enter or Space to place, and Escape to put it back. Releasing early never loses the item:
  * it goes back to where it was.
  *
+ * A carried item always ends one of two ways: it lands on a place that is still there and still
+ * takes it, or it goes back. Anything that interrupts a carry puts it back: the browser cancelling
+ * the pointer, the window losing focus, the button let go outside the window, Escape, or the item,
+ * its target, its area, or its track leaving the screen. During a drag only the pointer that
+ * pressed moves and drops the item; a second finger changes nothing. A picked-up item waits for a
+ * placing click from any pointer, since a child may switch from the trackpad to the mouse.
+ *
  * Three kinds of move:
  * - `targets`: the item goes onto a drop target, such as a picnic basket.
  * - `free`: the item lands anywhere in an area, such as a window on the toy desktop.
@@ -124,6 +131,8 @@ interface Active<I> {
   readonly offset: Point;
   /** For an axis move, the value before pick up, to put back on cancel. */
   readonly startValue: number;
+  /** The pointer that pressed, which alone moves and drops a held item. Null for the keyboard. */
+  readonly pointerId: number | null;
 }
 
 function center(rect: DOMRect): Point {
@@ -144,11 +153,17 @@ function snap(value: number, min: number, max: number, step: number): number {
   return Math.min(max, Math.max(min, snapped));
 }
 
+/**
+ * The kit parts `useCarry` needs. `holdCheckpoint` is optional so a test can pass a bare scope; in
+ * free play it keeps the session length from closing the activity while something is carried.
+ */
+type CarryKit = Pick<ActivityKit<unknown>, 'scope' | 'play'> & Partial<Pick<ActivityKit<unknown>, 'holdCheckpoint'>>;
+
 export function useCarry<I extends string, T extends string = never>(
-  kit: Pick<ActivityKit<unknown>, 'scope' | 'play'>,
+  kit: CarryKit,
   mode: CarryMode<I, T>,
 ): Carry<I, T> {
-  const { scope, play } = kit;
+  const { scope, play, holdCheckpoint } = kit;
   const [active, setActive] = useState<Active<I> | null>(null);
   const [over, setOver] = useState<T | null>(null);
   const targets = useRef(new Map<T, HTMLElement>());
@@ -170,6 +185,12 @@ export function useCarry<I extends string, T extends string = never>(
     return null;
   }, []);
 
+  /** Whether a target is still on screen and still takes the item, checked when the item lands. */
+  const stillTakes = useCallback(
+    (item: I, target: T): boolean => targets.current.has(target) && modeAccepts(live.current.mode, item, target),
+    [],
+  );
+
   const axisValue = useCallback((point: Point): number | null => {
     const modeNow = live.current.mode;
     if (modeNow.kind !== 'axis') return null;
@@ -186,11 +207,12 @@ export function useCarry<I extends string, T extends string = never>(
     const modeNow = live.current.mode;
     if (modeNow.kind !== 'free') return null;
     const area = modeNow.area.current?.getBoundingClientRect();
+    // With no area on screen there is nowhere to keep the item inside, so it goes back.
+    if (area === undefined) return null;
     const element = items.current.get(item)?.getBoundingClientRect();
     const from = modeNow.position(item);
     const x = from.x + offset.x;
     const y = from.y + offset.y;
-    if (area === undefined) return { x, y };
     const maxX = Math.max(0, area.width - (element?.width ?? 0));
     const maxY = Math.max(0, area.height - (element?.height ?? 0));
     return { x: Math.min(maxX, Math.max(0, x)), y: Math.min(maxY, Math.max(0, y)) };
@@ -201,14 +223,18 @@ export function useCarry<I extends string, T extends string = never>(
    * where it was. `at` is where the pointer let go; a keyboard drop uses the chosen target.
    */
   const finish = useCallback(
-    (placed: boolean, at?: Point) => {
+    (want: boolean, at?: Point) => {
       const { active: now, over: chosen, mode: modeNow } = live.current;
       if (now === null) return;
+      // Over at once, so a second listener that hears the same event finds nothing carried.
+      live.current = { ...live.current, active: null, over: null };
       setActive(null);
       setOver(null);
+      // An item that left the screen is never placed.
+      const placed = want && items.current.has(now.item);
       if (modeNow.kind === 'targets') {
         const target = at === undefined ? chosen : targetAt(now.item, at);
-        if (placed && target !== null) {
+        if (placed && target !== null && stillTakes(now.item, target)) {
           play('put-down');
           modeNow.onDrop(now.item, target);
         }
@@ -223,16 +249,17 @@ export function useCarry<I extends string, T extends string = never>(
         }
         return;
       }
-      if (!placed) {
-        modeNow.onChange(now.item, now.startValue);
+      // A pointer drop needs the track to read the value; without it the value goes back.
+      const value = at === undefined ? modeNow.value(now.item) : axisValue(at);
+      if (!placed || value === null) {
+        if (modeNow.value(now.item) !== now.startValue) modeNow.onChange(now.item, now.startValue);
         return;
       }
-      const value = (at === undefined ? null : axisValue(at)) ?? modeNow.value(now.item);
       if (value !== modeNow.value(now.item)) modeNow.onChange(now.item, value);
       play('put-down');
       modeNow.onDrop?.(now.item, value);
     },
-    [axisValue, freePoint, play, targetAt],
+    [axisValue, freePoint, play, stillTakes, targetAt],
   );
 
   /** Follows the pointer: the offset for targets and free moves, the value for an axis move. */
@@ -250,16 +277,44 @@ export function useCarry<I extends string, T extends string = never>(
     [axisValue, targetAt],
   );
 
-  // Window listeners while something is held or carried. They live in the activity's scope, so
-  // leaving the activity removes them.
-  const carrying = active !== null && active.how !== 'keyboard';
+  // Window listeners while anything is carried. They live in the activity's scope, so leaving the
+  // activity removes them.
+  const engaged = active !== null;
+  const byPointer = active !== null && active.how !== 'keyboard';
   useEffect(() => {
-    if (!carrying) return undefined;
+    if (!engaged) return undefined;
+    // Losing the window, such as to another program, puts back whatever is carried, however.
+    return scope.listen(window, 'blur', () => finish(false));
+  }, [engaged, finish, scope]);
+
+  // Free play waits for a calm moment to close at the end of the session; a carry is not one.
+  useEffect(() => (engaged ? holdCheckpoint?.() : undefined), [engaged, holdCheckpoint]);
+
+  // An item that leaves the screen while carried is let go of, so a later click places nothing.
+  useLayoutEffect(() => {
+    if (active !== null && !items.current.has(active.item)) finish(false);
+  });
+
+  useEffect(() => {
+    if (!byPointer) return undefined;
     const point = (event: PointerEvent): Point => ({ x: event.clientX, y: event.clientY });
+    /** The item carried by pointer now, unless a held item belongs to another pointer. */
+    const carriedFor = (event: PointerEvent): Active<I> | null => {
+      const now = live.current.active;
+      if (now === null || now.how === 'keyboard') return null;
+      return now.how === 'held' && now.pointerId !== event.pointerId ? null : now;
+    };
     const stops = [
       scope.listen(window, 'pointermove', (event: PointerEvent) => {
-        const now = live.current.active;
+        const now = carriedFor(event);
         if (now === null) return;
+        if (now.how === 'held' && event.buttons === 0) {
+          // The button went up where the page could not hear it, such as outside the window.
+          // A press that never moved was a pick-up click; a drag goes back.
+          if (now.pending) setActive({ ...now, how: 'clicked' });
+          else finish(false);
+          return;
+        }
         const at = point(event);
         if (now.pending) {
           const moved = Math.hypot(at.x - now.start.x, at.y - now.start.y);
@@ -268,7 +323,7 @@ export function useCarry<I extends string, T extends string = never>(
         follow(now, at);
       }),
       scope.listen(window, 'pointerup', (event: PointerEvent) => {
-        const now = live.current.active;
+        const now = carriedFor(event);
         if (now === null) return;
         if (now.how === 'held' && now.pending) {
           const modeNow = live.current.mode;
@@ -285,15 +340,17 @@ export function useCarry<I extends string, T extends string = never>(
         finish(true, point(event));
       }),
       scope.listen(window, 'pointerdown', (event: PointerEvent) => {
-        const now = live.current.active;
+        const now = carriedFor(event);
         if (now?.how !== 'held' || event === pickUpPress.current) return;
-        // A second press while the first is still held: its release never arrived, as happens
-        // when the window loses the pointer mid-click. The first press was a pick-up click, so
-        // this one is the placing click and its release puts the item down.
+        // The same pointer pressed again while the first press is still held: its release never
+        // arrived, as happens when the window loses the pointer mid-click. The first press was a
+        // pick-up click, so this one is the placing click and its release puts the item down.
         setActive({ ...now, how: 'clicked' });
       }),
       // The browser took the pointer away, for example for a system gesture. Nothing is placed.
-      scope.listen(window, 'pointercancel', () => finish(false)),
+      scope.listen(window, 'pointercancel', (event: PointerEvent) => {
+        if (carriedFor(event) !== null) finish(false);
+      }),
       scope.listen(window, 'keydown', (event: KeyboardEvent) => {
         if (event.key !== 'Escape') return;
         event.preventDefault();
@@ -303,7 +360,7 @@ export function useCarry<I extends string, T extends string = never>(
     return () => {
       for (const stop of stops) stop();
     };
-  }, [carrying, finish, follow, scope]);
+  }, [byPointer, finish, follow, scope]);
 
   const item = useCallback(
     (id: I): CarryItemProps => {
@@ -339,6 +396,7 @@ export function useCarry<I extends string, T extends string = never>(
             pending: true,
             offset: { x: 0, y: 0 },
             startValue: mode.kind === 'axis' ? mode.value(id) : 0,
+            pointerId: event.pointerId,
           });
         },
         onKeyDown(event) {
@@ -357,6 +415,7 @@ export function useCarry<I extends string, T extends string = never>(
               pending: false,
               offset: { x: 0, y: 0 },
               startValue: mode.kind === 'axis' ? mode.value(id) : 0,
+              pointerId: null,
             });
             if (mode.kind === 'targets') setOver(firstTarget(id));
             return;

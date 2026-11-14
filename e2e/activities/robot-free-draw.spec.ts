@@ -9,7 +9,16 @@ import { draft as d, type BlockDraft } from '../../src/features/robot-painter/en
 import { buildProgram } from '../../src/features/robot-painter/engine/validate.ts';
 import { strings } from '../../src/features/robot-painter/strings.ts';
 import { expectAccessible } from '../support/accessibility.ts';
-import { expectInstructionSpoken, forEachBand, REVIEW_SIZES, saveBandScreenshot } from '../support/activity.ts';
+import { BETWEEN_ROUNDS_MS, IDLE_CHECK_MS } from '../../src/activityShell/timing.ts';
+import { strings as closingStrings } from '../../src/app/closing/strings.ts';
+import { advanceClock } from '../support/clock.ts';
+import {
+  expectInstructionSpoken,
+  forEachBand,
+  kitTime,
+  REVIEW_SIZES,
+  saveBandScreenshot,
+} from '../support/activity.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
 import { enterBlocks, expectTargetsFit, openRobot, playRun, settleRobot } from '../support/robotPainter.ts';
 
@@ -120,5 +129,55 @@ test.describe('band-6-8', () => {
     await expect(first).toHaveAttribute('x1', String(mode.world.start.x));
     await expect(first).toHaveAttribute('x2', String(mode.world.start.x));
     await expect(first).toHaveAttribute('y2', String(mode.world.start.y - 1));
+  });
+});
+
+test.describe('the session length', () => {
+  const LIMIT_MINUTES = 15;
+
+  test('keeps drawing before the limit, and closes calmly after the next move once it is reached', async () => {
+    const band = 'band-3-5';
+    launched = await openRobot({ activity: activity.id, band, sessionMinutes: LIMIT_MINUTES });
+    const { page } = launched;
+    const closing = page.getByRole('heading', { level: 1, name: closingStrings.heading.text });
+    const right = page.locator('[data-arrow="right"]');
+    // A minute short of the limit, a move leaves the child drawing.
+    await advanceClock(page, (LIMIT_MINUTES - 1) * 60_000);
+    await right.click();
+    await settleRobot(page);
+    await kitTime(page).advance(BETWEEN_ROUNDS_MS);
+    await expect(page.locator('.rp-paper')).toHaveAttribute('data-lines', '1');
+    await expect(closing).toBeHidden();
+
+    // Past the limit, the next move still shows, and then the closing screen comes.
+    await advanceClock(page, 60_000);
+    await right.click();
+    await expect(page.locator('.rp-paper')).toHaveAttribute('data-lines', '2');
+    await kitTime(page).advance(BETWEEN_ROUNDS_MS);
+    await expect(closing).toBeVisible();
+  });
+
+  test('never closes part way through a run; the closing screen waits for the program to end', async () => {
+    const band = 'band-6-8';
+    const mode = generateLevel(0, band);
+    launched = await openRobot({ activity: activity.id, band, sessionMinutes: LIMIT_MINUTES });
+    const { page } = launched;
+    const closing = page.getByRole('heading', { level: 1, name: closingStrings.heading.text });
+    const blocks = [d.right(), d.right(), d.up()];
+    await enterBlocks(page, mode.toolbox, buildProgram([]), 'main', blocks);
+    await advanceClock(page, LIMIT_MINUTES * 60_000);
+    // "One step" leaves the run part way. The child then stops, long past the shell's own wait
+    // for a quiet moment, and the run is still theirs to finish.
+    await page.locator('[data-control="step"]').click();
+    await kitTime(page).advance(IDLE_CHECK_MS * 2 + BETWEEN_ROUNDS_MS);
+    await expect(page.locator('.rp-paper')).toHaveAttribute('data-lines', '1');
+    await expect(closing).toBeHidden();
+
+    await page.locator('[data-control="go"]').click();
+    await expect(page.locator('.rp-paper')).toHaveAttribute('data-lines', '2');
+    await expect(closing).toBeHidden();
+    // The run plays to its end, the drawing stays a moment, and then the closing screen comes.
+    await playRun(page, buildProgram(blocks), mode.world, band);
+    await expect(closing).toBeVisible();
   });
 });
