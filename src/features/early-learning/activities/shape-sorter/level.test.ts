@@ -13,6 +13,9 @@ function problems(level: ShapeSorterLevel): string[] {
   if ([...level.holes].toSorted().join() !== [...shapes].toSorted().join())
     found.push('the holes do not match the shapes');
   if (level.holes.some((hole, index) => hole === shapes[index])) found.push('a hole sits under its own shape');
+  if (level.pieces.some((piece, index) => piece.id !== `piece-${String(index)}`))
+    found.push('piece ids are not in order');
+  if (level.pieces.some((piece) => !BRIGHT.includes(piece.paint))) found.push('a piece has no bright paint');
   if (new Set(level.pieces.map((piece) => piece.paint)).size !== level.pieces.length)
     found.push('two pieces share a paint');
   return found;
@@ -23,6 +26,9 @@ function mostAlike(level: ShapeSorterLevel): number {
   const shapes = level.pieces.map((piece) => piece.shape);
   return Math.max(...shapes.map((shape) => shapes.filter((other) => lookAlike(shape, other)).length));
 }
+
+/** Paints that stand out from the dark holes. */
+const BRIGHT: readonly string[] = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
 
 const BASIC = ['circle', 'square', 'triangle'];
 const COMMON = [...BASIC, 'heart', 'rectangle', 'star'];
@@ -49,6 +55,25 @@ describe('generateLevel', () => {
     }
   });
 
+  it('lays the holes out in many orders, not always one turn along', () => {
+    const orders = new Set(
+      SEEDS.map((seed) => {
+        const level = generateLevel(seed, 2, 'band-3-5');
+        return level.holes.map((hole) => level.pieces.findIndex((piece) => piece.shape === hole)).join('');
+      }),
+    );
+    expect(orders).toEqual(new Set(['120', '201']));
+  });
+
+  it('uses every bright paint across rounds', () => {
+    const paints = new Set(
+      SEEDS.flatMap((seed) => generateLevel(seed, 4, 'band-6-8').pieces.map((piece) => piece.paint)),
+    );
+    expect([...paints].toSorted((a, b) => a.localeCompare(b))).toEqual(
+      [...BRIGHT].toSorted((a, b) => a.localeCompare(b)),
+    );
+  });
+
   it('uses every shape across the hardest rounds', () => {
     const seen = new Set(
       SEEDS.flatMap((seed) => generateLevel(seed, MAX_DIFFICULTY, 'band-6-8').pieces.map((piece) => piece.shape)),
@@ -65,6 +90,21 @@ describe('generateLevel', () => {
     expect(() => generateLevel(1, difficulty, 'band-3-5')).toThrow(
       `Shape sorter has difficulty 1 to 8, not ${String(difficulty)}.`,
     );
+  });
+});
+
+describe('lookAlike', () => {
+  // The design's list of shapes a young child mixes up, either way round.
+  it.each([
+    ['circle', 'oval', true],
+    ['oval', 'circle', true],
+    ['circle', 'hexagon', true],
+    ['square', 'rectangle', true],
+    ['square', 'diamond', true],
+    ['circle', 'square', false],
+    ['triangle', 'heart', false],
+  ] as const)('%s and %s look alike: %s', (a, b, alike) => {
+    expect(lookAlike(a, b)).toBe(alike);
   });
 });
 

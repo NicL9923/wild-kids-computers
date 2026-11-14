@@ -42,6 +42,16 @@ describe('generateLevel', () => {
     expect(unfamiliar === 0).toBe(familiarOnly);
   });
 
+  it('lays the animals out in many orders, not always one turn along', () => {
+    const orders = new Set(
+      SEEDS.map((seed) => {
+        const level = generateLevel(seed, 2, 'band-3-5');
+        return level.animals.map((animal) => level.homes.indexOf(animal.home)).join('');
+      }),
+    );
+    expect(orders).toEqual(new Set(['120', '201']));
+  });
+
   it('uses every home and every animal across the hardest rounds', () => {
     const levels = SEEDS.map((seed) => generateLevel(seed, MAX_DIFFICULTY, 'band-6-8'));
     expect(new Set(levels.flatMap((level) => level.homes)).size).toBe(HOMES.length);

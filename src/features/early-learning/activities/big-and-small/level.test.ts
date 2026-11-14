@@ -83,6 +83,22 @@ describe('generateLevel', () => {
     expect([...places].toSorted((a, b) => a - b)).toEqual([0, 1, 2]);
   });
 
+  it('puts the bigger of two pictures on either side across rounds', () => {
+    const sides = new Set(SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5').answer[0]));
+    expect(sides).toEqual(new Set(['item-0', 'item-1']));
+  });
+
+  it('starts order rounds in every mixed order of three', () => {
+    const orders = new Set(
+      SEEDS.map((seed) => {
+        const level = generateLevel(seed, 5, 'band-3-5');
+        return level.items.map((item) => level.answer.indexOf(item.id)).join('');
+      }),
+    );
+    // Six orders of three, less the two already sorted.
+    expect(orders).toEqual(new Set(['021', '102', '120', '201']));
+  });
+
   it('uses every picture across rounds', () => {
     const kinds = new Set(SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5').kind));
     expect([...kinds].toSorted((a, b) => a.localeCompare(b))).toEqual(
@@ -129,6 +145,10 @@ describe('unsortedOrder', () => {
   it.each([
     [
       [300, 214, 153],
+      [300, 153, 214],
+    ],
+    [
+      [153, 214, 300],
       [300, 153, 214],
     ],
     [

@@ -34,28 +34,42 @@ function wraps(level: DaysAndMonthsLevel): boolean {
 }
 
 describe('generateLevel', () => {
-  // The design table: the kinds of round each difficulty mixes, as cycle, mode, and count.
+  // The design table: the kinds of round each difficulty mixes, as cycle, mode, and count, and
+  // which of them may go round the end of the week or year.
   it.each([
-    [1, ['days after 3'], false],
-    [2, ['days after 3', 'days before 3'], false],
-    [3, ['days after 3', 'days before 3', 'days order 3'], true],
-    [4, ['days order 4', 'months after 3'], true],
-    [5, ['days order 5', 'months after 3', 'months before 3'], true],
-    [6, ['months before 4', 'months order 3'], true],
-    [7, ['months after 4', 'months order 4'], true],
-    [8, ['months after 4', 'months before 4', 'months order 5'], true],
-  ])('at difficulty %i mixes %j, going round the end: %s', (difficulty, kinds, wrapping) => {
+    [1, ['days after 3'], []],
+    [2, ['days after 3', 'days before 3'], []],
+    [3, ['days after 3', 'days before 3', 'days order 3'], ['days after 3', 'days before 3']],
+    [4, ['days order 4', 'months after 3'], ['days order 4']],
+    [5, ['days order 5', 'months after 3', 'months before 3'], ['days order 5', 'months after 3', 'months before 3']],
+    [6, ['months before 4', 'months order 3'], ['months before 4']],
+    [7, ['months after 4', 'months order 4'], ['months after 4', 'months order 4']],
+    [
+      8,
+      ['months after 4', 'months before 4', 'months order 5'],
+      ['months after 4', 'months before 4', 'months order 5'],
+    ],
+  ])('at difficulty %i mixes %j, going round the end only in %j', (difficulty, kinds, wrapping) => {
     const seen = new Set<string>();
-    let wrapped = false;
+    const wrapped = new Set<string>();
     for (const seed of SEEDS) {
       const level = generateLevel(seed, difficulty, 'band-6-8');
       expect(problems(level), `seed ${String(seed)}`).toEqual([]);
       const count = level.mode === 'order' ? level.tiles.length : level.choices.length;
-      seen.add(`${level.cycle} ${level.mode} ${String(count)}`);
-      wrapped ||= wraps(level);
+      const kind = `${level.cycle} ${level.mode} ${String(count)}`;
+      seen.add(kind);
+      if (wraps(level)) wrapped.add(kind);
     }
     expect([...seen].toSorted((a, b) => a.localeCompare(b))).toEqual(kinds);
-    expect(wrapped).toBe(wrapping);
+    expect([...wrapped].toSorted((a, b) => a.localeCompare(b))).toEqual(wrapping);
+  });
+
+  it('starts order rounds in many mixed orders, some with a name already in its place', () => {
+    const orders = SEEDS.map((seed) => generateLevel(seed, 6, 'band-6-8')).flatMap((level) =>
+      level.mode === 'order' ? [level.tiles.map((item) => level.run.indexOf(item)).join('')] : [],
+    );
+    // Of the five mixed orders of three, the two that move every name and the three that keep one.
+    expect(new Set(orders)).toEqual(new Set(['120', '201', '021', '102', '210']));
   });
 
   it('repeats a round for the same seed and changes it for another', () => {
@@ -93,19 +107,13 @@ describe('step', () => {
 });
 
 describe('nearMisses', () => {
-  it('offers the day before, the day after next, and the day itself first for "after"', () => {
+  it('offers the day before, the day after next, and the day itself for "after"', () => {
     // After Tuesday (1) is Wednesday (2).
-    expect(nearMisses('days', 1, 2).slice(0, 3)).toEqual([0, 3, 1]);
+    expect(nearMisses('days', 1, 2)).toEqual([0, 3, 1]);
   });
 
-  it('offers the month after, the month before last, and the month itself first for "before"', () => {
+  it('offers the month after, the month before last, and the month itself for "before"', () => {
     // Before January (0) is December (11).
-    expect(nearMisses('months', 0, 11).slice(0, 3)).toEqual([1, 10, 0]);
-  });
-
-  it('never offers the answer and fills with the nearest others', () => {
-    const misses = nearMisses('days', 3, 4);
-    expect(misses).not.toContain(4);
-    expect(misses.toSorted(byNumber)).toEqual([0, 1, 2, 3, 5, 6]);
+    expect(nearMisses('months', 0, 11)).toEqual([1, 10, 0]);
   });
 });

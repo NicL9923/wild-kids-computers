@@ -79,6 +79,16 @@ describe('generateLevel', () => {
     expect(mixed).toBe(SEEDS.length);
   });
 
+  it.each([1, 2, 4, 6])('offers plain random wrong times, not only misreadings, at difficulty %i', (difficulty) => {
+    const plain = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-9-12')).filter((level) => {
+      const likely = mixUps(level.time, level.step);
+      return level.choices.some(
+        (choice) => !sameTime(choice, level.time) && !likely.some((each) => sameTime(each, choice)),
+      );
+    });
+    expect(plain.length).toBeGreaterThan(SEEDS.length / 2);
+  });
+
   it('puts the answer in every place across rounds', () => {
     const places = new Set(
       SEEDS.map((seed) => {
@@ -125,6 +135,8 @@ describe('the clock arithmetic', () => {
   it('lists the misreadings of 3:45: the next hour, the hour before, swapped hands, and the other half', () => {
     expect(mixUps({ hour: 3, minute: 45 }, 15).map(digital)).toEqual(['4:45', '2:45', '9:15', '3:15', '4:00', '3:30']);
     expect(mixUps({ hour: 2, minute: 35 }, 5).map(digital)).toEqual(['3:35', '1:35', '7:10', '2:05', '2:40', '2:30']);
+    // Swapped hands at 2:30 read 6:10, which is off a quarter-hour round's step, so it is left out.
+    expect(mixUps({ hour: 2, minute: 30 }, 15).map(digital)).toEqual(['3:30', '1:30', '2:00', '2:45', '2:15']);
   });
 
   it('writes a time as a digital clock does', () => {

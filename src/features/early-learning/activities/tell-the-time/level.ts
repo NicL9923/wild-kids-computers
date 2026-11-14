@@ -18,24 +18,31 @@ type Mode = 'read' | 'set';
 /** Minutes between the times a round uses. */
 export type Step = 60 | 30 | 15 | 5;
 
-interface Tier {
-  readonly mode: Mode;
+interface ReadTier {
+  readonly mode: 'read';
   readonly step: Step;
-  /** For read rounds, how many times to choose from. */
+  /** How many times to choose from. */
   readonly choices: number;
-  /** For read rounds, whether the wrong times are the ones children most often read by mistake. */
+  /** Whether the wrong times are the ones children most often read by mistake. */
   readonly tricky: boolean;
 }
+
+interface SetTier {
+  readonly mode: 'set';
+  readonly step: Step;
+}
+
+type Tier = ReadTier | SetTier;
 
 /** One entry per difficulty, 1 first. Each new step is read before it is set. */
 const TIERS: readonly Tier[] = [
   { mode: 'read', step: 60, choices: 3, tricky: false },
   { mode: 'read', step: 30, choices: 3, tricky: false },
-  { mode: 'set', step: 30, choices: 0, tricky: false },
+  { mode: 'set', step: 30 },
   { mode: 'read', step: 15, choices: 3, tricky: false },
-  { mode: 'set', step: 15, choices: 0, tricky: false },
+  { mode: 'set', step: 15 },
   { mode: 'read', step: 5, choices: 4, tricky: false },
-  { mode: 'set', step: 5, choices: 0, tricky: false },
+  { mode: 'set', step: 5 },
   { mode: 'read', step: 5, choices: 4, tricky: true },
 ];
 
@@ -95,7 +102,7 @@ export function mixUps(time: ClockTime, step: Step): ClockTime[] {
 }
 
 /** The answer and wrong times, all on the step and all different, in random order. */
-function choicesFor(random: Random, time: ClockTime, tier: Tier): ClockTime[] {
+function choicesFor(random: Random, time: ClockTime, tier: ReadTier): ClockTime[] {
   const chosen: ClockTime[] = [time];
   const add = (candidate: ClockTime) => {
     if (chosen.length < tier.choices && !chosen.some((each) => sameTime(each, candidate))) chosen.push(candidate);
@@ -110,12 +117,13 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Te
   const tier = tierFor(difficulty);
   const random = createRandom(seed);
   const time = randomTime(random, tier.step);
-  if (tier.mode === 'read')
-    return { mode: 'read', step: tier.step, time, choices: choicesFor(random, time, tier), start: null };
+  if (tier.mode === 'read') {
+    return { mode: tier.mode, step: tier.step, time, choices: choicesFor(random, time, tier), start: null };
+  }
   // The hour hand starts on another hour, so the child always turns both hands. An offset from
   // 1 to 10 hours plus under an hour of minutes never comes back round to the same hour.
   const start = addMinutes(time, random.int(1, 10) * 60 + random.int(0, 60 / tier.step - 1) * tier.step);
-  return { mode: 'set', step: tier.step, time, choices: [], start };
+  return { mode: tier.mode, step: tier.step, time, choices: [], start };
 }
 
 /** The time as a digital clock shows it, such as 3:05. */

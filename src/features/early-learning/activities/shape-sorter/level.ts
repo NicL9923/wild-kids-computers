@@ -96,7 +96,7 @@ export function holeOrder(random: Random, shapes: readonly ShapeKind[]): ShapeKi
     if (order.every((shape, index) => shape !== shapes[index])) return order;
   }
   // A turn by one place always moves every hole.
-  return shapes.map((_, index) => shapes[(index + 1) % shapes.length] ?? shapes[0] ?? 'circle');
+  return [...shapes.slice(1), ...shapes.slice(0, 1)];
 }
 
 /** Pure: the same seed and difficulty give the same round in every band. */

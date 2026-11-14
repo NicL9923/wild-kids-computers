@@ -98,21 +98,13 @@ export function step(cycle: Cycle, from: number, by: number): number {
 }
 
 /**
- * The wrong answers to try first: the one on the other side, which children mix up with the
- * answer, the one past the answer, and the named one itself. Then any other, nearest first.
+ * The wrong answers, most tempting first: the one on the other side of the named one, which
+ * children mix up with the answer, the one past the answer, and the named one itself. Three is
+ * enough for every round, and in a week or a year they are always different.
  */
 export function nearMisses(cycle: Cycle, given: number, answer: number): number[] {
   const away = answer === step(cycle, given, 1) ? 1 : -1;
-  const near = [step(cycle, given, -away), step(cycle, given, 2 * away), given];
-  const rest = Array.from({ length: CYCLE_LENGTH[cycle] }, (_, index) => index).toSorted(
-    (a, b) => distance(cycle, a, given) - distance(cycle, b, given),
-  );
-  return [...new Set([...near, ...rest])].filter((item) => item !== answer);
-}
-
-function distance(cycle: Cycle, a: number, b: number): number {
-  const apart = Math.abs(a - b);
-  return Math.min(apart, CYCLE_LENGTH[cycle] - apart);
+  return [step(cycle, given, -away), step(cycle, answer, away), given];
 }
 
 function question(random: Random, variant: Variant & { mode: 'after' | 'before' }): QuestionRound {

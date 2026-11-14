@@ -76,14 +76,11 @@ export function isFilled(level: Pick<MirrorLevel, 'rows'>, cell: Cell): boolean 
 
 /** The squares the child must fill, top to bottom and left to right. */
 export function cellsToFill(level: MirrorLevel): Cell[] {
-  const cells: Cell[] = [];
-  for (let row = 0; row < level.size; row += 1) {
-    for (let column = 0; column < level.size; column += 1) {
-      const cell = { row, column };
-      if (inChildHalf(level, cell) && isFilled(level, cell)) cells.push(cell);
-    }
-  }
-  return cells;
+  return level.rows.flatMap((squares, row) =>
+    Array.from(squares, (square, column) => ({ square, cell: { row, column } }))
+      .filter(({ square, cell }) => square === '#' && inChildHalf(level, cell))
+      .map(({ cell }) => cell),
+  );
 }
 
 /** Pure: the same seed and difficulty give the same round in every band. */

@@ -9,6 +9,7 @@ const SEEDS = Array.from({ length: 300 }, (_, index) => index * 7_919 + 11);
 function problems(level: ColorMatchLevel): string[] {
   const found: string[] = [];
   if (new Set(level.boxes).size !== level.boxes.length) found.push('a box color repeats');
+  for (const color of level.boxes) if (!MATCH_COLORS.includes(color)) found.push(`${color} is not a color`);
   for (const toy of level.toys) if (!level.boxes.includes(toy.color)) found.push(`${toy.id} has no box`);
   for (const box of level.boxes)
     if (!level.toys.some((toy) => toy.color === box)) found.push(`the ${box} box stays empty`);
@@ -79,6 +80,19 @@ describe('areNear', () => {
     expect(areNear('red', 'orange')).toBe(true);
     expect(areNear('orange', 'red')).toBe(true);
     expect(areNear('red', 'blue')).toBe(false);
+    // The pairs that make a round hard, as the design lists them.
+    const near = MATCH_COLORS.flatMap((a) =>
+      MATCH_COLORS.filter((b) => a < b && areNear(a, b)).map((b) => `${a}-${b}`),
+    );
+    expect(near.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'blue-purple',
+      'brown-orange',
+      'brown-red',
+      'orange-red',
+      'orange-yellow',
+      'pink-purple',
+      'pink-red',
+    ]);
     expect(MATCH_COLORS.filter((color) => areNear('green', color))).toEqual([]);
   });
 });

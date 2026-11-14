@@ -61,6 +61,17 @@ describe('generateLevel', () => {
     expect([0, 1, 2, 3].map((row) => inChildHalf(flat, { row, column: 0 }))).toEqual([true, true, false, false]);
   });
 
+  it.each([
+    [{ row: 0, column: 0 }, true],
+    [{ row: 0, column: 1 }, false],
+    [{ row: 1, column: 1 }, true],
+    // Off the grid is never filled.
+    [{ row: 2, column: 0 }, false],
+    [{ row: 0, column: 2 }, false],
+  ])('knows whether the picture fills %j: %s', (cell, filled) => {
+    expect(isFilled({ rows: ['#.', '##'] }, cell)).toBe(filled);
+  });
+
   it('lists the squares to fill in reading order', () => {
     const level: MirrorLevel = {
       name: 'cup',

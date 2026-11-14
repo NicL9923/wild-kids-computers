@@ -94,7 +94,7 @@ export function packTray(boxes: readonly Box[]): { left: number; top: number }[]
   const heights = rows.map((row) => Math.max(...row.map(({ box }) => box.height)));
   const total = heights.reduce((sum, height) => sum + height, 0) + TRAY_GAP * (rows.length - 1);
   if (total > TRAY.height) return null;
-  const spots = boxes.map(() => ({ left: 0, top: 0 }));
+  const spots: { left: number; top: number }[] = [];
   let top = (TRAY.height - total) / 2;
   rows.forEach((row, rowIndex) => {
     const height = heights[rowIndex] ?? 0;
