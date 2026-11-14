@@ -23,6 +23,8 @@ describe('withDeadline', () => {
     timers.advance(1);
     await expect(bounded).rejects.toThrow(new DeadlineError('Loading the clip', 500));
     expect(outcome).toBeInstanceOf(DeadlineError);
+    // The name tells a log reader the work timed out rather than failed.
+    expect(outcome).toHaveProperty('name', 'DeadlineError');
     work.resolve('late');
     await Promise.resolve();
     expect(outcome).toBeInstanceOf(DeadlineError);

@@ -2,11 +2,9 @@ import type { Scheduler } from './scheduler.ts';
 
 /** Work that did not finish in time. */
 export class DeadlineError extends Error {
-  readonly ms: number;
+  override readonly name = 'DeadlineError';
   constructor(what: string, ms: number) {
     super(`${what} did not finish within ${ms} ms.`);
-    this.name = 'DeadlineError';
-    this.ms = ms;
   }
 }
 
