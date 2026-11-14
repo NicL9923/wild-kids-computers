@@ -71,3 +71,30 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* A part of a picture or a scene. The scene's sky and ground follow its theme. */
+.lg-crop {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lg-sky {
+  fill: var(--wk-color-meadow-sky);
+}
+
+.lg-ground {
+  fill: var(--wk-color-meadow-grass);
+}
+
+[data-theme='sea'] > .lg-ground {
+  fill: var(--wk-profile-sky);
+}
+
+[data-theme='night'] > .lg-sky {
+  fill: var(--wk-profile-night);
+}
+
+[data-theme='night'] > .lg-ground {
+  fill: var(--wk-profile-fern);
+}

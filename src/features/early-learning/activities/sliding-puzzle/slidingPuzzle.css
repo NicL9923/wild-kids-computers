@@ -1,0 +1,162 @@
+/*
+ * Sliding puzzle: the board fills the stage and the finished picture sits small beside it. A tile
+ * slides with a short glide that reduced motion turns off. Every value is a token.
+ */
+
+.sp-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--wk-space-section);
+  /* The left padding matches the finished picture's column, so the board sits in the middle. */
+  padding: 0 var(--wk-space-section) var(--wk-space-container) calc(var(--wk-space-section) * 2 + min(22vw, 34vh));
+}
+
+.sp-board-area {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.sp-board {
+  position: relative;
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-primary-base);
+  box-shadow: 0 0 0 calc(var(--wk-space-unit) * 2) var(--wk-color-primary-base);
+}
+
+.sp-tile,
+.sp-space,
+.sp-last {
+  position: absolute;
+  box-sizing: border-box;
+  padding: calc(var(--wk-space-unit));
+}
+
+.sp-tile {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    left calc(var(--wk-duration-base) * var(--wk-motion-scale)) var(--wk-ease-out),
+    top calc(var(--wk-duration-base) * var(--wk-motion-scale)) var(--wk-ease-out);
+}
+
+.sp-tile > svg,
+.sp-last > svg {
+  border-radius: var(--wk-radius-small);
+}
+
+.sp-tile:hover > svg {
+  filter: brightness(1.06);
+}
+
+.sp-tile:focus-visible {
+  outline-offset: calc(var(--wk-focus-width) * -1);
+}
+
+/* The space: the page color with a dashed edge, so it reads as empty on any picture. */
+.sp-space::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-border);
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface-sunken);
+}
+
+/* A finished picture shows whole: the board's lines fade out. */
+.sp-board[data-done='true'] .sp-tile,
+.sp-board[data-done='true'] .sp-last {
+  padding: 0;
+}
+
+.sp-board[data-done='true'] .sp-tile > svg,
+.sp-board[data-done='true'] .sp-last > svg {
+  border-radius: 0;
+}
+
+.sp-number {
+  position: absolute;
+  left: calc(var(--wk-space-unit) * 3);
+  top: calc(var(--wk-space-unit) * 3);
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--wk-target-min) * 0.55);
+  height: calc(var(--wk-target-min) * 0.55);
+  padding: 0 var(--wk-space-unit);
+  box-sizing: border-box;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  font-size: var(--wk-text-body);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.sp-board[data-done='true'] .sp-number {
+  display: none;
+}
+
+/* After two tiles that cannot slide, the ones that can glow with a thick edge. */
+.sp-tile[data-hint='true'] > svg {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-accent);
+  outline-offset: calc(var(--wk-border-width) * -3);
+  animation: sp-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes sp-hint {
+  to {
+    opacity: 0.75;
+  }
+}
+
+/* A tile that cannot slide gives a little shake that the motion scale turns off. */
+.sp-tile[data-wobble='0'] > svg {
+  animation: sp-wobble-a var(--wk-duration-base) var(--wk-ease-out);
+}
+
+.sp-tile[data-wobble='1'] > svg {
+  animation: sp-wobble-b var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes sp-wobble-a {
+  30% {
+    translate: calc(-4% * var(--wk-motion-scale)) 0;
+  }
+
+  70% {
+    translate: calc(3% * var(--wk-motion-scale)) 0;
+  }
+}
+
+@keyframes sp-wobble-b {
+  30% {
+    translate: calc(4% * var(--wk-motion-scale)) 0;
+  }
+
+  70% {
+    translate: calc(-3% * var(--wk-motion-scale)) 0;
+  }
+}
+
+.sp-goal {
+  width: min(22vw, 34vh);
+  margin: 0;
+  padding: var(--wk-space-unit);
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface);
+  box-shadow: var(--wk-shadow-raised);
+}
+
+.sp-goal > svg {
+  height: auto;
+  aspect-ratio: auto;
+  border-radius: calc(var(--wk-radius-small) - var(--wk-space-unit));
+}
