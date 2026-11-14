@@ -7,6 +7,7 @@
     "jsx": "react-jsx"
   },
   // Unit tests, end-to-end tests, and the source they import. tsconfig.app.json checks the
-  // same source again without Node types, which keeps Node out of the renderer.
-  "include": ["src", "e2e", "playwright.config.ts"]
+  // same source again without Node types, which keeps Node out of the renderer. The coloring page
+  // test shares its rules and mask format with the render tool through tools/coloringPages.ts.
+  "include": ["src", "e2e", "playwright.config.ts", "tools/coloringPages.ts"]
 }

@@ -107,7 +107,7 @@ A central list file causes a merge conflict every time two people add an item. T
 | Brush tip           | `src/core/paint/tips/<tipId>.ts`                                                                         |
 | Paint effect        | `src/core/paint/effects/<effectId>/index.ts`                                                             |
 | Stamp category      | `src/features/paint-studio/stamps/<categoryId>.ts`                                                       |
-| Coloring page       | `assets/coloring/<page-id>.svg` plus an entry file `src/features/paint-studio/coloringPages/<pageId>.ts` |
+| Coloring page       | `assets/coloring/src/<page-id>.svg` plus its entry `src/features/paint-studio/coloringPages/<pageId>.ts` |
 | Robot puzzle        | `src/features/robot-painter/puzzles/<tier>/<puzzleId>.ts`                                                |
 
 Each item carries an explicit `order` number where display order matters. A test fails on a duplicate id.
@@ -313,6 +313,14 @@ A registry test fails when a tool, tip, or effect has no golden image test. [src
 ### Image comparison method
 
 Paint tests run in Node with Vitest. Each test builds a document, runs a scripted tool or effect, and compares the result with a golden PNG in `src/core/paint/__goldens__/`. The comparison is exact, byte for byte, after decoding. No browser, GPU, or system font takes part, and the engine's math uses only exactly rounded operations, so the developer machine and CI produce the same pixels. The paint suite fails when the running Node version differs from `.node-version`. `npm run paint:goldens` rewrites goldens. Review every changed golden image before committing it.
+
+### Coloring pages
+
+A coloring page is an original SVG line drawing in `assets/coloring/src/<page-id>.svg`: 1600 by 1000, round black lines, no fill, no text. `npm run coloring:render` draws each changed source with Playwright's Chromium and writes the mask `assets/coloring/<page-id>.png`, a four-bit palette PNG of black lines on a transparent page. The app decodes the mask at runtime and hands it to the engine as `doc.mask`, so the lines are the same pixels on every machine, and Node tests load the same file. Each mask stores the SHA-256 of its source in a `tEXt` chunk, so a test fails when a source changes without a new mask.
+
+Each page has an entry, `src/features/paint-studio/coloringPages/<pageId>.ts`, from `defineColoringPage`: id, order, spoken title, bands youngest first, the mask and thumbnail URLs, a background point, and one point inside each region a child would color. `npm run coloring:regions -- <page-id>` prints the regions of a rendered mask, ready to paste.
+
+`src/features/paint-studio/testing/coloringPageTests.ts` is the proof that the fill respects the lines, run by one `coloringPagesBand*.test.ts` file per band. For every page it fills from every point with the real fill tool and fails when the paint reaches the page edge, reaches another point, or covers more than its region. It also fails when a visible region has no point, when a source breaks the line rules for its youngest band, or when a page breaks its band's region count or smallest region size. Those rules are in `tools/coloringPages.ts`.
 
 ## Design tokens
 

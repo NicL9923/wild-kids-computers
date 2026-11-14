@@ -72,6 +72,12 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Voice clips are named by a hash of the voice profile and the text.** A changed string has no clip until one is generated, so the check fails without a manifest to keep in sync.
 - **Sound effects are synthesized at runtime with the Web Audio API.** They are original work and add no files.
 - **Stamps and activity art use the Fluent Emoji "Color" SVG style**, a curated subset. The upstream LICENSE file is MIT. Checked 2026-11-13.
+- **Coloring pages ship as PNG masks rendered from SVG sources, not as SVG.** The mask is the same pixels on every machine, and Node tests fill the exact pixels the app uses. A four-bit palette with sixteen alpha levels keeps all 30 masks under 800 KB.
+- **A mask records the hash of its source.** A stale mask fails a test without a separate manifest to keep in step.
+- **The picker thumbnail is the SVG source.** It scales cleanly to any size and adds no files. Masks and thumbnails are imported with `?no-inline`, so they stay out of the JavaScript bundle.
+- **Coloring page bands:** a `band-3-5` page also appears for `band-6-8`, and a `band-6-8` page also appears for `band-9-12`. Simpler pages are no harm to an older child. Harder pages frustrate a younger one.
+- **Coloring page size rules by youngest band:** 4 to 8 regions at least 90 px across with lines at least 10 px for `band-3-5`, 10 to 20 regions at least 30 px across with lines at least 6.5 px for `band-6-8`, and 20 to 40 regions at least 16 px across with lines at least 4.5 px for `band-9-12`. "Across" is the widest disc that fits in the region. The drawings use 14, 9, and 6 px lines.
+- **Scenes for `band-9-12` sit inside a rounded frame.** Every page then has exactly one paper region at the page edge, which the fill test checks.
 
 ### Process
 

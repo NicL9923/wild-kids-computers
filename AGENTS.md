@@ -71,6 +71,7 @@ Node 24.22.2 is pinned in `.node-version` and `engines`. `.npmrc` sets `engine-s
 | `npm run mutation`                                                | Stryker on `src/core/**`, and only the math and pixel arithmetic of the paint engine. Fails below 80%.         |
 | `npm run dist`                                                    | Build, then an unsigned installer for this operating system in `release/`                                      |
 | `npm run perf`, `npm run paint:goldens`, `npm run voice:generate` | `perf` prints paint timings. `paint:goldens` rewrites changed goldens. `voice:generate` is not built yet.      |
+| `npm run coloring:render`, `npm run coloring:regions`             | `coloring:render` makes masks from changed coloring page SVGs. `coloring:regions` prints a page's regions.     |
 
 `check:voice` and `check:strings` are placeholders. Each one passes only while the files it would check do not exist yet, so the first clip or string catalog fails the check until someone writes the real one.
 
