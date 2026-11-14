@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/flower-pattern.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/flower-pattern.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'flower-pattern',
   order: 290,
-  title: 'Flower pattern',
+  title: strings.flowerPattern,
   bands: ['band-9-12'],
   mask,
   thumbnail,

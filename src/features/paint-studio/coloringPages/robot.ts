@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/robot.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/robot.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'robot',
   order: 250,
-  title: 'Robot',
+  title: strings.robot,
   bands: ['band-9-12'],
   mask,
   thumbnail,

@@ -1,5 +1,6 @@
 import { BANDS, type Band } from '../../core/bands.ts';
 import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH } from '../../core/paint/document.ts';
+import type { SpokenHandle } from '../../core/strings/defineStrings.ts';
 
 /**
  * A coloring page for the paint studio. Each page has one entry module in coloringPages/, named
@@ -21,8 +22,8 @@ export interface ColoringPage {
   readonly id: string;
   /** Position in the page picker, lowest first. */
   readonly order: number;
-  /** The short spoken name of the page, such as "Butterfly". */
-  readonly title: string;
+  /** The short spoken name of the page, such as "Butterfly", from coloringPages/strings.ts. */
+  readonly title: SpokenHandle;
   /** The bands that see this page. The first is the youngest, and its rules decide line width and region count. */
   readonly bands: readonly Band[];
   /** URL of the line-art mask PNG: black lines on a transparent page, 1600 by 1000. */
@@ -53,7 +54,6 @@ export function defineColoringPage(page: ColoringPage): ColoringPage {
   if (!Number.isInteger(page.order) || page.order < 0) {
     throw new Error(`Coloring page "${id}": order must be a whole number from 0, got ${page.order}.`);
   }
-  if (page.title.trim() === '') throw new Error(`Coloring page "${id}": the title is empty.`);
   if (page.bands.length === 0) throw new Error(`Coloring page "${id}": list at least one band.`);
   const known = page.bands.map((band) => BANDS.indexOf(band));
   if (known.includes(-1)) throw new Error(`Coloring page "${id}": unknown band in ${page.bands.join(', ')}.`);

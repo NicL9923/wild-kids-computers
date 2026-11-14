@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/sunflower.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/sunflower.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'sunflower',
   order: 190,
-  title: 'Sunflower',
+  title: strings.sunflower,
   bands: ['band-6-8', 'band-9-12'],
   mask,
   thumbnail,

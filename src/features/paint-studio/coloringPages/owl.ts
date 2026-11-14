@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/owl.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/owl.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'owl',
   order: 140,
-  title: 'Owl',
+  title: strings.owl,
   bands: ['band-6-8', 'band-9-12'],
   mask,
   thumbnail,

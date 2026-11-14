@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/tractor.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/tractor.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'tractor',
   order: 240,
-  title: 'Tractor',
+  title: strings.tractor,
   bands: ['band-9-12'],
   mask,
   thumbnail,

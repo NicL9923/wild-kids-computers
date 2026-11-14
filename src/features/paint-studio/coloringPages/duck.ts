@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/duck.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/duck.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'duck',
   order: 40,
-  title: 'Duck',
+  title: strings.duck,
   bands: ['band-3-5', 'band-6-8'],
   mask,
   thumbnail,

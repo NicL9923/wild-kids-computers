@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/dinosaur.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/dinosaur.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'dinosaur',
   order: 260,
-  title: 'Dinosaur',
+  title: strings.dinosaur,
   bands: ['band-9-12'],
   mask,
   thumbnail,

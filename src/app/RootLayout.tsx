@@ -1,10 +1,12 @@
 import { Outlet } from '@tanstack/react-router';
+import { useThemeSettings } from './session/sessionHooks.ts';
 import { ThemeRoot } from './theme/ThemeRoot.tsx';
 
 export default function RootLayout() {
-  // The app shell passes the active profile's settings here once profiles load.
+  // The active profile's band and settings, or the youngest band's defaults with no profile.
+  const theme = useThemeSettings();
   return (
-    <ThemeRoot>
+    <ThemeRoot settings={theme}>
       <Outlet />
     </ThemeRoot>
   );

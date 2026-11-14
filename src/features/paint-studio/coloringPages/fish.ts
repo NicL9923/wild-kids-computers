@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/fish.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/fish.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'fish',
   order: 30,
-  title: 'Fish',
+  title: strings.fish,
   bands: ['band-3-5', 'band-6-8'],
   mask,
   thumbnail,

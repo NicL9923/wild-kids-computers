@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Band } from '../../core/bands.ts';
 import { defineColoringPage, type ColoringPage } from './coloringPage.ts';
+import { strings } from './coloringPages/strings.ts';
 import { ASSETS, entries, pages } from './testing/coloringPageTests.ts';
 
 /** The page list as a whole. Each page's own checks are in coloringPagesBand*.test.ts. */
@@ -30,8 +31,10 @@ describe('coloring page entries', () => {
     expect(masks).toEqual(ids);
   });
 
-  it.each(entries)('names $file after its id and points at its own files', ({ file, page }) => {
+  it.each(entries)('names $file after its id and points at its own files and title', ({ file, page }) => {
     expect(file).toBe(camel(page.id));
+    // A copied entry that kept another page's title would say the wrong name aloud.
+    expect(page.title.key).toBe(file);
     expect(page.mask).toMatch(new RegExp(`assets/coloring/${page.id}\\.png(\\?no-inline)?$`));
     expect(page.thumbnail).toMatch(new RegExp(`assets/coloring/src/${page.id}\\.svg(\\?no-inline)?$`));
   });
@@ -41,7 +44,7 @@ describe('defineColoringPage', () => {
   const good: ColoringPage = {
     id: 'hot-air-balloon',
     order: 10,
-    title: 'Hot air balloon',
+    title: strings.hotAirBalloon,
     bands: ['band-3-5', 'band-6-8'],
     mask: 'mask.png',
     thumbnail: 'source.svg',
@@ -59,7 +62,6 @@ describe('defineColoringPage', () => {
     ['an id that is not kebab-case', { id: 'hotAirBalloon' }, /kebab-case/],
     ['an order below zero', { order: -1 }, /order must be a whole number/],
     ['an order that is not whole', { order: 1.5 }, /order must be a whole number/],
-    ['an empty title', { title: '  ' }, /title is empty/],
     ['no bands', { bands: [] }, /at least one band/],
     // Saved or hand-written data can name a band the type system never saw.
     ['an unknown band', { bands: unknownBands }, /unknown band/],

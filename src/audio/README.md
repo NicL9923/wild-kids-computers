@@ -20,18 +20,10 @@ To add an effect, add its name to `SFX_NAMES` and its recipe to [sfx/oneShots.ts
 
 ## Wire it into the app
 
-The shell does this once:
+`src/main.tsx` does this once. It creates the engine with the test log on only under test, exposes the log, and passes the engine to the session store and to `<AudioProvider>`. The session store gives the engine the active profile's volume and mute, and saves any change made on the engine. See [src/app/session/README.md](../app/session/README.md).
 
-```tsx
-const audio = createAppAudio({ underTest: bridgeInfo.underTest, volume: settings.volume });
-if (bridgeInfo.underTest) exposeAudioTestLog(audio);
-audio.onVolumeChange((volume) => saveSettings({ ...settings, volume }));
-
-<AudioProvider engine={audio}>...</AudioProvider>;
-```
-
-- The always-visible mute control uses `const [muted, toggle] = useMute()`.
-- The parent corner sets `audio.setVolume({ voice, effects })`. `useVolume()` re-renders on change.
+- The always-visible mute control uses `const [muted, toggle] = useMute()`. The session saves the change to the profile's settings.
+- The parent corner changes volume with `updateSettings({ voiceVolume, effectsVolume })` or `audio.setVolume({ voice, effects })`. Either one reaches both. `useVolume()` re-renders on change.
 - `exposeAudioTestLog` puts the log on `window.wkcAudioLog`. `e2e/support/audioLog.ts` reads it: every string spoken, with its clip and whether the clip exists, and every effect played.
 
 ## Files

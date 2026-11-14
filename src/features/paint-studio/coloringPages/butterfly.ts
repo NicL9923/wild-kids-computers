@@ -1,11 +1,12 @@
 import mask from '../../../../assets/coloring/butterfly.png?no-inline';
 import thumbnail from '../../../../assets/coloring/src/butterfly.svg?no-inline';
 import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
 
 export default defineColoringPage({
   id: 'butterfly',
   order: 10,
-  title: 'Butterfly',
+  title: strings.butterfly,
   bands: ['band-3-5', 'band-6-8'],
   mask,
   thumbnail,
