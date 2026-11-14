@@ -274,6 +274,12 @@
       }
     },
     {
+      "files": ["src/**"],
+      "rules": {
+        "wkc/no-native-drag": "error"
+      }
+    },
+    {
       "files": ["src/**/*.tsx"],
       "rules": {
         "react/jsx-no-literals": [

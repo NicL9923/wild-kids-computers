@@ -39,10 +39,10 @@ const reportSchema = z.object({
   ),
 });
 
-function lint(relative: string): { rule: string; line: number }[] {
+function lint(relative: string, text = PROBE): { rule: string; line: number }[] {
   const file = path.join(project, relative);
   mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, PROBE);
+  writeFileSync(file, text);
   const result = spawnSync(path.join(root, 'node_modules/.bin/oxlint'), ['--format', 'json', relative], {
     cwd: project,
     encoding: 'utf8',
@@ -67,4 +67,35 @@ describe('paint math lint rules', () => {
   it('leave code outside the paint engine alone', () => {
     expect(lint('src/core/other/probe.ts')).toEqual([]);
   });
+});
+
+const DRAG_PROBE = [
+  'export function Probe({ el }: { el: HTMLElement }) {',
+  '  el.setPointerCapture(1);',
+  '  return (',
+  '    <div>',
+  '      <img draggable alt="" />',
+  '      <img draggable={true} alt="" />',
+  '      <img draggable={false} alt="" />',
+  '      <div onDragStart={() => undefined} onDragEnd={() => undefined} />',
+  '      <div onPointerDown={() => undefined} />',
+  '    </div>',
+  '  );',
+  '}',
+].join('\n');
+
+describe('the native drag lint rule', () => {
+  it('bans draggable, onDrag handlers, and pointer capture in activities, and allows draggable={false}', () => {
+    const rules = lint('src/features/computer-skills/activities/probe/ProbeActivity.tsx', DRAG_PROBE).filter(
+      (d) => d.rule === 'wkc(no-native-drag)',
+    );
+    expect(rules.map((d) => d.line)).toEqual([2, 5, 6, 8, 8]);
+  });
+
+  it.each(['src/activityShell/carry/Probe.tsx', 'src/features/paint-studio/Probe.tsx'])(
+    'leaves the exempt path %s alone',
+    (relative) => {
+      expect(lint(relative, DRAG_PROBE).filter((d) => d.rule === 'wkc(no-native-drag)')).toEqual([]);
+    },
+  );
 });

@@ -4,19 +4,22 @@ import { createScope, type ListenerTarget } from './scope.ts';
 
 /** A listener target that records what is attached, standing in for an element. */
 function fakeTarget() {
-  const listeners = new Map<string, Set<(event: never) => void>>();
-  const target: ListenerTarget & { fire(type: string, event: unknown): void; count(type: string): number } = {
+  const listeners = new Map<string, Set<EventListenerOrEventListenerObject>>();
+  const target: ListenerTarget & { fire(type: string, event: object): void; count(type: string): number } = {
     addEventListener(type, listener) {
+      if (listener === null) return;
       const set = listeners.get(type) ?? new Set();
       set.add(listener);
       listeners.set(type, set);
     },
     removeEventListener(type, listener) {
-      listeners.get(type)?.delete(listener);
+      if (listener !== null) listeners.get(type)?.delete(listener);
     },
     fire(type, event) {
-      // The listeners were typed by their callers; the fake hands each one the event it was given.
-      for (const listener of listeners.get(type) ?? []) Reflect.apply(listener, undefined, [event]);
+      for (const listener of listeners.get(type) ?? []) {
+        // The fake hands each listener the plain object the test gave, standing in for an event.
+        if (typeof listener === 'function') Reflect.apply(listener, undefined, [event]);
+      }
     },
     count: (type) => listeners.get(type)?.size ?? 0,
   };

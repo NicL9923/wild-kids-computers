@@ -1,10 +1,7 @@
 import type { Cancel, Scheduler } from './scheduler.ts';
 
 /** Anything with add and remove listener methods: an element, the window, the document. */
-export interface ListenerTarget {
-  addEventListener(type: string, listener: (event: never) => void, options?: AddEventListenerOptions | boolean): void;
-  removeEventListener(type: string, listener: (event: never) => void, options?: EventListenerOptions | boolean): void;
-}
+export type ListenerTarget = Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
 
 /**
  * Owns every timer, frame, listener, and sound an activity starts. Leaving the activity disposes
@@ -85,8 +82,12 @@ export function createScope(scheduler: Scheduler): OwnedScope {
     },
     listen(target, type, listener, options) {
       if (disposed) return NOTHING;
-      target.addEventListener(type, listener, options);
-      return track(() => target.removeEventListener(type, listener, options));
+      // The caller typed its listener for the event it expects; the target hands it that event.
+      const handler = (event: Event) => {
+        Reflect.apply(listener, undefined, [event]);
+      };
+      target.addEventListener(type, handler, options);
+      return track(() => target.removeEventListener(type, handler, options));
     },
     own(cleanup) {
       if (disposed) {
