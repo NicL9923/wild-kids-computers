@@ -1,0 +1,206 @@
+import { describe, expect, it } from 'vitest';
+import { createToyClipboard } from '../../../../app/inputGuards.ts';
+import { applyTextOp, createEditor } from '../../../toy-desktop/model/textEditor.ts';
+import activity from './activity.ts';
+import {
+  differingRange,
+  editDistance,
+  generateLevel,
+  MAX_FIX_DIFFICULTY,
+  SENTENCES,
+  STEPS,
+  wordsOf,
+  type FixLevel,
+} from './level.ts';
+import { strings } from './strings.ts';
+import { capLabel, SENTENCE_SPEECH, tipFor } from './tips.ts';
+
+const SEEDS = Array.from({ length: 400 }, (_, index) => index * 3571 + 9);
+const DIFFICULTIES = Array.from({ length: MAX_FIX_DIFFICULTY }, (_, index) => index + 1);
+
+/** Runs one key through the real text model from the level's start. */
+function press(level: FixLevel, op: 'backspace' | 'delete'): string {
+  const start = { ...createEditor({ text: level.start }), anchor: level.caret, caret: level.caret };
+  return applyTextOp(start, { type: op }, createToyClipboard()).editor.text;
+}
+
+describe('generateLevel', () => {
+  it.each(DIFFICULTIES)(
+    'at difficulty %i gives one slip from a real sentence, with the caret in the text',
+    (difficulty) => {
+      const step = STEPS[difficulty - 1];
+      for (const seed of SEEDS) {
+        const level = generateLevel(seed, difficulty, 'band-9-12');
+        const sentence = SENTENCES.find((entry) => entry.id === level.sentence);
+        expect(level.target).toBe(sentence?.text);
+        expect(level.start).not.toBe(level.target);
+        expect(step?.kinds).toContain(level.kind);
+        expect(level.caret).toBeGreaterThanOrEqual(0);
+        expect(level.caret).toBeLessThanOrEqual(level.start.length);
+        expect(level.marked).toBe(step?.marked);
+        expect(level.keys).toEqual(step?.keys);
+        expect(level.mixed).toBe((step?.kinds.length ?? 0) > 1);
+      }
+    },
+  );
+
+  it('makes each slip small: one letter, or one word', () => {
+    for (const difficulty of DIFFICULTIES) {
+      for (const seed of SEEDS) {
+        const level = generateLevel(seed, difficulty, 'band-6-8');
+        const distance = editDistance(level.start, level.target);
+        const longest = Math.max(...wordsOf(level.target).map((word) => word.text.length));
+        // A letter slip is one key away; a word slip is at most one word and its space.
+        const most = level.kind.endsWith('letter') ? 1 : longest + 1;
+        expect(distance, level.start).toBeGreaterThan(0);
+        expect(distance, level.start).toBeLessThanOrEqual(most);
+        // The words left are real words of the sentence, apart from the one slip.
+        const extra = wordsOf(level.start).filter((word) => !wordsOf(level.target).some((w) => w.text === word.text));
+        expect(extra.length, level.start).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('at difficulty 1 puts the caret just after the extra letter, so Backspace fixes it', () => {
+    for (const seed of SEEDS) {
+      const level = generateLevel(seed, 1, 'band-6-8');
+      expect(press(level, 'backspace'), level.start).toBe(level.target);
+      expect(differingRange(level.start, level.target)?.end).toBe(level.caret);
+    }
+  });
+
+  it('at difficulty 2 puts the caret just before the extra letter, so Delete fixes it', () => {
+    for (const seed of SEEDS) {
+      const level = generateLevel(seed, 2, 'band-6-8');
+      expect(press(level, 'delete'), level.start).toBe(level.target);
+      expect(differingRange(level.start, level.target)?.start).toBe(level.caret);
+    }
+  });
+
+  it.each([
+    [3, 'end'],
+    [7, 'end'],
+    [MAX_FIX_DIFFICULTY, 'start'],
+  ] as const)('at difficulty %i starts the caret at the %s, away from the slip', (difficulty, where) => {
+    for (const seed of SEEDS) {
+      const level = generateLevel(seed, difficulty, 'band-9-12');
+      expect(level.caret).toBe(where === 'end' ? level.start.length : 0);
+      const range = differingRange(level.start, level.target);
+      // Never right beside the slip, so the arrows are needed.
+      expect(range?.end, level.start).not.toBe(level.caret);
+      expect(range?.start, level.start).not.toBe(level.caret);
+    }
+  });
+
+  it('reaches every sentence and every slip at the top of the range', () => {
+    const levels = SEEDS.map((seed) => generateLevel(seed, MAX_FIX_DIFFICULTY, 'band-9-12'));
+    expect(new Set(levels.map((level) => level.sentence)).size).toBe(SENTENCES.length);
+    expect(new Set(levels.map((level) => level.kind))).toEqual(
+      new Set(['missing-letter', 'changed-letter', 'extra-word', 'changed-word']),
+    );
+  });
+
+  it('never makes a rude word', () => {
+    // Slips change letters inside real words. This lists every word any seed made, so a new
+    // sentence cannot slip into something a parent would not want on screen.
+    const made = new Set<string>();
+    for (const difficulty of DIFFICULTIES) {
+      for (const seed of SEEDS) {
+        for (const word of wordsOf(generateLevel(seed, difficulty, 'band-6-8').start))
+          made.add(word.text.toLowerCase());
+      }
+    }
+    const rude = [
+      'dick',
+      'dck',
+      'cock',
+      'tit',
+      'tits',
+      'shit',
+      'fuck',
+      'piss',
+      'fart',
+      'butt',
+      'damn',
+      'hell',
+      'crap',
+      'ass',
+      'poop',
+      'pee',
+      'sex',
+      'kill',
+      'dead',
+      'die',
+      'gun',
+    ];
+    expect(rude.filter((word) => made.has(word))).toEqual([]);
+  });
+
+  it('gives each band a range inside the steps', () => {
+    const ranges = activity.kind === 'rounds' ? activity.difficulty : {};
+    expect(ranges).toEqual({ 'band-6-8': { min: 1, max: 6 }, 'band-9-12': { min: 3, max: MAX_FIX_DIFFICULTY } });
+  });
+
+  it.each([0, MAX_FIX_DIFFICULTY + 1, 1.5])('rejects difficulty %s', (difficulty) => {
+    expect(() => generateLevel(1, difficulty, 'band-6-8')).toThrow(/difficulty 1 to 8, not/);
+  });
+});
+
+describe('sentences', () => {
+  it('each has a spoken clip that says exactly it, and its changed word is in it', () => {
+    for (const sentence of SENTENCES) {
+      expect(SENTENCE_SPEECH[sentence.id].text).toBe(sentence.text);
+      expect(wordsOf(sentence.text).map((word) => word.text)).toContain(sentence.swap[0]);
+      expect(sentence.swap[1]).not.toBe(sentence.swap[0]);
+    }
+  });
+});
+
+describe('differingRange', () => {
+  it.each([
+    ['The caat naps.', 'The cat naps.', { start: 6, end: 7 }],
+    ['The ct naps.', 'The cat naps.', { start: 5, end: 5 }],
+    ['The dog naps.', 'The cat naps.', { start: 4, end: 7 }],
+    ['the the cat', 'the cat', { start: 4, end: 8 }],
+    ['same', 'same', null],
+  ])('finds where %j differs from %j', (text, target, range) => {
+    expect(differingRange(text, target)).toEqual(range);
+  });
+});
+
+describe('editDistance', () => {
+  it.each([
+    ['cat', 'cat', 0],
+    ['cat', 'cats', 1],
+    ['cats', 'cat', 1],
+    ['cat', 'cot', 1],
+    ['', 'abc', 3],
+    ['kitten', 'sitting', 3],
+  ])('from %j to %j is %i', (from, to, distance) => {
+    expect(editDistance(from, to)).toBe(distance);
+  });
+});
+
+describe('tips', () => {
+  it.each([
+    ['extra-letter', 'after', false, 'linux', strings.tipBackspace],
+    ['extra-letter', 'after', false, 'mac', strings.tipBackspaceMac],
+    ['extra-letter', 'before', false, 'windows', strings.tipDelete],
+    ['extra-letter', 'before', false, 'mac', strings.tipDeleteMac],
+    ['extra-letter', 'end', false, 'linux', strings.tipExtraLetter],
+    ['missing-letter', 'end', false, 'linux', strings.tipMissing],
+    ['changed-letter', 'end', false, 'linux', strings.tipChangedLetter],
+    ['extra-word', 'end', false, 'linux', strings.tipExtraWord],
+    ['changed-word', 'end', false, 'linux', strings.tipChangedWord],
+    ['changed-word', 'start', true, 'linux', strings.tipFind],
+  ] as const)('a %s slip with the caret %s (mixed %s) on %s', (kind, caretStart, mixed, os, tip) => {
+    expect(tipFor({ kind, caretStart, mixed }, os)).toBe(tip);
+  });
+
+  it('names Backspace and Delete as the keyboard prints them', () => {
+    expect(capLabel('backspace', 'windows')).toBe(strings.capBackspace);
+    expect(capLabel('backspace', 'mac')).toBe(strings.capBackspaceMac);
+    expect(capLabel('delete', 'linux')).toBe(strings.capDelete);
+    expect(capLabel('delete', 'mac')).toBe(strings.capDeleteMac);
+  });
+});
