@@ -8,8 +8,7 @@ interface Node {
   type: string;
   operator?: string;
   name?: Node | string;
-  value?: Node | null;
-  expression?: Node;
+  value?: unknown;
   property?: Node;
   callee?: Node;
 }
@@ -41,9 +40,17 @@ function identifierName(node: Node | string | undefined): string | undefined {
 }
 
 /** `draggable={false}` turns native drag off, so it is allowed. Anything else turns it on. */
-function turnsDragOff(value: Node | null | undefined): boolean {
-  const expression = value?.type === 'JSXExpressionContainer' ? value.expression : undefined;
-  return expression?.type === 'Literal' && Reflect.get(expression, 'value') === false;
+function turnsDragOff(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || !('expression' in value)) return false;
+  const expression = value.expression;
+  return (
+    typeof expression === 'object' &&
+    expression !== null &&
+    'type' in expression &&
+    expression.type === 'Literal' &&
+    'value' in expression &&
+    expression.value === false
+  );
 }
 
 const plugin = {
