@@ -1,0 +1,51 @@
+/*
+ * A big letter card on top and the keyboard picture below it, both centered. The card shows the
+ * capital as it is printed on the key, and the small letter under it.
+ */
+
+.findkey-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-container);
+}
+
+.findkey-card {
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--wk-target-large) * 1.4);
+  aspect-ratio: 1;
+  max-height: 100%;
+  padding: var(--wk-space-item);
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  color: var(--wk-color-text);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.findkey-upper {
+  font-size: calc(var(--wk-target-large) * 1.05);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.findkey-lower {
+  font-size: calc(var(--wk-target-large) * 0.45);
+  color: var(--wk-color-text-muted);
+}
+
+.findkey-stage[data-found='true'] .findkey-card {
+  background: var(--wk-color-selected);
+}
+
+.findkey-keyboard {
+  width: min(100%, calc(var(--wk-target-min) * 18));
+}

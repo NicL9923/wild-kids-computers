@@ -1,0 +1,140 @@
+/*
+ * The path keeps its 25:8 shape and sits above the keyboard picture. Everything on the path
+ * stands on the ground line: the bottom of each piece is the top of the grass.
+ */
+
+.jump-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-container);
+}
+
+.jump-path-area {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.jump-path {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 25 / 8));
+  aspect-ratio: 25 / 8;
+  overflow: hidden;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-meadow-sky);
+}
+
+.jump-ground {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.jump-grass {
+  fill: var(--wk-color-meadow-grass);
+}
+
+.jump-trail {
+  stroke: var(--wk-color-surface-sunken);
+  stroke-width: 18;
+  stroke-linecap: round;
+}
+
+/* Pieces stand on the ground: 250 of 320 units from the top. */
+.jump-thing,
+.jump-gate,
+.jump-home,
+.jump-critter {
+  position: absolute;
+  translate: -50% 0;
+}
+
+.jump-thing,
+.jump-gate,
+.jump-home {
+  bottom: calc(70 / 320 * 100%);
+}
+
+.jump-thing img,
+.jump-home img,
+.jump-critter img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.jump-critter {
+  z-index: 1;
+}
+
+.jump-critter[data-home='true'] {
+  opacity: 0;
+  transition: opacity var(--wk-duration-calm) var(--wk-ease-out);
+}
+
+.jump-critter[data-hop='1'] img {
+  animation: jump-hop-a var(--wk-duration-base) var(--wk-ease-out);
+}
+
+.jump-critter[data-hop='0'] img {
+  animation: jump-hop-b var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes jump-hop-a {
+  50% {
+    translate: 0 calc(-18% * var(--wk-motion-scale));
+  }
+}
+
+@keyframes jump-hop-b {
+  50% {
+    translate: 0 calc(-18% * var(--wk-motion-scale));
+  }
+}
+
+.jump-gate-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.jump-post {
+  fill: var(--wk-color-primary-base);
+}
+
+.jump-gate-board rect {
+  fill: var(--wk-profile-marigold);
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 2;
+}
+
+.jump-gate-brace {
+  stroke: var(--wk-color-primary-base);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.jump-gate-board {
+  transform-origin: 10px 55px;
+  transition:
+    scale calc(var(--wk-duration-calm) * var(--wk-motion-scale)) var(--wk-ease-out),
+    opacity var(--wk-duration-calm) var(--wk-ease-out);
+}
+
+/* Open: the board swings back against the left post. */
+.jump-gate[data-open='true'] .jump-gate-board {
+  scale: 0.12 1;
+  opacity: 0.6;
+}
+
+.jump-keyboard {
+  width: min(100%, calc(var(--wk-target-min) * 16));
+}
