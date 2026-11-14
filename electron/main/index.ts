@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { app, ipcMain, Menu, powerMonitor, protocol, session } from 'electron';
+import { app, ipcMain, Menu, powerMonitor, protocol, session, type BrowserWindow } from 'electron';
 import {
   BRIDGE_METHODS,
   channelFor,
@@ -16,6 +16,7 @@ import { applyNetworkSwitches, hardenSession, sessionControls } from './networkB
 import { applyPageSwitches } from './pageSwitches.ts';
 import { exportPicture, printPicture } from './pictureOutput.ts';
 import { osFamily } from './platformInfo.ts';
+import { claimSingleInstance } from './singleInstance.ts';
 import { resolveStartUrl } from './startUrl.ts';
 import { readTestMode, stripDebugSwitches } from './testMode.ts';
 import { createWindowControl } from './windowControl.ts';
@@ -24,6 +25,12 @@ import { createWindowControl } from './windowControl.ts';
 stripDebugSwitches(app.commandLine, app.isPackaged);
 const testMode = readTestMode(process.env, app.isPackaged);
 if (testMode.userDataDir !== undefined) app.setPath('userData', testMode.userDataDir);
+
+// The lock is keyed on the user data directory, so it is taken after the path is final and
+// before anything opens storage. A second launch brings the first window forward and exits.
+let mainWindow: BrowserWindow | undefined;
+const isPrimaryInstance = claimSingleInstance(app, () => mainWindow);
+if (!isPrimaryInstance) app.exit(0);
 
 const os = osFamily(process.platform);
 const startUrl = resolveStartUrl({
@@ -63,6 +70,7 @@ async function start(): Promise<void> {
   await hardenSession(sessionControls(session.defaultSession), networkPolicy);
   registerBundleProtocol(protocol, rendererRoot);
   const window = createMainWindow({ startUrl, preloadPath });
+  mainWindow = window;
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       appMenuTemplate(os, app.getName(), (command) => window.webContents.send(MENU_COMMAND_CHANNEL, command)),
@@ -119,4 +127,4 @@ async function start(): Promise<void> {
   }
 }
 
-void start();
+if (isPrimaryInstance) void start();

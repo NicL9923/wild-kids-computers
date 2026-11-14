@@ -37,6 +37,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 ### Storage
 
 - **Saved data lives in `<userData>/data/`**, away from the files Chromium keeps in the user data directory.
+- **One app instance per user data directory.** The main process takes Electron's single-instance lock before it opens storage, and a second launch brings the first window forward and exits. The file store assumes it is the only writer: two instances saving one picture shared staging names, and a probe left a mismatched picture and thumbnail that recovery kept. A probe on Electron 45.3.2 confirmed that Chromium keys the lock on the user data path, so the end-to-end tests, each with its own directory, still run side by side.
 - **The bridge adds `documents.removeProfile`**, because deleting a profile must remove activity documents whose names the parent corner cannot list.
 - **Pictures have no index file.** The gallery lists the PNG files and sorts by modification time, so there is no index to fall out of step.
 - **Bad saved data and a future version are both set aside.** A newer app's document stays on disk under the `.corrupt-<timestamp>` name, so a parent can recover it after updating again.

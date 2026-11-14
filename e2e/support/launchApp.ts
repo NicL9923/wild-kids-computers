@@ -84,18 +84,7 @@ export async function restartApp(launched: LaunchedApp, testInfo: TestInfo = {})
 async function startApp(userDataDir: string, testInfo: TestInfo): Promise<LaunchedApp> {
   let app: ElectronApplication | undefined;
   try {
-    app = await electron.launch({
-      args: [projectRoot],
-      cwd: projectRoot,
-      env: {
-        ...process.env,
-        WKC_TEST: '1',
-        WKC_USER_DATA_DIR: userDataDir,
-        WKC_TEST_INFO: JSON.stringify(testInfo),
-        // A test always runs the bundle, never a dev server left in the environment.
-        WKC_DEV_SERVER_URL: '',
-      },
-    });
+    app = await electron.launch({ args: [projectRoot], cwd: projectRoot, env: appLaunchEnv(userDataDir, testInfo) });
     const page = await app.firstWindow();
     // Tests drive input through the debugging protocol, never through the operating system. The
     // display's real pointer rests at the middle of the screen, over the middle of the window, so
@@ -119,6 +108,21 @@ async function startApp(userDataDir: string, testInfo: TestInfo): Promise<Launch
     if (app !== undefined) await closeQuietly(app);
     throw error;
   }
+}
+
+/** The project root, which Electron runs as the app. */
+export const APP_ROOT = projectRoot;
+
+/** The environment that starts the app in test mode on a user data directory. */
+export function appLaunchEnv(userDataDir: string, testInfo: TestInfo = {}) {
+  return {
+    ...process.env,
+    WKC_TEST: '1',
+    WKC_USER_DATA_DIR: userDataDir,
+    WKC_TEST_INFO: JSON.stringify(testInfo),
+    // A test always runs the bundle, never a dev server left in the environment.
+    WKC_DEV_SERVER_URL: '',
+  };
 }
 
 async function writeReadyProfile(dataDir: string, band: Band): Promise<void> {
