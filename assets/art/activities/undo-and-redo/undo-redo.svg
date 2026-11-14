@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- two round arrows, one turning back and one going on again: undo and redo -->
+  <path d="M150 86a52 52 0 0 0-95-16" fill="none" stroke="#2b2740" stroke-width="30" stroke-linecap="round"/>
+  <path d="M150 86a52 52 0 0 0-95-16" fill="none" stroke="#4f8fe8" stroke-width="18" stroke-linecap="round"/>
+  <path d="M30 44l14 52 48-22z" fill="#4f8fe8" stroke="#2b2740" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M50 114a52 52 0 0 0 95 16" fill="none" stroke="#2b2740" stroke-width="30" stroke-linecap="round"/>
+  <path d="M50 114a52 52 0 0 0 95 16" fill="none" stroke="#f2a33a" stroke-width="18" stroke-linecap="round"/>
+  <path d="M170 156l-14-52-48 22z" fill="#f2a33a" stroke="#2b2740" stroke-width="7" stroke-linejoin="round"/>
+</svg>
