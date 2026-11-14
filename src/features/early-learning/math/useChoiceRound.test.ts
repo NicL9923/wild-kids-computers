@@ -19,9 +19,10 @@ const unexpected = (name: string) => () => {
   throw new Error(`The choice round should not call kit.${name}`);
 };
 
+const said = (options?: FeedbackOptions) => options?.say?.id ?? null;
+
 function fakeKit(scheduler: ManualScheduler): { kit: ActivityKit; calls: KitCall[] } {
   const calls: KitCall[] = [];
-  const said = (options?: FeedbackOptions) => options?.say?.id ?? null;
   const kit: ActivityKit = {
     scope: createScope(scheduler),
     clock: scheduler,

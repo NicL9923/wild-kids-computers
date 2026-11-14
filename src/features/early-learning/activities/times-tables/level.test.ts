@@ -23,6 +23,9 @@ function problems(level: TimesLevel, difficulty: number): string[] {
   return found;
 }
 
+/** The different values, smallest first, as one string. */
+const spread = (values: readonly number[]) => [...new Set(values)].toSorted((a, b) => a - b).join(' ');
+
 describe('generateLevel', () => {
   it.each(Array.from({ length: MAX_TIMES_DIFFICULTY }, (_, index) => index + 1))(
     'at difficulty %i gives a fair round for every seed',
@@ -63,6 +66,35 @@ describe('generateLevel', () => {
     ]);
   });
 
+  // The design of each difficulty, read from the rounds it makes: the rows, the things in a
+  // row, what shows, and the choices.
+  it.each<[number, string, string, string, number]>([
+    [1, '2 3', '2 3 4 5', 'array', 3],
+    [2, '2 3 4 5', '2 3 4 5', 'array', 3],
+    [3, '2 3 4 5', '2 5 10', 'both', 4],
+    [4, '2 3 4 5 6', '2 3 4 5 6', 'both', 4],
+    [5, '1 2 3 4 5 6 7 8 9 10', '2 5 10', 'fact', 4],
+    [6, '2 3 4 5 6', '2 3 4 5 6', 'fact', 4],
+    [7, '2 3 4 5 6 7 8 9', '2 3 4 5 6 7 8 9', 'fact', 4],
+    [8, '2 3 4 5 6 7 8 9 10', '2 3 4 5 6 7 8 9 10', 'fact', 4],
+    [9, '6 7 8 9 10', '6 7 8 9 10', 'fact', 4],
+  ])('difficulty %i has rows %s of %s, shows the %s, with %i choices', (difficulty, rows, columns, show, choices) => {
+    const levels = Array.from({ length: 1000 }, (_, index) => generateLevel(index * 7919 + 1, difficulty, 'band-9-12'));
+    expect(spread(levels.map((level) => level.rows))).toBe(rows);
+    expect(spread(levels.map((level) => level.columns))).toBe(columns);
+    expect(new Set(levels.map((level) => level.show))).toEqual(new Set([show]));
+    expect(new Set(levels.map((level) => level.choices.length))).toEqual(new Set([choices]));
+  });
+
+  it('fills ten times ten with numbers just under 100, never past it', () => {
+    const tens = Array.from({ length: 3000 }, (_, index) => generateLevel(index * 7919 + 1, 9, 'band-9-12')).filter(
+      (level) => level.answer === 100,
+    );
+    expect(tens.length).toBeGreaterThan(10);
+    const offered = new Set(tens.flatMap((level) => level.choices));
+    expect([...offered].toSorted((a, b) => a - b)).toEqual([20, 90, 98, 99, 100]);
+  });
+
   it('offers a neighboring fact as a choice in most rounds', () => {
     const levels = SEEDS.map((seed) => generateLevel(seed, 7, 'band-9-12'));
     const neighbor = levels.filter((level) =>
@@ -93,5 +125,7 @@ describe('mistakesFor', () => {
     expect(mistakesFor(3, 4)).toEqual([8, 16, 9, 15, 7, 20]);
     expect(mistakesFor(1, 10)).toEqual([20, 9, 11, 11, 30]);
     expect(mistakesFor(10, 10)).toEqual([90, 90, 20]);
+    expect(mistakesFor(9, 10)).toEqual([80, 100, 81, 99, 19]);
+    expect(mistakesFor(1, 2)).toEqual([4, 1, 3, 3, 6]);
   });
 });

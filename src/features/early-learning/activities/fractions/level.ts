@@ -157,7 +157,7 @@ export function wrongFractions(random: Random, target: Fraction, all: readonly F
 function shade(random: Random, fraction: Fraction, shading: Tier['shading']): number[] {
   const indexes = Array.from({ length: fraction.denominator }, (_, index) => index);
   if (shading === 'together') return indexes.slice(0, fraction.numerator);
-  return random.sample(indexes, fraction.numerator).toSorted((a, b) => a - b);
+  return random.sample(indexes, fraction.numerator);
 }
 
 /** A shape cut into equal parts, with the fraction's share shaded. */

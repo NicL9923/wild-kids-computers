@@ -54,6 +54,37 @@ describe('generateLevel', () => {
     }
   });
 
+  // The design of each difficulty, read from the rounds it makes: the operations, the smallest
+  // and largest whole, what shows, how many choices, and whether taking away can leave nothing.
+  it.each<[number, string, number, number, string, number, boolean]>([
+    [1, 'add', 2, 3, 'things', 3, false],
+    [2, 'add', 2, 5, 'things', 3, false],
+    [3, 'add subtract', 2, 5, 'things', 3, false],
+    [4, 'add subtract', 3, 6, 'things', 3, false],
+    [5, 'add subtract', 4, 8, 'things', 3, false],
+    [6, 'add subtract', 5, 10, 'both', 3, false],
+    [7, 'add subtract', 5, 10, 'both', 4, true],
+    [8, 'add subtract', 8, 15, 'both', 4, true],
+    [9, 'add subtract', 8, 15, 'sentence', 4, true],
+    [10, 'add subtract', 10, 20, 'sentence', 4, true],
+  ])(
+    'difficulty %i: %s, wholes %i to %i, shows %s, %i choices, nothing left %s',
+    (difficulty, operations, low, high, show, choices, zero) => {
+      const levels = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-6-8'));
+      const wholes = levels.map((level) => (level.operation === 'add' ? level.answer : level.first));
+      expect([...new Set(levels.map((level) => level.operation))].toSorted().join(' ')).toBe(operations);
+      expect([Math.min(...wholes), Math.max(...wholes)]).toEqual([low, high]);
+      expect(new Set(levels.map((level) => level.show))).toEqual(new Set([show]));
+      expect(new Set(levels.map((level) => level.choices.length))).toEqual(new Set([choices]));
+      expect(levels.some((level) => level.answer === 0)).toBe(zero);
+    },
+  );
+
+  it('offers numbers past the largest whole, so the biggest choice is not always the answer', () => {
+    const levels = SEEDS.map((seed) => generateLevel(seed, 10, 'band-6-8'));
+    expect(levels.some((level) => level.choices.some((choice) => choice > 20))).toBe(true);
+  });
+
   it('never takes everything away until difficulty 7, then sometimes does', () => {
     for (let difficulty = 1; difficulty <= 6; difficulty += 1) {
       for (const seed of SEEDS) expect(generateLevel(seed, difficulty, 'band-6-8').answer).toBeGreaterThan(0);

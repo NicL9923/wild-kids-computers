@@ -88,12 +88,12 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Sk
   const blank = tier.blank === 'end' ? tier.length - 1 : random.int(1, tier.length - 1);
   const answer = first + blank * step;
   // The mistakes children make: counting on by one, and hopping a step or two too far or short.
+  // At least three of them are always in range, even when the answer is 100.
   const choices = pickChoices(
     random,
     answer,
     tier.choices,
     inRange([answer - 1, answer + 1, answer - step, answer + step, answer - 2 * step, answer + 2 * step]),
-    inRange([answer + 2, answer - 2, answer + 3, answer - 3]),
   );
   return { step, numbers, blank, answer, choices, hops: tier.hops };
 }

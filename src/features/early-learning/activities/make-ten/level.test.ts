@@ -55,6 +55,29 @@ describe('generateLevel', () => {
     },
   );
 
+  // The design of each difficulty, read from the rounds it makes.
+  it.each<[number, number, number, number, number, boolean]>([
+    [1, 5, 2, 4, 3, false],
+    [2, 5, 1, 4, 3, false],
+    [3, 10, 5, 9, 3, false],
+    [4, 10, 1, 9, 3, false],
+    [5, 10, 1, 9, 4, false],
+    [6, 10, 1, 9, 4, true],
+    [7, 10, 1, 9, 4, true],
+  ])(
+    'difficulty %i makes %i from %i to %i counters with %i choices, sentence %s',
+    (difficulty, whole, low, high, choices, sentence) => {
+      const levels = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-6-8'));
+      expect(new Set(levels.map((level) => level.whole))).toEqual(new Set([whole]));
+      expect([
+        Math.min(...levels.map((level) => level.filled)),
+        Math.max(...levels.map((level) => level.filled)),
+      ]).toEqual([low, high]);
+      expect(new Set(levels.map((level) => level.choices.length))).toEqual(new Set([choices]));
+      expect(new Set(levels.map((level) => level.sentence))).toEqual(new Set([sentence]));
+    },
+  );
+
   it('fills the frame left to right until difficulty 5, then in any spaces', () => {
     for (const difficulty of [1, 2, 3, 4, 6]) {
       for (const seed of SEEDS.slice(0, 60)) expect(inOrder(generateLevel(seed, difficulty, 'band-6-8'))).toBe(true);

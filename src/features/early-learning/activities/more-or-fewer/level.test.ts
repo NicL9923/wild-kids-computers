@@ -34,6 +34,7 @@ function problems(level: MoreLevel, difficulty: number): string[] {
     found.push('the answer is not the asked group');
   if (!tier.asks.includes(level.ask)) found.push(`asks ${level.ask}`);
   for (const group of level.groups) {
+    if (level.arrangement === 'rows' && group.spots !== null) found.push(`${group.id} is scattered in a rows round`);
     if (group.spots === null) {
       if (level.arrangement === 'scatter') found.push(`${group.id} has no spots`);
       continue;
@@ -78,6 +79,34 @@ describe('generateLevel', () => {
         expect(level.arrangement).toBe(arrangement);
         expect(problems(level, difficulty)).toEqual([]);
       }
+    },
+  );
+
+  // The design of each difficulty, read from the rounds it makes: the counts, the groups, the
+  // closest and farthest neighbors, the questions, and the arrangement.
+  it.each<[number, number, number, number, number, number, string, string]>([
+    [1, 1, 5, 2, 3, 4, 'more', 'rows'],
+    [2, 1, 6, 2, 2, 4, 'more', 'rows'],
+    [3, 1, 8, 2, 2, 3, 'fewer more', 'rows'],
+    [4, 2, 10, 2, 1, 3, 'fewer more', 'rows'],
+    [5, 2, 10, 2, 1, 2, 'fewer more', 'scatter'],
+    [6, 3, 12, 3, 1, 3, 'fewest most', 'scatter'],
+    [7, 5, 15, 3, 1, 2, 'fewest most', 'scatter'],
+    [8, 8, 20, 3, 1, 2, 'fewest most', 'scatter'],
+  ])(
+    'difficulty %i: counts %i to %i in %i groups, neighbors %i to %i apart, asks %s, %s',
+    (difficulty, low, high, groups, closest, farthest, asks, arrangement) => {
+      const levels = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-6-8'));
+      const counts = levels.flatMap((level) => level.groups.map((group) => group.count));
+      const gaps = levels.flatMap((level) => {
+        const sorted = level.groups.map((group) => group.count).toSorted((a, b) => a - b);
+        return sorted.slice(1).map((count, index) => count - (sorted[index] ?? 0));
+      });
+      expect([Math.min(...counts), Math.max(...counts)]).toEqual([low, high]);
+      expect(new Set(levels.map((level) => level.groups.length))).toEqual(new Set([groups]));
+      expect([Math.min(...gaps), Math.max(...gaps)]).toEqual([closest, farthest]);
+      expect([...new Set(levels.map((level) => level.ask))].toSorted().join(' ')).toBe(asks);
+      expect(new Set(levels.map((level) => level.arrangement))).toEqual(new Set([arrangement]));
     },
   );
 

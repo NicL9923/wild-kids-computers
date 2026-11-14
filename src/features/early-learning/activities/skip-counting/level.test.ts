@@ -30,6 +30,13 @@ function problems(level: SkipLevel, difficulty: number): string[] {
   return found;
 }
 
+/** Where a count starts: at zero, at a multiple of its step, or off the multiples. */
+function startOf(level: SkipLevel): string {
+  const first = level.numbers[0] ?? -1;
+  if (first === 0) return 'zero';
+  return first % level.step === 0 ? 'multiple' : 'offset';
+}
+
 describe('generateLevel', () => {
   it.each(Array.from({ length: MAX_SKIP_DIFFICULTY }, (_, index) => index + 1))(
     'at difficulty %i gives a fair round for every seed',
@@ -55,6 +62,51 @@ describe('generateLevel', () => {
     }
   });
 
+  // The design of each difficulty, read from the rounds it makes: the steps, where counts start,
+  // how many numbers show, where the blank goes, the choices, and the hops.
+  it.each<[number, string, string, number, string, number, boolean]>([
+    [1, '10', 'zero', 5, 'end', 3, true],
+    [2, '5', 'zero', 5, 'end', 3, true],
+    [3, '2', 'zero', 5, 'end', 3, true],
+    [4, '2 5 10', 'multiple', 6, 'end', 3, true],
+    [5, '2 5 10', 'multiple', 6, 'inside', 4, false],
+    [6, '10', 'offset', 6, 'end', 4, false],
+    [7, '2 5', 'offset', 6, 'end', 4, false],
+    [8, '2 5 10', 'offset', 7, 'inside', 4, false],
+  ])(
+    'difficulty %i counts by %s from %s, shows %i, blank at the %s, %i choices, hops %s',
+    (difficulty, steps, start, length, blank, choices, hops) => {
+      const levels = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-9-12'));
+      expect([...new Set(levels.map((level) => level.step))].toSorted((a, b) => a - b).join(' ')).toBe(steps);
+      expect(new Set(levels.map(startOf))).toEqual(new Set([start]));
+      expect(new Set(levels.map((level) => level.numbers.length))).toEqual(new Set([length]));
+      const atEnd = levels.every((level) => level.blank === level.numbers.length - 1);
+      expect(atEnd ? 'end' : 'inside').toBe(blank);
+      expect(new Set(levels.map((level) => level.choices.length))).toEqual(new Set([choices]));
+      expect(new Set(levels.map((level) => level.hops))).toEqual(new Set([hops]));
+    },
+  );
+
+  it('offers each kind of mistake: one off, and a step or two away, both ways', () => {
+    const offsets = new Set(
+      SEEDS.flatMap((seed) => {
+        const level = generateLevel(seed, 6, 'band-9-12');
+        return level.choices.map((choice) => choice - level.answer);
+      }),
+    );
+    expect([...offsets].toSorted((a, b) => a - b)).toEqual([-20, -10, -1, 0, 1, 10, 20]);
+  });
+
+  it('offers 0 when the blank is two steps past it', () => {
+    const levels = Array.from({ length: 3000 }, (_, index) => generateLevel(index * 7919 + 1, 5, 'band-9-12'));
+    expect(levels.some((level) => level.choices.includes(0))).toBe(true);
+  });
+
+  it('offers 100 when it is near the answer, and nothing past it', () => {
+    const levels = SEEDS.map((seed) => generateLevel(seed, 4, 'band-9-12'));
+    expect(levels.some((level) => level.choices.includes(100) && level.answer !== 100)).toBe(true);
+  });
+
   it('starts with tens from zero, the easiest count', () => {
     expect(generateLevel(3, 1, 'band-6-8').numbers).toEqual([0, 10, 20, 30, 40]);
   });
@@ -62,12 +114,6 @@ describe('generateLevel', () => {
   it('puts the blank anywhere but first once it moves inside', () => {
     const blanks = new Set(SEEDS.map((seed) => generateLevel(seed, 8, 'band-9-12').blank));
     expect([...blanks].toSorted((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
-  });
-
-  it('offers counting on by one as a choice', () => {
-    const levels = SEEDS.map((seed) => generateLevel(seed, 6, 'band-9-12'));
-    expect(levels.some((level) => level.choices.includes(level.answer + 1))).toBe(true);
-    expect(levels.some((level) => level.choices.includes(level.answer - 1))).toBe(true);
   });
 
   it('puts the answer in every position over many rounds', () => {

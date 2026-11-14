@@ -66,6 +66,49 @@ describe('generateLevel', () => {
     }
   });
 
+  // The design of each difficulty, read from the rounds it makes: the mode, the step, the
+  // lowest and highest first number, the marks, the labels shown, and the choices.
+  it.each<[number, string, number, number, number, number, number, number]>([
+    [1, 'missing', 1, 0, 0, 6, 5, 3],
+    [2, 'missing', 1, 0, 0, 11, 10, 3],
+    [3, 'missing', 1, 0, 10, 11, 10, 3],
+    [4, 'place', 1, 0, 0, 11, 3, 0],
+    [5, 'place', 1, 0, 20, 11, 3, 0],
+    [6, 'missing', 2, 0, 20, 11, 10, 4],
+    [7, 'missing', 5, 0, 25, 11, 10, 4],
+    [8, 'place', 10, 0, 0, 11, 2, 0],
+    [9, 'place', 5, 0, 50, 11, 2, 0],
+  ])(
+    'difficulty %i: %s, by %i, starting %i to %i, %i marks, %i labeled, %i choices',
+    (difficulty, mode, step, lowest, highest, marks, shown, choices) => {
+      const levels = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-9-12'));
+      const starts = levels.map((level) => level.marks[0]?.value ?? -1);
+      expect(new Set(levels.map((level) => level.mode))).toEqual(new Set([mode]));
+      expect(new Set(levels.map((level) => level.step))).toEqual(new Set([step]));
+      expect([Math.min(...starts), Math.max(...starts)]).toEqual([lowest, highest]);
+      expect(new Set(levels.map((level) => level.marks.length))).toEqual(new Set([marks]));
+      expect(new Set(levels.map((level) => level.marks.filter((mark) => mark.labeled).length))).toEqual(
+        new Set([shown]),
+      );
+      expect(new Set(levels.map((level) => level.choices.length))).toEqual(new Set([choices]));
+    },
+  );
+
+  it('offers 0 when it is next to the missing number', () => {
+    const levels = SEEDS.map((seed) => generateLevel(seed, 1, 'band-6-8')).filter((level) => level.answer === 1);
+    expect(levels.some((level) => level.choices.includes(0))).toBe(true);
+  });
+
+  it('offers each kind of mistake when counting by fives: one off and a step or two away, both ways', () => {
+    const offsets = new Set(
+      SEEDS.flatMap((seed) => {
+        const level = generateLevel(seed, 7, 'band-9-12');
+        return level.choices.map((choice) => choice - level.answer);
+      }),
+    );
+    expect([...offsets].toSorted((a, b) => a - b)).toEqual([-10, -5, -1, 0, 1, 5, 10]);
+  });
+
   it('labels fewer marks as the levels rise: all, then the ends and the middle, then only the ends', () => {
     expect(labeled(2)).toBe(10);
     expect(labeled(4)).toBe(3);
@@ -81,13 +124,6 @@ describe('generateLevel', () => {
     const targets = new Set(SEEDS.map((seed) => generateLevel(seed, 4, 'band-9-12').target));
     expect(targets.has(5)).toBe(false);
     expect(targets.size).toBe(8);
-  });
-
-  it('offers one-off mistakes when counting by more than one', () => {
-    const levels = SEEDS.map((seed) => generateLevel(seed, 7, 'band-9-12'));
-    expect(
-      levels.some((level) => level.choices.includes(level.answer + 1) || level.choices.includes(level.answer - 1)),
-    ).toBe(true);
   });
 
   it('puts the answer in every position over many rounds', () => {

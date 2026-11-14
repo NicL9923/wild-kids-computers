@@ -83,8 +83,7 @@ export function tierFor(difficulty: number): Tier {
 /** Every set of counts the tier allows, smallest first: neighbors differ by a gap in range. */
 export function countSets(tier: Tier): number[][] {
   const [low, high] = tier.gap;
-  let sets: number[][] = [];
-  for (let first = tier.min; first <= tier.max; first += 1) sets.push([first]);
+  let sets = Array.from({ length: tier.max - tier.min + 1 }, (_, index) => [tier.min + index]);
   for (let added = 1; added < tier.groups; added += 1) {
     sets = sets.flatMap((set) => {
       const last = set.at(-1) ?? 0;

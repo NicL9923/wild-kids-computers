@@ -6,6 +6,7 @@ describe('nearby', () => {
   it('lists the numbers within the spread, leaving out the answer and anything out of range', () => {
     expect(nearby(5, 2, 0, 100)).toEqual([3, 4, 6, 7]);
     expect(nearby(1, 2, 1, 100)).toEqual([2, 3]);
+    expect(nearby(3, 2, 1, 100)).toEqual([1, 2, 4, 5]);
     expect(nearby(99, 2, 0, 100)).toEqual([97, 98, 100]);
   });
 });

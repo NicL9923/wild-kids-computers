@@ -99,8 +99,10 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Li
   return { mode: tier.mode, step: tier.step, marks, target, answer, choices };
 }
 
-/** The numbers a child mistakes for the missing one: a step or two away, and one away when counting by more than one. */
+/**
+ * The numbers a child mistakes for the missing one: a step or two away, and one away, which
+ * matters when counting by more than one. pickChoices drops the repeats when the step is 1.
+ */
 function wrongAnswers(answer: number, step: number): number[] {
-  const steps = [answer - 2 * step, answer - step, answer + step, answer + 2 * step];
-  return step > 1 ? [...steps, answer - 1, answer + 1] : steps;
+  return [answer - 2 * step, answer - step, answer + step, answer + 2 * step, answer - 1, answer + 1];
 }

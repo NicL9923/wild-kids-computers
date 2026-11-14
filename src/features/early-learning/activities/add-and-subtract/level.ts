@@ -96,12 +96,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Ad
   const answer = operation === 'add' ? first + second : first - second;
   const kind = random.pick(THINGS);
   const lowest = tier.zero ? 0 : 1;
-  const choices = pickChoices(
-    random,
-    answer,
-    tier.choices,
-    nearby(answer, 3, lowest, tier.max + 3),
-    nearby(answer, 4, lowest, tier.max + 4),
-  );
+  // Three on each side leaves at least three wrong numbers, even when the answer is 0.
+  const choices = pickChoices(random, answer, tier.choices, nearby(answer, 3, lowest, tier.max + 3));
   return { operation, first, second, answer, kind, show: tier.show, choices };
 }

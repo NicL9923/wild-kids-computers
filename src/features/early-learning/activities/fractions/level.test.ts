@@ -27,11 +27,14 @@ function problems(level: FractionLevel, difficulty: number): string[] {
   if (level.mode !== tier.mode) found.push(`mode ${level.mode}`);
   for (const picture of level.pictures) {
     const total = picture.parts.reduce((sum, part) => sum + part, 0);
-    if (Math.abs(total - 1) > 1e-9) found.push(`${picture.id} parts do not make a whole`);
+    // Written so a part that is not a number, which makes the total NaN, fails too.
+    if (!(Math.abs(total - 1) <= 1e-9)) found.push(`${picture.id} parts do not make a whole`);
     if (new Set(picture.shaded).size !== picture.shaded.length) found.push(`${picture.id} shades a part twice`);
     if (picture.shaded.some((index) => index < 0 || index >= picture.parts.length))
       found.push(`${picture.id} shades a missing part`);
     if (picture.fraction === null) {
+      // A grid cannot draw unequal parts, so an unequal shape is a circle or a bar.
+      if (picture.shape === 'grid') found.push(`${picture.id} is an unequal grid`);
       // A shape with parts that are not equal never shows the target's share.
       if (picture.parts.every((part) => Math.abs(part - (picture.parts[0] ?? 0)) < 1e-9))
         found.push(`${picture.id} is equal`);
@@ -55,18 +58,25 @@ function problems(level: FractionLevel, difficulty: number): string[] {
     if (right.length !== 1 || right[0]?.id !== level.answer) found.push('the answer is not the one matching picture');
     const unequal = tier.unequal && level.target.denominator <= 4;
     if (level.pictures.some((picture) => picture.fraction === null) !== unequal) found.push('unequal picture');
+    if (level.fractions.length !== 0) found.push('a picture round offers fractions');
   } else {
     const [picture] = level.pictures;
     if (level.pictures.length !== 1 || picture?.fraction !== level.target) found.push('the picture is not the target');
     if (level.fractions.length !== tier.choices) found.push(`${String(level.fractions.length)} fractions`);
     const right = level.fractions.filter((fraction) => sameValue(fraction, level.target));
-    if (right.length !== 1 || fractionKey(right[0] ?? level.target) !== level.answer)
+    if (right.length !== 1 || fractionKey(right[0] ?? level.target) !== level.answer) {
       found.push('the answer is not offered once');
+    }
+    const values = level.fractions.map((fraction) => fraction.numerator / fraction.denominator);
+    if (values.some((value, index) => index > 0 && value < (values[index - 1] ?? 0))) {
+      found.push('the fractions are not smallest first');
+    }
   }
   return found;
 }
 
-const together = (picture: Picture) => picture.shaded.every((index, at) => index === at);
+/** Whether the shaded parts are the first ones, side by side. */
+const together = (picture: Picture) => picture.shaded.toSorted((a, b) => a - b).every((index, at) => index === at);
 
 const keysOf = (fractions: readonly Fraction[]) => fractions.map(fractionKey);
 
@@ -94,6 +104,38 @@ describe('generateLevel', () => {
       expect(problems(level, difficulty)).toEqual([]);
     }
   });
+
+  // The design of each difficulty, read from the rounds it makes: the mode, the denominators,
+  // whether more than one part is shaded, whether shaded parts sit apart, the choices, and
+  // whether a shape with unequal parts is offered.
+  it.each<[number, string, string, boolean, boolean, number, boolean]>([
+    [1, 'pick-picture', '2 3 4', false, false, 3, false],
+    [2, 'pick-picture', '2 3 4 6 8', false, false, 3, false],
+    [3, 'pick-picture', '3 4', true, false, 3, false],
+    [4, 'pick-picture', '2 3 4 5 6', true, false, 4, true],
+    [5, 'pick-fraction', '2 3 4', true, false, 3, false],
+    [6, 'pick-fraction', '2 3 4 5 6 8', true, false, 4, false],
+    [7, 'pick-picture', '2 3 4 5 6 8', true, true, 4, true],
+    [8, 'pick-fraction', '2 3 4 5 6 8', true, true, 4, false],
+  ])(
+    'difficulty %i: %s, parts %s, more than one shaded %s, apart %s, %i choices, unequal %s',
+    (difficulty, mode, denominators, many, apart, choices, unequal) => {
+      const levels = SEEDS.map((seed) => generateLevel(seed, difficulty, 'band-9-12'));
+      const targets = levels.map((level) => level.target);
+      const pictures = levels.flatMap((level) => level.pictures).filter((picture) => picture.fraction !== null);
+      expect(new Set(levels.map((level) => level.mode))).toEqual(new Set([mode]));
+      expect([...new Set(targets.map((target) => target.denominator))].toSorted((a, b) => a - b).join(' ')).toBe(
+        denominators,
+      );
+      expect(targets.some((target) => target.numerator > 1)).toBe(many);
+      expect(pictures.some((picture) => !together(picture))).toBe(apart);
+      const offered = levels.map((level) =>
+        level.mode === 'pick-picture' ? level.pictures.length : level.fractions.length,
+      );
+      expect(new Set(offered)).toEqual(new Set([choices]));
+      expect(levels.some((level) => level.pictures.some((picture) => picture.fraction === null))).toBe(unequal);
+    },
+  );
 
   it('shades parts side by side at first, and apart at the top', () => {
     const equal = SEEDS.slice(0, 50).flatMap((seed) =>
@@ -146,11 +188,12 @@ describe('wrongFractions', () => {
   it('prefers the likely confusions: the same parts, the same number shaded, or the unshaded share', () => {
     const all = fractionsFor(tierFor(8));
     const target = { numerator: 3, denominator: 8 };
-    for (let seed = 0; seed < 100; seed += 1) {
-      for (const fraction of wrongFractions(createRandom(seed), target, all, 3)) {
-        expect(fraction.denominator === 8 || fraction.numerator === 3 || fraction.numerator === 5).toBe(true);
-      }
+    const offered = Array.from({ length: 100 }, (_, seed) => wrongFractions(createRandom(seed), target, all, 3)).flat();
+    for (const fraction of offered) {
+      expect(fraction.denominator === 8 || fraction.numerator === 3 || fraction.numerator === 5).toBe(true);
     }
+    // Each kind of confusion shows up on its own: 1/8, 3/5, and 5/6.
+    expect(keysOf(offered)).toEqual(expect.arrayContaining(['1/8', '3/5', '5/6']));
   });
 
   it('refuses when there are not enough different values, naming the target', () => {
