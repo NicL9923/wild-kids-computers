@@ -38,6 +38,14 @@ export type CarryMode<I extends string, T extends string> =
       /** Whether a target takes this item. A target that does not is never marked valid. */
       readonly accepts?: (item: I, target: T) => boolean;
       readonly onDrop: (item: I, target: T) => void;
+      /**
+       * For items whose click already means something, such as a toolbox block that a click adds.
+       * Called for a press and release without a drag, and for Enter or Space. Return true when
+       * the click acted; the item is then not picked up. Return false to pick it up as usual.
+       * Dragging still carries the item. Give such items another click path to every target,
+       * such as choosing the target first, because they cannot be clicked up and clicked down.
+       */
+      readonly onClick?: (item: I) => boolean;
     }
   | {
       readonly kind: 'free';
@@ -261,6 +269,12 @@ export function useCarry<I extends string, T extends string = never>(
         const now = live.current.active;
         if (now === null) return;
         if (now.how === 'held' && now.pending) {
+          const modeNow = live.current.mode;
+          if (modeNow.kind === 'targets' && modeNow.onClick?.(now.item) === true) {
+            setActive(null);
+            setOver(null);
+            return;
+          }
           // A press and release without a drag: the item stays picked up until the next click.
           setActive({ ...now, how: 'clicked' });
           return;
@@ -320,6 +334,7 @@ export function useCarry<I extends string, T extends string = never>(
           if (now === null) {
             if (!isPick) return;
             event.preventDefault();
+            if (mode.kind === 'targets' && mode.onClick?.(id) === true) return;
             play('pick-up');
             const start = center(event.currentTarget.getBoundingClientRect());
             setActive({

@@ -1,6 +1,6 @@
 # Robot painter
 
-The logic of the robot painter area: the block program model, the interpreter, the drawing comparison, 30 puzzles, and the free mode toolboxes. Everything here is plain TypeScript with no React, no DOM, no timers, and no text a child sees. The screens, strings, and end-to-end tests come next and build on this.
+The robot painter area: the block program model, the interpreter, the drawing comparison, 30 puzzles, the free mode toolboxes, and the screens built on them. `engine/` and `puzzles/` are plain TypeScript with no React, no DOM, no timers, and no text a child sees.
 
 ## Files
 
@@ -102,14 +102,30 @@ const picture = toPaintPicture(next.value.segments, puzzle.world.canvas);
 | `extra-line`    | "The drawing has an extra line here." | `segments`                  |
 | `wrong-end`     | "The picture is ready. Now end here." | `at`, `goal`                |
 
-The `Hint` type is not exported yet, because nothing outside the engine uses it. Export it from `engine/puzzle.ts` when the screen needs it.
+`blocks/speech.ts` holds the words the screen says for each hint.
 
 ## Free mode
 
 `FREE_MODES[band]` gives the canvas, start, toolbox, block limit, and style. `band-3-5` is `direct`: arrows that run at once, plus four colors. The older bands build programs. Free mode has no goal and no check.
 
-## For the screen agent
+## Screens
 
-- **Discovery.** Only `src/registry/` may call `import.meta.glob`, and `activity.ts` and `level.ts` may not import a registry. The sequence activity therefore cannot list its steps from the registry inside `activity.ts`. Either the kit takes the steps from the registry where it builds the activity, or the component reads `puzzlesForTier` and `activity.ts` declares only the tier. Decide with the activity kit owner.
-- **End-to-end tests.** Playwright runs without Vite, so it cannot use the registry. Import a puzzle module by path, such as `src/features/robot-painter/puzzles/tier-1/firstStep.ts`, and compute the answer from `puzzle.solution`. The engine and the puzzle files use only erasable TypeScript and `.ts` imports, so Node can load them.
-- **Paint studio.** `toPaintPicture` returns the canonical lines, each drawn once, scaled into the document with a margin. The studio strokes each line with its color and width.
+Four activities under `activities/`: `robot-first-steps` (tier 1, `band-3-5` and `band-6-8`), `robot-patterns` (tier 2, `band-6-8` and `band-9-12`), `robot-inventor` (tier 3, `band-9-12`), and `robot-free-draw` (free mode, every band). Each tier's `level.ts` imports its puzzle modules in order and the activity declares `stepsDirectory`, so the registry test catches a puzzle file that is not listed.
+
+| Path                       | What it holds                                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `editor/programEdit.ts`    | Pure edits: insert, append, move, remove, update a value, add and remove a defined block. Each result validates. |
+| `editor/editorState.ts`    | The program with undo, "start over", and the list a toolbox click adds to                                        |
+| `editor/palette.ts`        | What the toolbox shows for a puzzle's toolbox items, and stepping a block's value with plus and minus            |
+| `editor/ProgramEditor.tsx` | Toolbox and program for older bands, with `useCarry` for every move                                              |
+| `stage/RobotStage.tsx`     | The paper in SVG: dots, faint target, drawing, hints, flower, and the robot                                      |
+| `stage/useRobotRun.ts`     | Runs a program one step at a time through the kit scope                                                          |
+| `stage/useGlide.ts`        | Glides the robot on the kit's frames, so a pinned test clock steps it and reduced motion jumps                   |
+| `screen/RobotPainter.tsx`  | The screen for a puzzle or free play, its three layouts, checking, hints, and "paint it"                         |
+| `blocks/`                  | Block pictures and the spoken name of every block and hint                                                       |
+| `timing.ts`                | Step pauses and the pause after a run, for the screen and the end-to-end tests                                   |
+
+- **Layouts.** `direct` for direct puzzles and the youngest free play: arrows that move the robot at once. `plan` for the youngest build puzzles: four arrows with go in the middle and a row of places; pressing a placed arrow takes it out. `editor` for every older band: toolbox, program, and the controls go, one step, robot back to the start, undo, and start over.
+- **Editing.** A click on a toolbox block adds it at the end of the chosen list; a new repeat or defined block becomes the chosen list. Dragging a toolbox block puts it into any gap. A placed block is picked up by a click or a drag and put into a gap or onto "take the block out". Enter does the same from the keyboard. `useCarry`'s `onClick` option lets the toolbox click add instead of picking up.
+- **Checking.** After a run the engine checks the picture. Solved: the kit's confirmation, then two equal choices, next picture or stay here; "next" ends the step. Not solved: the first hint is spoken, the robot goes back to the start after `RESULT_PAUSE_MS`, and the program stays. From the second unsolved run the paper also shows where the drawing differs.
+- **Paint it.** Free mode sends the drawing with `toPaintPicture` and `openPaintStudioWith`, and the studio opens with it.
