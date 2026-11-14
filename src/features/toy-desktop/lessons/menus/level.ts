@@ -19,7 +19,7 @@ export interface MenuTask {
  * A round's window and the commands to run in it, in order. Every command here is one the app's
  * own buttons do not offer, so the child has to find it in a menu.
  */
-export interface MenuCase {
+interface MenuCase {
   readonly id: string;
   readonly app: AppKind;
   readonly tasks: readonly MenuTask[];

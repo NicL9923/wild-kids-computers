@@ -8,7 +8,7 @@ import type { AppKind, DesktopState } from '../../model/state.ts';
 import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 
 /** The problems this lesson poses. A window pushed off to the right is left out: a wide screen shows it. */
-export type FaultKind = 'sound-muted' | 'window-minimized' | 'window-behind' | 'window-off-side';
+type FaultKind = 'sound-muted' | 'window-minimized' | 'window-behind' | 'window-off-side';
 
 const APPS: readonly AppKind[] = ['notepad', 'picture-viewer', 'file-explorer', 'music-box', 'calculator'];
 
