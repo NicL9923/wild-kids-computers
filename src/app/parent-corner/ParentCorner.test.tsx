@@ -3,6 +3,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, describe, expect, it } from 'vitest';
 import { documentNames } from '../../core/platform/names.ts';
 import { verifyParentPin } from '../../core/storage/parentPin.ts';
+import { strings as seedPodStrings } from '../../features/computer-skills/activities/pop-the-seed-pods/strings.ts';
 import { appDocument, settingsDocument } from '../../core/storage/schemas.ts';
 import { strings as gateStrings } from '../parent-gate/strings.ts';
 import { strings as profileStrings } from '../profiles/strings.ts';
@@ -185,7 +186,9 @@ describe('parent corner', () => {
     };
     await openCorner({ ...savedProfiles([FOX, OWL], FOX.id), [documentNames.progress(FOX.id)]: json(progress) });
     const skills = screen.getByRole('region', { name: strings.skills.text });
-    expect(within(skills).getByText('pop-the-seed-pods')).toBeTruthy();
+    // The skill is named by the activity's goal sentence, never by its id.
+    expect(await within(skills).findByText(seedPodStrings.goal.text)).toBeTruthy();
+    expect(within(skills).queryByText('pop-the-seed-pods')).toBeNull();
     expect(within(skills).getByText(strings.firstPracticed.text)).toBeTruthy();
     expect(within(skills).queryByText(/%|\bscore\b|\blevel\b/i)).toBeNull();
 
