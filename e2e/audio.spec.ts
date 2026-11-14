@@ -27,8 +27,6 @@ test('decodes and plays a voice clip and a synthesized tone with no sound device
     await context.resume();
     const bytes = Uint8Array.from(atob(clipBase64), (char) => char.charCodeAt(0));
     const buffer = await context.decodeAudioData(bytes.buffer);
-    // page.evaluate sends only this function to the page, so the helper must live inside it.
-    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const playToEnd = (source: AudioScheduledSourceNode, seconds: number) =>
       new Promise<boolean>((resolve) => {
         source.addEventListener('ended', () => resolve(true), { once: true });
