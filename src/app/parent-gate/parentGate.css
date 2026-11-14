@@ -2,6 +2,8 @@
 
 @layer components {
   .wk-gate-form {
+    --wk-text-small: max(var(--wk-adult-text-min), calc(var(--wk-font-small) * var(--wk-text-scale)));
+
     display: flex;
     flex-direction: column;
     gap: var(--wk-space-container);

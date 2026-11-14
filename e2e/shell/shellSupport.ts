@@ -68,3 +68,21 @@ export async function openParentCorner(page: Page): Promise<void> {
   await expect(parentCornerHeading(page)).toBeVisible();
   await settle(page);
 }
+
+/**
+ * The smallest font size of any visible text on the page, in CSS px. Adult screens keep body
+ * text at 16 px or more.
+ */
+export function smallestVisibleText(page: Page): Promise<{ size: number; text: string }> {
+  return page.evaluate(() => {
+    let smallest = { size: Number.POSITIVE_INFINITY, text: '' };
+    for (const element of document.querySelectorAll<HTMLElement>('body *')) {
+      const own = [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+      if (!own || element.closest('[hidden], .wk-visually-hidden') !== null || element.getClientRects().length === 0)
+        continue;
+      const size = Number.parseFloat(getComputedStyle(element).fontSize);
+      if (size < smallest.size) smallest = { size, text: element.textContent?.trim().slice(0, 40) ?? '' };
+    }
+    return smallest;
+  });
+}

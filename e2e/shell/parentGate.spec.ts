@@ -16,6 +16,7 @@ import {
   grownUps,
   openParentCorner,
   parentCornerHeading,
+  smallestVisibleText,
   waitForHome,
   wordGateAnswer,
 } from './shellSupport.ts';
@@ -48,6 +49,7 @@ test('the word gate refuses a wrong answer with a neutral message and opens on t
   await expect(gate).toBeVisible();
   const answer = await wordGateAnswer(page);
   expect(answer).toMatch(/^\d{3}$/);
+  expect((await smallestVisibleText(page)).size).toBeGreaterThanOrEqual(16);
   await expectAccessible(page);
   await saveScreen(page, 'band-3-5', 'shell-gate-words');
 
@@ -61,6 +63,8 @@ test('the word gate refuses a wrong answer with a neutral message and opens on t
 
   await answerGate(page, answer);
   await expect(parentCornerHeading(page)).toBeVisible();
+  // Adult text is at least 16 px, though the corner uses the oldest band's denser look.
+  expect((await smallestVisibleText(page)).size).toBeGreaterThanOrEqual(16);
   const spoken = (await readAudioLog(page)).filter((entry) => entry.kind === 'voice').map((entry) => entry.name);
   expect(spoken.filter((id) => id.startsWith('parent-gate.') || id.startsWith('numbers.'))).toEqual([]);
 });

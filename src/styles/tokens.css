@@ -167,6 +167,14 @@
   --wk-icon-size: calc(var(--wk-target-min) * 0.62);
 }
 
+/*
+ * Adult screens, the parent corner and the parent gate, never set text below this. The oldest
+ * band's small text is 15 px, which suits a child's label but not a paragraph an adult must read.
+ */
+:root {
+  --wk-adult-text-min: 16px;
+}
+
 /* ---- parent settings ---- */
 
 [data-text-size='large'] {
