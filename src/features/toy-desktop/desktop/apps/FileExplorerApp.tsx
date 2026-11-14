@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type MouseEvent } from 'react';
 import { toyClipboard } from '../../../../app/inputGuards.ts';
 import { useCarry } from '../../../../activityShell/carry/useCarry.ts';
 import { Emoji } from '../../../../components/ui/Emoji.tsx';
@@ -41,27 +41,32 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
   const inTrash = app.folderId === TRASH_ID || isTrashed(state.fs, app.folderId);
   const send = (action: ExplorerAction) => dispatch({ type: 'explorer', windowId, action });
   // The click that places an item lands on the folder or place under it. It puts the item there
-  // and does nothing more, so a drop never also opens the folder.
-  const dropping = useRef(false);
+  // and does nothing more, so a drop never also opens the folder. That click comes from the same
+  // press as the drop: the drop marks it, and the next press clears the mark, so no timer decides
+  // which input counts. A click from the keyboard has a detail of 0 and never places anything, so
+  // Enter on a place right after a drop always opens it.
+  const placingClick = useRef(false);
   const carry = useCarry<string, string>(kit, {
     kind: 'targets',
     accepts: (item, target) => item !== target,
     onDrop: (item, target) => {
-      dropping.current = true;
-      kit.scope.setTimeout(() => {
-        dropping.current = false;
-      }, 0);
+      placingClick.current = true;
       send({ type: 'move', nodeId: item, toId: target });
     },
   });
-  const unlessDropping = (run: () => void) => () => {
-    if (!dropping.current) run();
+  const unlessPlacing = (run: () => void) => (event: MouseEvent) => {
+    if (!placingClick.current || event.detail === 0) run();
   };
   const searching = app.search.text.trim() !== '';
   const tools = (inTrash ? TRASH_TOOLS : FOLDER_TOOLS).filter(({ command }) => !parts.hiddenCommands.includes(command));
 
   return (
-    <div className='td-explorer'>
+    <div
+      className='td-explorer'
+      onPointerDownCapture={() => {
+        placingClick.current = false;
+      }}
+    >
       <div className='td-toolbar' role='toolbar' aria-label={t(strings.fileExplorer)}>
         {tools.map(({ command, glyph, emoji }) => (
           <button
@@ -106,7 +111,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
               aria-current={app.folderId === place.id && !searching ? 'page' : undefined}
               {...carry.target(place.id)}
               {...sayName(place.label)}
-              onClick={unlessDropping(() => send({ type: 'open-node', nodeId: place.id }))}
+              onClick={unlessPlacing(() => send({ type: 'open-node', nodeId: place.id }))}
             >
               <Emoji id={place.emoji} decorative className='td-place-picture' />
               {t(place.label)}
@@ -137,7 +142,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
                     onFocus={() => {
                       if (!selected) send({ type: 'select', nodeId: node.id });
                     }}
-                    onClick={unlessDropping(() => {
+                    onClick={unlessPlacing(() => {
                       // Nothing in the trash opens, so a click there picks the item for Restore.
                       if (inTrash) send({ type: 'select', nodeId: node.id });
                       else if (node.kind === 'folder') send({ type: 'open-node', nodeId: node.id });
