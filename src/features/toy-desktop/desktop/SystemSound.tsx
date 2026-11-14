@@ -5,7 +5,8 @@ import { strings } from './strings.ts';
 
 /**
  * The toy computer's own sound: a button that mutes and unmutes it, and a volume slider. It
- * changes only the toy computer's sounds, never the app's voice or the real computer.
+ * changes only the toy computer's sounds, never the app's voice or the real computer. A lesson
+ * points at the button with the highlight key "system-sound".
  */
 export function SystemSound() {
   const { desktop, sayName } = useDesktopContext();
@@ -19,6 +20,7 @@ export function SystemSound() {
         aria-label={t(strings.sound)}
         aria-pressed={!silent}
         data-system-sound={silent ? 'off' : 'on'}
+        data-highlight-key='system-sound'
         {...sayName(strings.sound)}
         onClick={() =>
           desktop.dispatch(
