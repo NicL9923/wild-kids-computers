@@ -21,3 +21,8 @@
   line-height: 1;
   cursor: pointer;
 }
+
+/* A slimmer edge inside each group, so the busiest round keeps every thing a target wide. */
+.match-stage .math-group {
+  padding: var(--wk-space-item);
+}

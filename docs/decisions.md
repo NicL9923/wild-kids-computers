@@ -80,6 +80,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Letters that say the same sound never share a round.** c and k share the shared clip "kuh", and q starts with it, so a sound or a spelling round never offers two of them.
 - **Sight words, missing letter, and sentence builder start at band-6-8.** Each needs the child to read written words, which hard rule 5 keeps away from the youngest. First sound and build the word with its letter guide cover the same ground for them.
 - **Rhyme sets are true rhymes in General American English, checked by ear.** Pairs that share only a vowel, such as goat and nose, meet only at higher difficulty, and near rhymes are left out.
+- **A thing to count is never smaller than the band's target, at 1280 by 800.** Match the numeral shows two groups at band-3-5 and at most three elsewhere, and more or fewer stops at ten things a group, with closer counts making the top levels harder. More groups or more things in a row shrank each thing to about 40 px. The "fits the hardest round" tests measure every thing in the busiest seed.
 
 ### Assets
 

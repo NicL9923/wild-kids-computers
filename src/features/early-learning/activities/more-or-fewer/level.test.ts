@@ -90,9 +90,9 @@ describe('generateLevel', () => {
     [3, 1, 8, 2, 2, 3, 'fewer more', 'rows'],
     [4, 2, 10, 2, 1, 3, 'fewer more', 'rows'],
     [5, 2, 10, 2, 1, 2, 'fewer more', 'scatter'],
-    [6, 3, 12, 3, 1, 3, 'fewest most', 'scatter'],
-    [7, 5, 15, 3, 1, 2, 'fewest most', 'scatter'],
-    [8, 8, 20, 3, 1, 2, 'fewest most', 'scatter'],
+    [6, 2, 10, 3, 2, 3, 'fewest most', 'scatter'],
+    [7, 3, 10, 3, 1, 2, 'fewest most', 'scatter'],
+    [8, 4, 10, 3, 1, 1, 'fewest most', 'scatter'],
   ])(
     'difficulty %i: counts %i to %i in %i groups, neighbors %i to %i apart, asks %s, %s',
     (difficulty, low, high, groups, closest, farthest, asks, arrangement) => {
