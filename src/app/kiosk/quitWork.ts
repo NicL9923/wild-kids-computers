@@ -7,7 +7,7 @@
  * useEffect(() => quitWork.hold({ pending: () => saver.hasUnsavedChanges, finish: () => saver.keep() }), [saver]);
  * ```
  */
-export interface QuitWork {
+interface QuitWork {
   /** Whether anything is waiting. Called when a close starts, so keep it cheap. */
   readonly pending: () => boolean;
   /** Finishes the work. Resolves to whether it finished. Never rejects. */
