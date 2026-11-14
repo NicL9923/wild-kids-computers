@@ -156,6 +156,7 @@
     margin: 0;
     font-size: var(--wk-text-title);
     text-align: center;
+    text-wrap: balance;
   }
 
   /* ---- useCarry: a picked-up item lifts, and places it may go show a dashed edge ---- */

@@ -34,6 +34,8 @@ export interface LaunchOptions {
 export interface LaunchSetup {
   /** Document text by name, written over anything launchApp wrote for the ready profile. */
   documents?: Partial<Record<DocumentName, string>>;
+  /** Runs on the data directory last, before the app starts, such as to damage a file. */
+  prepare?: (dataDir: string) => Promise<void>;
 }
 
 export interface LaunchedApp {
@@ -65,6 +67,7 @@ export async function launchApp(options?: LaunchOptions, setup: LaunchSetup = {}
       if (!isDocumentName(name) || text === undefined) throw new Error(`Not a document name: ${name}`);
       await writeDocumentFile(dataDir, name, text);
     }
+    await setup.prepare?.(dataDir);
     return await startApp(userDataDir, testInfo);
   } catch (error) {
     await rm(userDataDir, { recursive: true, force: true });
