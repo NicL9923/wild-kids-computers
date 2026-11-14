@@ -98,6 +98,7 @@ forEachBand(activity.bands, (band) => {
     const level = generateLevel(roundSeed(SEED, 0), BLANKET_DIFFICULTY, band);
     expect(level.mode).toBe('spots');
     // The blanket has its own instruction, and the replay control says it.
+    await expect(page.locator('.wk-instruction-text')).toContainText(strings.spots.text);
     await expectInstructionSpoken(page, strings.spots);
     await saveBandScreenshot(page, band, `${activity.id}-blanket`);
 
