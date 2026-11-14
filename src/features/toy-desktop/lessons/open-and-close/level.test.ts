@@ -85,9 +85,10 @@ describe.each([
         const opensFile = 'file' in icon ? icon.file : undefined;
         expect(opensFile).toBe('app' in icon && icon.app === 'picture-viewer' ? VIEWER_PICTURE : undefined);
       }
-      for (const window of level.desktop.windows) {
-        if (window.app.kind === 'picture-viewer') expect(window.app.fileId).toBe(fox.id);
-      }
+      const viewers = level.desktop.windows.flatMap((window) =>
+        window.app.kind === 'picture-viewer' ? [window.app.fileId] : [],
+      );
+      expect(viewers.every((fileId) => fileId === fox.id)).toBe(true);
     }
   });
 });
