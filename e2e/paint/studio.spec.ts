@@ -6,8 +6,7 @@ import { strings as colorNames } from '../../src/core/strings/shared/colors.ts';
 import { strings as effectNames } from '../../src/features/paint-studio/effects/strings.ts';
 import { strings } from '../../src/features/paint-studio/strings.ts';
 import { expectAccessible } from '../support/accessibility.ts';
-import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
-import { restartApp } from './relaunch.ts';
+import { launchApp, restartApp, type LaunchedApp } from '../support/launchApp.ts';
 import {
   canvasFingerprint,
   coloringPagePoints,
