@@ -22,8 +22,9 @@ const config = {
     'src/core/paint/warp.ts',
     'src/core/paint/scatter.ts',
     'src/features/robot-painter/engine/!(*.test).ts',
-    // Every activity's level generator.
+    // Every activity's level generator, toy desktop lessons included.
     'src/features/*/activities/*/level.ts',
+    'src/features/toy-desktop/lessons/*/level.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],

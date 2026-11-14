@@ -43,7 +43,7 @@ describe('free play level', () => {
     const toyApps = ['calculator', 'file-explorer', 'music-box', 'notepad', 'picture-viewer'];
     expect(parts.launcher.toSorted(byName)).toEqual(toyApps);
     expect(parts.icons.flatMap((icon) => ('app' in icon ? [icon.app] : [])).toSorted(byName)).toEqual(toyApps);
-    expect(parts.icons.some((icon) => 'trash' in icon)).toBe(true);
+    expect(parts.icons).toContainEqual({ trash: true });
     expect([parts.menuBar, parts.taskStrip, parts.move, parts.resize]).toEqual([true, true, true, true]);
     expect(parts.windowControls).toEqual(['minimize', 'maximize', 'close']);
   });
