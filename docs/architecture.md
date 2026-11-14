@@ -102,7 +102,7 @@ A central list file causes a merge conflict every time two people add an item. T
 | Item                | Convention                                                                                               |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |
 | Activity definition | `src/features/**/activity.ts`, default export from `defineActivity`                                      |
-| Strings             | `src/**/strings.ts`, named export `strings` from `defineStrings`                                         |
+| Strings             | `src/**/strings.ts` and the shared sets in `src/core/strings/shared/*.ts`, named export `strings`        |
 | Paint tool          | `src/core/paint/tools/<toolId>/index.ts`                                                                 |
 | Brush tip           | `src/core/paint/tips/<tipId>.ts`                                                                         |
 | Paint effect        | `src/core/paint/effects/<effectId>/index.ts`                                                             |
@@ -139,6 +139,7 @@ export const strings = defineStrings('pop-the-seed-pods', {
 - The hash is a synchronous pure TypeScript hash of at least 64 bits. The text is normalized first: Unicode NFC, collapsed whitespace, straight quotes.
 - Because the name comes from the text, a changed string has no clip until someone generates it. Two strings with the same speech share one clip.
 - `npm run voice:generate` creates missing clips with Kokoro-82M and encodes them as mono Opus in an Ogg container. The generator lives in `tools/voice/` with its own `package.json`, so its dependencies stay out of the app. It reads the list of spoken strings from a file that a Vitest task writes.
+- `src/registry/voiceClips.ts` finds the clips. It imports them with `?no-inline`, because the content security policy blocks fetching a `data:` URL.
 - `npm run check:voice` fails when a spoken string has no clip. It also fails when a clip matches no string, so the folder holds no stale audio. It fails on a hash collision between two different texts.
 - The voice profile records the model, voice, and speed. Changing it renames every clip, which forces regeneration.
 - During parallel work, feature branches do not generate clips. The coordinator generates clips on the integration branch after each merge. `check:voice` gates the integration branch and CI, not a feature branch. A missing clip at runtime plays nothing and still records the string in the test log.
@@ -151,7 +152,7 @@ export const strings = defineStrings('pop-the-seed-pods', {
 - Fluent Emoji files live in `assets/emoji/`. Import them with `tools/importEmoji.ts`, which copies from a local clone of the upstream repository and keeps the upstream MIT notice in `assets/emoji/LICENSE`.
 - Sound effects are synthesized at runtime with the Web Audio API in `src/audio/sfx/`. They are original work and add no files.
 - Original art is SVG, authored in this repository, and licensed MIT.
-- A build check fails when a non-code file in the renderer output did not come from `assets/`.
+- A build check fails when a non-code file in the renderer output did not come from `assets/`. `npm run build` runs it as `check:build-assets` after the renderer build. It matches files by content, because Vite renames them.
 
 ## Platform bridge
 
