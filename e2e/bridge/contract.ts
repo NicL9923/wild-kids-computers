@@ -40,6 +40,8 @@ export interface BridgeTarget {
     session: BridgeSession,
     run: () => Promise<Outcome>,
   ) => Promise<{ outcome: Outcome; printedWidth: number | null }>;
+  /** Replaces the stored thumbnail of a gallery picture behind the bridge, as damage on disk would. */
+  damageThumbnail: (session: BridgeSession, profileId: string, id: string, stored: number[]) => Promise<void>;
 }
 
 const BYTES = '__bytes';
@@ -256,6 +258,13 @@ export function defineBridgeContract(target: BridgeTarget): void {
           await call(page, 'pictures.save', 'p1', { id: 'ghost', png: bytes(PICTURE), thumbnail: bytes(THUMBNAIL) }),
         ).toEqual(failure('not-found'));
         expect(await call(page, 'pictures.list', 'nobody', 'gallery')).toEqual({ ok: true, value: [] });
+      });
+
+      test('refuses a stored thumbnail that is not a PNG', async () => {
+        const saved = await savePicture(page);
+        await target.damageThumbnail(session, 'p1', saved.id, [1, 2, 3, 4]);
+        expect(await call(page, 'pictures.read', 'p1', saved.id, 'thumbnail')).toEqual(failure('io'));
+        expect(await call(page, 'pictures.read', 'p1', saved.id, 'picture')).toEqual({ ok: true, value: PICTURE });
       });
 
       test('rejects bytes that are not a PNG and ids that are not safe', async () => {

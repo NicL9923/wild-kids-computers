@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { access, copyFile, mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, copyFile, mkdir, open, readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   BridgeError,
@@ -104,7 +105,9 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
       if (info.size > MAX_DOCUMENT_BYTES) {
         throw new BridgeError('too-large', `The saved ${name} document is over ${MAX_DOCUMENT_BYTES} bytes.`);
       }
-      return readFile(file, 'utf8');
+      // The file can grow between the size check and the read, so the read is capped as well.
+      const bytes = await readCapped(file, MAX_DOCUMENT_BYTES, `saved ${name} document`);
+      return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length).toString('utf8');
     },
 
     async write(name, text) {
@@ -174,11 +177,20 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     async read(profileId, id, file) {
       for (const place of ['gallery', 'trash'] as const) {
         const target = pictureFiles(profileId, place, id)[file];
+        let bytes: Uint8Array;
         try {
-          return new Uint8Array(await readFile(target));
+          bytes = await readCapped(
+            target,
+            file === 'picture' ? MAX_PICTURE_BYTES : MAX_THUMBNAIL_BYTES,
+            `saved ${file}`,
+          );
         } catch (error) {
-          if (errorCode(error) !== 'ENOENT') throw error;
+          if (errorCode(error) === 'ENOENT') continue;
+          throw error;
         }
+        if (!hasPngSignature(bytes))
+          throw new BridgeError('io', `The saved ${file} for picture ${id} is not a PNG file.`);
+        return bytes;
       }
       throw new BridgeError('not-found', `No ${file} for picture ${id}.`);
     },
@@ -237,6 +249,38 @@ async function exists(file: string): Promise<boolean> {
 async function summary(file: string, id: string): Promise<PictureSummary> {
   const info = await stat(file);
   return { id, updatedAt: Math.floor(info.mtimeMs) };
+}
+
+/** O_NOFOLLOW does not exist on Windows, where Node leaves it undefined. */
+const NO_FOLLOW = process.platform === 'win32' ? 0 : constants.O_NOFOLLOW;
+
+/**
+ * Reads at most `max` bytes. A file over the cap rejects before its bytes are allocated, and a
+ * file that grows during the read rejects once it passes the cap.
+ */
+async function readCapped(file: string, max: number, label: string): Promise<Uint8Array> {
+  const handle = await open(file, constants.O_RDONLY | NO_FOLLOW);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new BridgeError('io', `The ${label} is not a file.`);
+    if (info.size > max) throw new BridgeError('too-large', `The ${label} is over ${max} bytes.`);
+    let buffer = new Uint8Array(Math.min(info.size, max) + 1);
+    let length = 0;
+    for (;;) {
+      if (length === buffer.length) {
+        // The file grew after the size check. One byte past the cap is enough to refuse it.
+        if (length > max) throw new BridgeError('too-large', `The ${label} is over ${max} bytes.`);
+        const larger = new Uint8Array(Math.min(buffer.length * 2, max + 1));
+        larger.set(buffer);
+        buffer = larger;
+      }
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) return buffer.subarray(0, length);
+      length += bytesRead;
+    }
+  } finally {
+    await handle.close();
+  }
 }
 
 function checkPng(bytes: Uint8Array, max: number, label: string): void {

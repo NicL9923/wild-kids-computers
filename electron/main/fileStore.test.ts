@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BridgeError } from '../../src/core/platform/bridge.ts';
-import { MAX_DOCUMENT_BYTES, MAX_THUMBNAIL_BYTES } from '../../src/core/platform/limits.ts';
+import { MAX_DOCUMENT_BYTES, MAX_PICTURE_BYTES, MAX_THUMBNAIL_BYTES } from '../../src/core/platform/limits.ts';
 import type { DocumentName } from '../../src/core/platform/names.ts';
 import { createFileStore } from './fileStore.ts';
 
@@ -249,5 +249,21 @@ describe('pictures', () => {
     await rm(path.join(root, 'profile', 'p1', 'pictures', 'pic-a.thumb.png'));
     await pictures.trash('p1', 'pic-a');
     expect((await pictures.list('p1', 'trash')).map((p) => p.id)).toEqual(['pic-a']);
+  });
+
+  // A gallery file that grew or was replaced on disk must not cost a huge allocation in the main
+  // process and again in the renderer, and must not reach the renderer as a picture.
+  it.each([
+    ['a picture over its cap', 'pic-a.png', MAX_PICTURE_BYTES + 1, 'picture', 'too-large'],
+    ['a thumbnail over its cap', 'pic-a.thumb.png', MAX_THUMBNAIL_BYTES + 1, 'thumbnail', 'too-large'],
+    ['a picture that is not a PNG', 'pic-a.png', 16, 'picture', 'io'],
+    ['a thumbnail that is not a PNG', 'pic-a.thumb.png', 16, 'thumbnail', 'io'],
+  ] as const)('refuses to read %s from disk', async (_label, name, size, file, code) => {
+    const { pictures } = store();
+    await pictures.save('p1', { png: png(1), thumbnail: png(2) });
+    const bytes = new Uint8Array(size);
+    if (code === 'too-large') bytes.set(SIGNATURE);
+    await writeFile(path.join(root, 'profile', 'p1', 'pictures', name), bytes);
+    expect(await rejection(pictures.read('p1', 'pic-a', file))).toMatchObject({ code });
   });
 });

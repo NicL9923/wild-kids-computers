@@ -257,7 +257,13 @@ export function createBrowserBridge(options: BrowserBridgeOptions): PlatformBrid
         }
         const record = await getPicture(requireId(profileId, 'profileId'), requireId(id, 'id'));
         if (record === undefined) throw new BridgeError('not-found', `No ${file} for picture ${id}.`);
-        return (file === 'picture' ? record.png : record.thumbnail).slice();
+        const bytes = file === 'picture' ? record.png : record.thumbnail;
+        // The same caps as a save, so both builds refuse a damaged record the same way.
+        const max = file === 'picture' ? MAX_PICTURE_BYTES : MAX_THUMBNAIL_BYTES;
+        if (bytes.length > max) throw new BridgeError('too-large', `The saved ${file} is over ${max} bytes.`);
+        if (!hasPngSignature(bytes))
+          throw new BridgeError('io', `The saved ${file} for picture ${id} is not a PNG file.`);
+        return bytes.slice();
       },
 
       async copy(profileId, id) {
