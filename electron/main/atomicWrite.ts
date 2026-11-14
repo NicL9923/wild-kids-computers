@@ -28,7 +28,8 @@ export async function writeFileAtomic(target: string, data: string | Uint8Array)
   }
 }
 
-async function renameWithRetry(from: string, to: string): Promise<void> {
+/** Renames, retrying the brief locks Windows scanners hold. */
+export async function renameWithRetry(from: string, to: string): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       await rename(from, to);

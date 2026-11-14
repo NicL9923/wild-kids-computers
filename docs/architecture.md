@@ -191,6 +191,7 @@ Rules:
 
 - The main process validates every IPC argument with Zod and rejects calls from any frame that is not the app's own page.
 - The main process writes files atomically: write a temporary file, flush it, then rename. Writes to one file run in call order.
+- A picture and its thumbnail commit as a pair. Both are staged complete and flushed, then the picture's rename commits the save and the thumbnail's rename follows. Before any picture call, the store finishes a commit that stopped after the picture's rename and discards one that stopped before it, so a listing never pairs a picture with another save's thumbnail.
 - The main process follows no link under the data directory. A path with a symbolic link or junction anywhere below `<userData>/data/` is refused with `forbidden`, and a linked picture file is left out of a listing. Reads stop at the size cap of their kind.
 - The Electron build keeps data under `<userData>/data/`: `app.json`, `profiles.json`, and `profile/<id>/` with `settings.json`, `progress.json`, `activity/<activity-id>.json`, and `pictures/` with a `trash/` folder. The browser build keeps the same names in IndexedDB.
 - In a test run the page exposes the bridge it uses as `window.wkcTest.bridge`. The Electron app does this only with `WKC_TEST=1`. The browser build does it with a `wkc-test` query parameter, which grants nothing the page could not already do.

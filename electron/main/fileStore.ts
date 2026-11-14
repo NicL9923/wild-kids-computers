@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { copyFile, lstat, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import {
   BridgeError,
@@ -27,7 +27,7 @@ import {
   type DocumentName,
   type PicturePlace,
 } from '../../src/core/platform/names.ts';
-import { errorCode, KeyedQueue, writeFileAtomic } from './atomicWrite.ts';
+import { errorCode, KeyedQueue, renameWithRetry, writeFileAtomic } from './atomicWrite.ts';
 
 export interface FileStoreOptions {
   now?: () => number;
@@ -36,6 +36,10 @@ export interface FileStoreOptions {
 
 const PICTURE_SUFFIX = '.png';
 const THUMBNAIL_SUFFIX = '.thumb.png';
+/** A complete new file waiting to replace the file named before this suffix. */
+const STAGED_SUFFIX = '.staged';
+/** What writeFileAtomic leaves behind when the app stops during a write. */
+const TEMPORARY_SUFFIX = '.tmp';
 
 /**
  * Documents and pictures as files under one root directory. Every path comes from
@@ -49,6 +53,8 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
   const now = options.now ?? Date.now;
   const newId = options.newId ?? randomUUID;
   const queue = new KeyedQueue();
+  /** Profiles whose picture folder has had leftovers from an interrupted save cleared. */
+  const recovered = new Set<string>();
 
   function inside(segments: string[]): string {
     const resolved = path.resolve(root, ...segments);
@@ -119,6 +125,57 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     return target.picture;
   }
 
+  /**
+   * Clears what an interrupted save or copy left in a profile's gallery folder: a staged
+   * thumbnail whose picture already committed is renamed into place, staged files of a save that
+   * never reached its commit are removed, and so are temporary files. Runs inside the gallery
+   * queue, so no save of this process is in flight.
+   */
+  async function recoverPictures(profileId: string): Promise<void> {
+    if (recovered.has(profileId)) return;
+    const dir = await unlinked(pictureDirName(profileId, 'gallery'));
+    let names: string[];
+    try {
+      names = await readdir(dir);
+    } catch (error) {
+      if (errorCode(error) !== 'ENOENT') throw error;
+      names = [];
+    }
+    const present = new Set(names);
+    for (const name of names) {
+      if (name.endsWith(TEMPORARY_SUFFIX)) await rm(path.join(dir, name), { force: true });
+    }
+    for (const name of names) {
+      if (!name.endsWith(PICTURE_SUFFIX + STAGED_SUFFIX) || name.endsWith(THUMBNAIL_SUFFIX + STAGED_SUFFIX)) continue;
+      const id = name.slice(0, -(PICTURE_SUFFIX + STAGED_SUFFIX).length);
+      await discardStaged({
+        picture: path.join(dir, name),
+        thumbnail: path.join(dir, `${id}${THUMBNAIL_SUFFIX}${STAGED_SUFFIX}`),
+      });
+      present.delete(`${id}${THUMBNAIL_SUFFIX}${STAGED_SUFFIX}`);
+    }
+    for (const name of present) {
+      if (!name.endsWith(THUMBNAIL_SUFFIX + STAGED_SUFFIX)) continue;
+      const file = path.join(dir, name);
+      await unlinked(file);
+      await renameWithRetry(file, file.slice(0, -STAGED_SUFFIX.length));
+    }
+    recovered.add(profileId);
+  }
+
+  /** Runs a picture operation in the profile's queue, after recovery, and recovers again after a failure. */
+  async function inPictureQueue<T>(profileId: string, operation: () => Promise<T>): Promise<T> {
+    return queue.run(pictureDirName(profileId, 'gallery'), async () => {
+      await recoverPictures(profileId);
+      try {
+        return await operation();
+      } catch (error) {
+        recovered.delete(profileId);
+        throw error;
+      }
+    });
+  }
+
   const documents: DocumentStore = {
     async read(name) {
       const file = await documentPath(name);
@@ -166,86 +223,91 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
     async save(profileId, input: SavePictureInput) {
       checkPng(input.png, MAX_PICTURE_BYTES, 'picture');
       checkPng(input.thumbnail, MAX_THUMBNAIL_BYTES, 'thumbnail');
-      const dir = pictureDirName(profileId, 'gallery');
-      return queue.run(dir, async () => {
+      return inPictureQueue(profileId, async () => {
         const id = input.id ?? newId();
         const files =
           input.id === undefined
             ? await pictureFiles(profileId, 'gallery', id)
             : await requirePicture(profileId, 'gallery', id);
-        await writeFileAtomic(files.thumbnail, input.thumbnail);
-        await writeFileAtomic(files.picture, input.png);
+        await commitPair(files, input.png, input.thumbnail);
         return summary(files.picture, id);
       });
     },
 
-    async list(profileId, place) {
-      const dir = await unlinked(pictureDirName(profileId, place));
-      let names: string[];
-      try {
-        names = await readdir(dir);
-      } catch (error) {
-        if (errorCode(error) === 'ENOENT') return [];
-        throw error;
-      }
-      const ids = names
-        .filter((name) => name.endsWith(PICTURE_SUFFIX) && !name.endsWith(THUMBNAIL_SUFFIX))
-        .map((name) => name.slice(0, -PICTURE_SUFFIX.length))
-        .filter((id) => isSafeId(id));
-      const summaries = await Promise.all(ids.map((id) => listed(path.join(dir, `${id}${PICTURE_SUFFIX}`), id)));
-      return summaries
-        .filter((item) => item !== null)
-        .toSorted((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
-    },
-
-    async read(profileId, id, file) {
-      for (const place of ['gallery', 'trash'] as const) {
-        const target = (await pictureFiles(profileId, place, id))[file];
-        let bytes: Uint8Array;
+    list(profileId, place) {
+      return inPictureQueue(profileId, async () => {
+        const dir = await unlinked(pictureDirName(profileId, place));
+        let names: string[];
         try {
-          bytes = await readCapped(
-            target,
-            file === 'picture' ? MAX_PICTURE_BYTES : MAX_THUMBNAIL_BYTES,
-            `saved ${file}`,
-          );
+          names = await readdir(dir);
         } catch (error) {
-          if (errorCode(error) === 'ENOENT') continue;
+          if (errorCode(error) === 'ENOENT') return [];
           throw error;
         }
-        if (!hasPngSignature(bytes))
-          throw new BridgeError('io', `The saved ${file} for picture ${id} is not a PNG file.`);
-        return bytes;
-      }
-      throw new BridgeError('not-found', `No ${file} for picture ${id}.`);
+        const ids = names
+          .filter((name) => name.endsWith(PICTURE_SUFFIX) && !name.endsWith(THUMBNAIL_SUFFIX))
+          .map((name) => name.slice(0, -PICTURE_SUFFIX.length))
+          .filter((id) => isSafeId(id));
+        const summaries = await Promise.all(ids.map((id) => listed(path.join(dir, `${id}${PICTURE_SUFFIX}`), id)));
+        return summaries
+          .filter((item) => item !== null)
+          .toSorted((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
+      });
+    },
+
+    read(profileId, id, file) {
+      return inPictureQueue(profileId, async () => {
+        for (const place of ['gallery', 'trash'] as const) {
+          const target = (await pictureFiles(profileId, place, id))[file];
+          let bytes: Uint8Array;
+          try {
+            bytes = await readCapped(
+              target,
+              file === 'picture' ? MAX_PICTURE_BYTES : MAX_THUMBNAIL_BYTES,
+              `saved ${file}`,
+            );
+          } catch (error) {
+            if (errorCode(error) === 'ENOENT') continue;
+            throw error;
+          }
+          if (!hasPngSignature(bytes))
+            throw new BridgeError('io', `The saved ${file} for picture ${id} is not a PNG file.`);
+          return bytes;
+        }
+        throw new BridgeError('not-found', `No ${file} for picture ${id}.`);
+      });
     },
 
     async copy(profileId, id) {
-      const dir = pictureDirName(profileId, 'gallery');
-      return queue.run(dir, async () => {
+      return inPictureQueue(profileId, async () => {
         const source = await requirePicture(profileId, 'gallery', id);
+        const png = await readCapped(source.picture, MAX_PICTURE_BYTES, 'saved picture');
+        const thumbnail = await readCapped(source.thumbnail, MAX_THUMBNAIL_BYTES, 'saved thumbnail').catch(
+          (error: unknown) => {
+            if (errorCode(error) === 'ENOENT') return null;
+            throw error;
+          },
+        );
         const copyId = newId();
         const target = await pictureFiles(profileId, 'gallery', copyId);
-        await copyFile(source.thumbnail, target.thumbnail).catch((error: unknown) => {
-          if (errorCode(error) !== 'ENOENT') throw error;
-        });
-        await copyFile(source.picture, target.picture);
+        await commitPair(target, png, thumbnail);
         return summary(target.picture, copyId);
       });
     },
 
     async trash(profileId, id) {
-      await queue.run(pictureDirName(profileId, 'gallery'), () => move(profileId, id, 'gallery', 'trash'));
+      await inPictureQueue(profileId, () => move(profileId, id, 'gallery', 'trash'));
     },
 
     async restore(profileId, id) {
-      return queue.run(pictureDirName(profileId, 'gallery'), async () => {
+      return inPictureQueue(profileId, async () => {
         const file = await move(profileId, id, 'trash', 'gallery');
         return summary(file, id);
       });
     },
 
     async purge(profileId, id) {
-      await queue.run(pictureDirName(profileId, 'gallery'), async () => {
+      await inPictureQueue(profileId, async () => {
         const files = await requirePicture(profileId, 'trash', id);
         await rm(files.thumbnail, { force: true });
         await rm(files.picture, { force: true });
@@ -259,6 +321,57 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
 function requireId(value: string, label: string): string {
   if (!isSafeId(value)) throw new BridgeError('invalid-argument', `${label} is not a safe id.`);
   return value;
+}
+
+/**
+ * Writes a picture and its thumbnail so that a crash or failure at any step leaves the old pair
+ * or the new pair, never one of each. Both files are staged complete and flushed first. The
+ * picture's rename is the commit point: while its staged file exists nothing has changed, and
+ * once it is gone the staged thumbnail only needs its rename. `recoverPictures` finishes or
+ * discards what a stopped commit left.
+ */
+async function commitPair(files: Record<PictureFile, string>, png: Uint8Array, thumbnail: Uint8Array | null) {
+  const staged = { picture: files.picture + STAGED_SUFFIX, thumbnail: files.thumbnail + STAGED_SUFFIX };
+  try {
+    await writeFileAtomic(staged.picture, png);
+    if (thumbnail !== null) await writeFileAtomic(staged.thumbnail, thumbnail);
+    await syncDirectory(path.dirname(files.picture));
+  } catch (error) {
+    await discardStaged(staged);
+    throw error;
+  }
+  try {
+    await renameWithRetry(staged.picture, files.picture);
+  } catch (error) {
+    await discardStaged(staged);
+    throw error;
+  }
+  if (thumbnail === null) {
+    await rm(files.thumbnail, { force: true });
+    return;
+  }
+  await syncDirectory(path.dirname(files.picture));
+  await renameWithRetry(staged.thumbnail, files.thumbnail);
+}
+
+/** Removes staged files, the thumbnail first, so a stop halfway still reads as "never committed". */
+async function discardStaged(staged: Record<PictureFile, string>): Promise<void> {
+  await rm(staged.thumbnail, { force: true });
+  await rm(staged.picture, { force: true });
+}
+
+/**
+ * Flushes a directory's entries, so a rename is on disk before the next one. Windows cannot
+ * open a directory for this and orders its own metadata writes, so it skips the flush.
+ */
+async function syncDirectory(dir: string): Promise<void> {
+  if (process.platform === 'win32') return;
+  const handle = await open(dir, 'r');
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
 }
 
 function linkError(): BridgeError {
