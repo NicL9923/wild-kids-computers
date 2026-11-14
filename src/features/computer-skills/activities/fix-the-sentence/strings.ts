@@ -1,0 +1,52 @@
+import { defineStrings } from '../../../../core/strings/defineStrings.ts';
+
+export const strings = defineStrings('fix-the-sentence', {
+  title: { text: 'Fix the sentence' },
+  goal: {
+    text: 'Moves the cursor and uses Backspace, Delete, and selection to correct a sentence.',
+    silent: 'parent',
+  },
+  instruction: { text: 'Change the sentence in the box so it says the right thing.' },
+  itSays: { text: 'Make it say:' },
+  shouldSay: { text: 'It should say', silent: 'decorative' },
+  box: { text: 'The sentence to fix', silent: 'decorative' },
+  keys: { text: 'Keys that help', silent: 'decorative' },
+  // Tips, one per kind of slip. Mac keyboards call Backspace "delete".
+  tipBackspace: { text: 'Press Backspace once to take out the extra letter.' },
+  tipBackspaceMac: { text: 'Press delete once to take out the extra letter.' },
+  tipDelete: { text: 'Press Delete once to take out the extra letter after the line.' },
+  tipDeleteMac: { text: 'Hold fn and press delete to take out the extra letter after the line.' },
+  tipExtraLetter: { text: 'Move with the arrow keys, then take out the extra letter.' },
+  tipMissing: { text: 'Move with the arrow keys to the gap and type the letter that belongs there.' },
+  tipChangedLetter: { text: 'Move to the letter that does not belong and change it.' },
+  tipExtraWord: { text: 'Hold Shift and press an arrow key to select the extra word, then take it out.' },
+  tipChangedWord: {
+    text: 'Hold Shift and press an arrow key to select the word that does not belong, then type the right one.',
+  },
+  tipFind: { text: 'Find the part that is different and change it.' },
+  showMark: { text: 'The mark shows what to change.' },
+  fixed: { text: 'Now it says the right thing.' },
+  // Key caps.
+  capLeft: { text: '←', silent: 'decorative' },
+  capRight: { text: '→', silent: 'decorative' },
+  capShift: { text: 'Shift', silent: 'decorative' },
+  capBackspace: { text: 'Backspace', silent: 'decorative' },
+  capBackspaceMac: { text: 'delete', silent: 'decorative' },
+  capDelete: { text: 'Delete', silent: 'decorative' },
+  capDeleteMac: { text: 'fn + delete', silent: 'decorative' },
+  // The sentences, said as they should be.
+  catNaps: { text: 'The cat naps in the sun.' },
+  frogJumps: { text: 'A frog can jump far.' },
+  busPark: { text: 'We ride the bus to the park.' },
+  kiteColors: { text: 'My kite is red and blue.' },
+  foxLog: { text: 'The fox hides in a log.' },
+  milkBowl: { text: 'I put milk in my bowl.' },
+  shipSails: { text: 'The ship sails on the sea.' },
+  snowTent: { text: 'Snow fell on the tent.' },
+  birdSings: { text: 'The bird sings in the tree.' },
+  dadReads: { text: 'Dad reads me a book.' },
+  plantSeeds: { text: 'We plant seeds in spring.' },
+  owlSleeps: { text: 'The owl sleeps all day.' },
+  frogsPond: { text: 'Two frogs swim in the pond.' },
+  grandmaCake: { text: 'Grandma bakes a big cake.' },
+});
