@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: 'v8',
         include: ['src/**', 'electron/**', 'tools/**'],
-        exclude: ['**/*.test.{ts,tsx}', '**/testing/**', 'tools/test/**', 'src/main.tsx'],
+        exclude: ['**/*.test.{ts,tsx}', '**/testing/**', 'tools/test/**', 'src/main.tsx', '**/*.md'],
         reporter: ['text-summary', 'html', 'json-summary'],
       },
     },

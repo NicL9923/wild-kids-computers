@@ -112,12 +112,15 @@ export async function frames(page: Page): Promise<void> {
 const PROFILE_ID = 'e2e-child';
 
 /** Gallery picture ids of the test profile, newest first, read through the app's own bridge. */
-export async function galleryIds(page: Page): Promise<string[]> {
-  return page.evaluate(async (profileId) => {
-    const bridge = window.wkcTest?.bridge;
-    if (bridge === undefined) return [];
-    return (await bridge.pictures.list(profileId, 'gallery')).map((picture) => picture.id);
-  }, PROFILE_ID);
+export async function galleryIds(page: Page, place: 'gallery' | 'trash' = 'gallery'): Promise<string[]> {
+  return page.evaluate(
+    async ({ profileId, where }) => {
+      const bridge = window.wkcTest?.bridge;
+      if (bridge === undefined) return [];
+      return (await bridge.pictures.list(profileId, where)).map((picture) => picture.id);
+    },
+    { profileId: PROFILE_ID, where: place },
+  );
 }
 
 /** A coloring page's points, read from its entry file, so the test does not ask the page for answers. */

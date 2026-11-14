@@ -258,6 +258,24 @@ test('a picture put in the trash comes back with one click', async () => {
   expect(await galleryIds(page)).toHaveLength(1);
 });
 
+test('a picture left in the trash is gone for good once the gallery closes', async () => {
+  const page = await start('band-6-8');
+  await chooseTool(page, strings['tool-fill'].text);
+  const at = await screenPoint(page, 800, 500);
+  await page.mouse.click(at.x, at.y);
+  await expect.poll(() => galleryIds(page), { timeout: 10_000 }).toHaveLength(1);
+
+  await button(page, strings.gallery.text).click();
+  const cards = page.getByRole('list', { name: strings.galleryTitle.text }).getByRole('listitem');
+  await cards.first().getByRole('button', { name: strings.deletePicture.text }).click();
+  await expect(cards).toHaveCount(0);
+  expect(await galleryIds(page, 'trash')).toHaveLength(1);
+
+  await button(page, strings.backToPainting.text).click();
+  await expect(page.locator('.wk-paint-screen[data-ready="true"] canvas[data-layer="paint"]')).toBeVisible();
+  await expect.poll(() => galleryIds(page, 'trash')).toEqual([]);
+});
+
 test('band-3-5 shows only brush, stamps, fill, eraser, and effects, as pictures', async () => {
   const page = await start('band-3-5');
   const tools = page.getByRole('toolbar', { name: strings.tools.text }).getByRole('button');
