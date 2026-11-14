@@ -127,6 +127,8 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
 
   const markSolved = () => {
     setSolved(true);
+    // The next picture opens now, whether the child goes on or stays here and leaves later.
+    if (puzzle !== null) kit.stepSolved();
     kit.feedback.correct(paper.current === null ? {} : { at: paper.current });
     void kit.speakSequence([feedback.youDidIt, strings.choose]);
   };

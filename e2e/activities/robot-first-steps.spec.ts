@@ -11,6 +11,7 @@ import { RESULT_PAUSE_MS } from '../../src/features/robot-painter/timing.ts';
 import { buildProgram } from '../../src/features/robot-painter/engine/validate.ts';
 import { draft as d } from '../../src/features/robot-painter/engine/program.ts';
 import { expectAccessible } from '../support/accessibility.ts';
+import { savedFurthestStep } from '../support/sequenceStep.ts';
 import {
   expectInstructionSpoken,
   forEachBand,
@@ -106,6 +107,17 @@ forEachBand(activity.bands, (band) => {
     await expect(page.locator('[data-choice="next"]')).toBeVisible();
     await saveBandScreenshot(page, band, activity.id, 'solved');
     await expectAccessible(page);
+  });
+
+  test('a solved picture opens the next one even when the child stays', async () => {
+    launched = await openRobot({ activity: activity.id, band });
+    const { page } = launched;
+    const step = puzzle(0);
+    await pressSolution(page, step);
+    await page.locator('[data-choice="stay"]').click();
+    await expect(page.locator('[data-choice="next"]')).toHaveCount(0);
+    const open = launched;
+    await expect.poll(() => savedFurthestStep(open, activity.id)).toBe(1);
   });
 
   test('a plan that misses the picture is spoken about, and the robot goes back with the plan kept', async () => {

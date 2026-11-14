@@ -258,20 +258,22 @@ function Round({
   level,
   player,
   onRoundComplete,
+  onStepSolved = noSteps(definition.id),
 }: {
   definition: ActivityDefinition;
   band: Band;
   level: unknown;
   player: Player;
   onRoundComplete: RoundCompleteHandler;
+  onStepSolved?: () => void;
 }) {
   const scope = useScope();
   const [tally] = useState(createTally);
   const { host, startInstruction, state, reducedMotion, pictures } = player;
   // Rebuilt when the saved state, motion, or pictures change; the tally keeps the round's counts.
   const kit = useMemo(
-    () => createKit({ scope, host, tally, onRoundComplete, state, reducedMotion, pictures }),
-    [scope, host, tally, onRoundComplete, state, reducedMotion, pictures],
+    () => createKit({ scope, host, tally, onRoundComplete, onStepSolved, state, reducedMotion, pictures }),
+    [scope, host, tally, onRoundComplete, onStepSolved, state, reducedMotion, pictures],
   );
 
   useEffect(() => {
@@ -280,6 +282,13 @@ function Round({
   }, [scope, host, startInstruction]);
 
   return <RoundComponent definition={definition} level={level} band={band} kit={kit} />;
+}
+
+/** The stepSolved handler of an activity that is not a sequence. */
+function noSteps(activityId: string): () => void {
+  return () => {
+    throw new Error(`Activity ${activityId} has no steps: stepSolved is for sequence activities.`);
+  };
 }
 
 /** Renders the activity's lazy component. */
@@ -431,6 +440,11 @@ function SequenceRun({
   const onRoundComplete = useCallback(() => {
     setPhase((current) => (current.kind === 'playing' && !current.ended ? { ...current, ended: true } : current));
   }, []);
+  // Solving opens the next step at once; the record never moves back, so solving an earlier step
+  // again changes nothing.
+  const onStepSolved = useCallback(() => {
+    if (step !== null) progress.recordStep(definition.id, Math.min(step + 1, lastStep));
+  }, [definition.id, lastStep, progress, step]);
 
   const ended = phase.kind === 'playing' && phase.ended;
   useEffect(() => {
@@ -465,6 +479,7 @@ function SequenceRun({
         level={level}
         player={player}
         onRoundComplete={onRoundComplete}
+        onStepSolved={onStepSolved}
       />
     </Frame>
   );

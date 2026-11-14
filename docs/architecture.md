@@ -262,11 +262,11 @@ e2e/activities/<activity-id>.spec.ts
 
 ### Activity kinds
 
-| Kind       | Shape                                                                                                                                                            | Examples                                                  |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `rounds`   | The kit generates a level from a seed and a difficulty, the child plays it, and the difficulty model adjusts. A finish screen follows `roundsPerSession` rounds. | Most activities                                           |
-| `sequence` | An ordered list of authored steps. The kit saves the furthest step and lets the child pick any step up to it. No difficulty model.                               | Typing course, shortcut workshop, each robot painter tier |
-| `free`     | Open play with no rounds and no finish screen.                                                                                                                   | Robot free mode, toy desktop free play                    |
+| Kind       | Shape                                                                                                                                                                                           | Examples                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `rounds`   | The kit generates a level from a seed and a difficulty, the child plays it, and the difficulty model adjusts. A finish screen follows `roundsPerSession` rounds.                                | Most activities                                           |
+| `sequence` | An ordered list of authored steps. The kit saves the furthest step and lets the child pick any step up to it. `kit.stepSolved()` opens the next step before the step ends. No difficulty model. | Typing course, shortcut workshop, each robot painter tier |
+| `free`     | Open play with no rounds and no finish screen.                                                                                                                                                  | Robot free mode, toy desktop free play                    |
 
 Robot painter has one `sequence` activity per tier and one `free` activity. Each puzzle is a step, with a unit test that its reference solution solves it. Each toy desktop lesson is its own activity.
 

@@ -49,6 +49,9 @@ function Fixture({ level, kit }: ActivityProps<string, { taps: number }>) {
       <button type='button' onClick={() => kit.roundComplete()}>
         done
       </button>
+      <button type='button' onClick={() => kit.stepSolved()}>
+        solved
+      </button>
       <button type='button' onClick={() => kit.feedback.wrong()}>
         wrong
       </button>
@@ -396,6 +399,24 @@ describe('a sequence activity', () => {
     expect((await level()).textContent).toBe('step 1');
   });
 
+  it('opens the next step as soon as a step is solved, even when the child stays', async () => {
+    const h = await run(sequence);
+    expect((await level()).textContent).toBe('step 0');
+    click('solved');
+    expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(1);
+    await advance(BETWEEN_ROUNDS_MS);
+    // Still on the solved step: solving does not end it.
+    expect((await level()).textContent).toBe('step 0');
+  });
+
+  it('never lowers the furthest step when an earlier step is solved again', async () => {
+    const h = await run(sequence, { furthestStep: 2 });
+    fireEvent.click(await screen.findByRole('button', { name: '1' }));
+    await level();
+    click('solved');
+    expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(2);
+  });
+
   it('lets a child who reached a later step pick any step up to it, and no further', async () => {
     await run(sequence, { furthestStep: 1 });
     // Steps one and two are shown; step three is not reached yet and is not shown at all.
@@ -414,6 +435,22 @@ describe('a sequence activity', () => {
     expect(h.store.getSnapshot().progress.activities[sequence.id]?.furthestStep).toBe(2);
     await advance(BETWEEN_ROUNDS_MS);
     expect(await screen.findByRole('button', { name: '3' })).toBeTruthy();
+  });
+});
+
+describe('stepSolved outside a sequence', () => {
+  it('throws for a rounds activity, which has no steps to open', async () => {
+    await run(rounds);
+    await level();
+    const errors: unknown[] = [];
+    const onError = (event: ErrorEvent) => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener('error', onError);
+    click('solved');
+    window.removeEventListener('error', onError);
+    expect(String(errors[0])).toMatch(/run-rounds has no steps/);
   });
 });
 
