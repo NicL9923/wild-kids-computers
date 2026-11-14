@@ -7,7 +7,7 @@ export function localDateKey(date: Date): string {
   return `${String(date.getFullYear()).padStart(4, '0')}-${month}-${day}`;
 }
 
-export function emptyActivityProgress(): ActivityProgress {
+function emptyActivityProgress(): ActivityProgress {
   return { recentRounds: [], daysPracticed: [] };
 }
 

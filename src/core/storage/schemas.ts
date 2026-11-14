@@ -26,7 +26,7 @@ export const parentPinSchema = z.object({
 
 export type ParentPinRecord = z.infer<typeof parentPinSchema>;
 
-export const appSchema = z.object({
+const appSchema = z.object({
   version: z.literal(1),
   firstLaunchDone: z.boolean(),
   kioskLock: z.boolean(),
@@ -53,9 +53,9 @@ export const appDocument = defineDocument<AppDocument>({
 // ---- profiles -----------------------------------------------------------------------------
 
 export const MAX_PROFILES = 24;
-export const MAX_PROFILE_NAME_LENGTH = 40;
+const MAX_PROFILE_NAME_LENGTH = 40;
 
-export const profileSchema = z.object({
+const profileSchema = z.object({
   id: safeId,
   avatarId: safeId,
   colorId: safeId,
@@ -65,7 +65,7 @@ export const profileSchema = z.object({
 
 export type Profile = z.infer<typeof profileSchema>;
 
-export const profilesSchema = z.object({
+const profilesSchema = z.object({
   version: z.literal(1),
   profiles: z
     .array(profileSchema)
@@ -84,15 +84,15 @@ export const profilesDocument = defineDocument<ProfilesDocument>({
 
 // ---- profile/<id>/settings ----------------------------------------------------------------
 
-export const TEXT_SIZES = ['standard', 'large', 'larger'] as const;
-export const LETTER_SPACINGS = ['standard', 'wide', 'wider'] as const;
-export const REDUCED_MOTION = ['system', 'on', 'off'] as const;
-export const MIN_SESSION_MINUTES = 5;
-export const MAX_SESSION_MINUTES = 240;
+const TEXT_SIZES = ['standard', 'large', 'larger'] as const;
+const LETTER_SPACINGS = ['standard', 'wide', 'wider'] as const;
+const REDUCED_MOTION = ['system', 'on', 'off'] as const;
+const MIN_SESSION_MINUTES = 5;
+const MAX_SESSION_MINUTES = 240;
 
 const volume = z.number().min(0).max(1);
 
-export const settingsSchema = z.object({
+const settingsSchema = z.object({
   version: z.literal(1),
   voiceVolume: volume,
   effectsVolume: volume,
@@ -132,11 +132,16 @@ export const settingsDocument = defineDocument<Settings>({
 export const RECENT_ROUNDS = 10;
 /** How many practice dates each activity keeps, a little over a year of daily play. */
 export const MAX_DAYS_PRACTICED = 400;
+/**
+ * The difficulty scale. The difficulty model works within it.
+ * @public
+ */
 export const MIN_DIFFICULTY = 1;
+/** @public */
 export const MAX_DIFFICULTY = 10;
 
 /** A local calendar date, YYYY-MM-DD, that exists. */
-export const localDateSchema = z.string().refine((value) => {
+const localDateSchema = z.string().refine((value) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (match === null) return false;
   const year = Number(match[1]);
@@ -146,13 +151,17 @@ export const localDateSchema = z.string().refine((value) => {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }, 'must be a real date as YYYY-MM-DD');
 
-export const roundOutcomeSchema = z.object({
+const roundOutcomeSchema = z.object({
   mistakes: z.int().min(0),
   hintsUsed: z.int().min(0),
   /** Milliseconds since the epoch when the round finished. */
   at: z.int().min(0),
 });
 
+/**
+ * One finished round, as the difficulty model reads it.
+ * @public
+ */
 export type RoundOutcome = z.infer<typeof roundOutcomeSchema>;
 
 // Long lists are trimmed, not rejected, so one busy year never resets every activity's progress.
@@ -169,7 +178,7 @@ export const activityProgressSchema = z.object({
 
 export type ActivityProgress = z.infer<typeof activityProgressSchema>;
 
-export const progressSchema = z.object({
+const progressSchema = z.object({
   version: z.literal(1),
   activities: z.record(safeId, activityProgressSchema),
 });

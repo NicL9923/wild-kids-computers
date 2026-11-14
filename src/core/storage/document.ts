@@ -22,7 +22,7 @@ export function defineDocument<T>(spec: DocumentSpec<T>): DocumentSpec<T> {
   return spec;
 }
 
-export type ParseFailureReason =
+type ParseFailureReason =
   | 'too-large'
   | 'invalid-json'
   | 'not-an-object'
@@ -89,7 +89,7 @@ function describe(value: unknown): string {
   return typeof value === 'string' ? `the string ${JSON.stringify(value)}` : typeof value;
 }
 
-export type LoadStatus =
+type LoadStatus =
   /** The saved document was valid and current. */
   | 'loaded'
   /** The saved document was valid after migration. Save it to store the new version. */

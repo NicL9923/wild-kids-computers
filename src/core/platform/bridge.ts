@@ -18,7 +18,7 @@ export interface PlatformBridge {
 
 export type OsFamily = 'mac' | 'windows' | 'linux';
 
-export interface PlatformInfo {
+interface PlatformInfo {
   /** The operating system family, so shortcut lessons show the right modifier key. */
   os: OsFamily;
   appVersion: string;
@@ -77,7 +77,7 @@ export interface WindowState {
   kioskLock: boolean;
 }
 
-export interface WindowControl {
+interface WindowControl {
   getState(): Promise<WindowState>;
   setFullscreen(on: boolean): Promise<WindowState>;
   /** Fullscreen, plus a close request goes to the renderer instead of closing. Best effort. */
@@ -96,7 +96,7 @@ export interface WindowControl {
 export type ExportResult = 'saved' | 'cancelled';
 export type PrintResult = 'printed' | 'cancelled';
 
-export interface PictureOutput {
+interface PictureOutput {
   /** Saves a PNG where the adult chooses. `fileStem` must pass isExportFileStem. */
   exportPicture(png: Uint8Array, fileStem: string): Promise<ExportResult>;
   printPicture(png: Uint8Array): Promise<PrintResult>;

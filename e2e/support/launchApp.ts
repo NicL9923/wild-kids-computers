@@ -102,7 +102,7 @@ async function writeReadyProfile(dataDir: string, band: Band): Promise<void> {
 }
 
 /** Writes a document where the main process reads it, using the shared name-to-file mapping. */
-export async function writeDocumentFile(dataDir: string, name: DocumentName, text: string): Promise<void> {
+async function writeDocumentFile(dataDir: string, name: DocumentName, text: string): Promise<void> {
   const parsed = parseDocumentName(name);
   if (parsed === null) throw new Error(`Not a document name: ${name}`);
   const file = path.join(dataDir, ...documentFileSegments(parsed));

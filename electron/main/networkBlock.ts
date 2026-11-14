@@ -9,7 +9,7 @@ import type { CommandLine, Session } from 'electron';
 export const DEAD_PROXY = '127.0.0.1:9';
 
 /** Where the spellchecker would download dictionaries. The address is unroutable. */
-export const DEAD_DICTIONARY_URL = 'http://0.0.0.0/';
+const DEAD_DICTIONARY_URL = 'http://0.0.0.0/';
 
 export interface NetworkPolicy {
   /** The Vite dev server, set only for an unpackaged dev run. */

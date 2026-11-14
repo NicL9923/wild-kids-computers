@@ -1,7 +1,7 @@
 import type { WindowState } from '../../src/core/platform/bridge.ts';
 
 /** How long the renderer has to say it is showing the parent gate before a close goes through. */
-export const CLOSE_ACK_TIMEOUT_MS = 3_000;
+const CLOSE_ACK_TIMEOUT_MS = 3_000;
 
 /** The parts of BrowserWindow the kiosk lock uses. */
 export interface LockableWindow {

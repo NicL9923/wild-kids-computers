@@ -1,7 +1,7 @@
 import type { PlatformBridge } from '../core/platform/bridge.ts';
 
 /** What end-to-end tests reach from the page. Present only in a test run. */
-export interface WkcTestHook {
+interface WkcTestHook {
   bridge: PlatformBridge;
 }
 

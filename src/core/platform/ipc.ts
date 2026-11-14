@@ -42,7 +42,7 @@ type Leaf<Path extends string> = Path extends `${infer Group}.${infer Method}`
 
 type AsyncFunction = (...args: never[]) => Promise<unknown>;
 
-export type MethodSignature<M extends BridgeMethod> = Leaf<M> extends AsyncFunction ? Leaf<M> : never;
+type MethodSignature<M extends BridgeMethod> = Leaf<M> extends AsyncFunction ? Leaf<M> : never;
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; code: BridgeErrorCode; message: string };
 

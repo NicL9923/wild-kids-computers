@@ -108,7 +108,7 @@ function requirePng(bytes: unknown, max: number, label: string): Uint8Array {
   return bytes;
 }
 
-export function osFamilyFromPlatform(platform: string): OsFamily {
+function osFamilyFromPlatform(platform: string): OsFamily {
   if (/mac|iphone|ipad/i.test(platform)) return 'mac';
   if (/win/i.test(platform)) return 'windows';
   return 'linux';

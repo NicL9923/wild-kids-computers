@@ -7,6 +7,10 @@
  *   from another program would carry system data in.
  */
 
+/**
+ * What the toy clipboard holds. Text for now; toy apps may add kinds.
+ * @public
+ */
 export interface ToyClipboardContent {
   kind: 'text';
   text: string;
@@ -38,7 +42,10 @@ export function createToyClipboard(): ToyClipboard {
   };
 }
 
-/** The app's one toy clipboard. Toy desktop apps and lessons read and write it. */
+/**
+ * The app's one toy clipboard. Toy desktop apps and lessons read and write it.
+ * @public
+ */
 export const toyClipboard: ToyClipboard = createToyClipboard();
 
 type TextControl = HTMLInputElement | HTMLTextAreaElement;
