@@ -335,7 +335,7 @@ Build activities from DOM and SVG elements with real buttons and labels. Use `<c
 - **Random effects.** Effects that scatter things take a seed.
 - **Undo.** The canvas is divided into 64 px tiles. An operation copies a tile the first time it touches it, so a stroke stores only the tiles it changed. Undo swaps the saved tiles with the current pixels, so a step holds one copy. A step that replaces the document, such as "Start over" or opening a coloring page, also saves the mask. The cap is set in bytes, and a test proves that 30 full-canvas steps fit under it.
 - **Input.** The studio reads `getCoalescedEvents()` and feeds every point to the tool. Once per animation frame it calls `putImageData` with the document-sized `ImageData` and the changed rectangle, so no pixels are copied to build a frame.
-- **Worker.** The studio runs whole-picture effects in a Web Worker so the screen never freezes. The engine itself stays synchronous, and tests call it directly.
+- **Worker.** The studio runs whole-picture effects and the autosave PNG encoding in a Web Worker so the screen never freezes and a fill never waits for a save. The engine itself stays synchronous, and tests call it directly.
 - **Sticky pen.** A click without movement puts the pen down, and the next click lifts it. Press, drag, and release also works. This is the click alternative to drag for every paint tool.
 
 A registry test fails when a tool, tip, or effect has no golden image test. [src/core/paint/README.md](../src/core/paint/README.md) explains the API and how to add a tool, tip, or effect.

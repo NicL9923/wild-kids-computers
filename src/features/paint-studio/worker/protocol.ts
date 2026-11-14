@@ -1,6 +1,15 @@
-/** Messages between the studio and the whole-picture effect worker. */
+/** Messages between the studio and its worker: whole-picture effects and gallery files. */
 export type EffectRequest =
   | { readonly kind: 'warm'; readonly id: number }
+  | {
+      readonly kind: 'encode';
+      readonly id: number;
+      readonly width: number;
+      readonly height: number;
+      readonly paint: Uint8ClampedArray;
+      readonly mask: Uint8ClampedArray | null;
+      readonly pageId: string | null;
+    }
   | {
       readonly kind: 'apply';
       readonly id: number;
@@ -13,4 +22,5 @@ export type EffectRequest =
 export type EffectResponse =
   | { readonly kind: 'ready'; readonly id: number }
   | { readonly kind: 'result'; readonly id: number; readonly pixels: Uint8ClampedArray }
+  | { readonly kind: 'encoded'; readonly id: number; readonly png: Uint8Array; readonly thumbnail: Uint8Array }
   | { readonly kind: 'error'; readonly id: number; readonly message: string };

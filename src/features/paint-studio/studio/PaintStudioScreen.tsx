@@ -176,7 +176,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   // The timers, frames, and worker live as long as the screen.
   useEffect(() => {
     const scope = createScope(kitScheduler);
-    const runner = createEffectRunner(startEffectWorker);
+    const runner = createEffectRunner(startEffectWorker, encodePicture);
     let live = true;
     void (async () => {
       await runner.warm();
@@ -191,9 +191,14 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }, []);
 
   const makeSaver = useCallback(
-    (owner: StudioDocument, id: string | null, savedVersion: number, scope: OwnedScope) =>
+    (owner: StudioDocument, id: string | null, savedVersion: number, { scope, runner }: StudioRuntime) =>
       new Autosaver(
-        { scope, delayMs: AUTOSAVE_DELAY_MS, encode: () => encodePicture(owner), save: pictures.save },
+        {
+          scope,
+          delayMs: AUTOSAVE_DELAY_MS,
+          encode: () => runner.encode(owner.doc, owner.pageId),
+          save: pictures.save,
+        },
         id,
         savedVersion,
       ),
@@ -205,7 +210,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     (next: StudioDocument, id: string | null, savedVersion: number) => {
       if (runtime === null) return;
       void saverRef.current?.flush();
-      saverRef.current = makeSaver(next, id, savedVersion, runtime.scope);
+      saverRef.current = makeSaver(next, id, savedVersion, runtime);
       setStudio(next);
     },
     [makeSaver, runtime],

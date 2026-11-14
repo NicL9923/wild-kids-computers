@@ -47,16 +47,24 @@ function fakeWorker(answer: (request: EffectRequest) => EffectResponse | 'crash'
 
 function applyInFake(request: EffectRequest): EffectResponse {
   if (request.kind === 'warm') return { kind: 'ready', id: request.id };
+  if (request.kind === 'encode') {
+    // Stands in for the PNG files: the first paint byte, and whether a mask and page id came along.
+    const marker = [request.paint[0] ?? 0, request.mask === null ? 0 : 1, request.pageId === null ? 0 : 1];
+    return { kind: 'encoded', id: request.id, png: new Uint8Array(marker), thumbnail: new Uint8Array([9]) };
+  }
   const source = surfaceFromData(request.width, request.height, request.pixels);
   const target = surfaceFromData(request.width, request.height, request.pixels);
   flip?.apply(source, target);
   return { kind: 'result', id: request.id, pixels: target.data };
 }
 
+/** Effect tests never encode; a call is a bug in the test. */
+const noEncoding = (): Promise<never> => Promise.reject(new Error('This test does not encode pictures.'));
+
 describe('effect runner', () => {
   it('sends a copy of the pixels to the worker and returns its result, leaving the source alone', async () => {
     const fake = fakeWorker(applyInFake);
-    const runner = createEffectRunner(() => fake.worker);
+    const runner = createEffectRunner(() => fake.worker, noEncoding);
     await runner.warm();
     const source = picture();
     const result = await runner.run(flip, source);
@@ -71,13 +79,13 @@ describe('effect runner', () => {
     const fake = fakeWorker((request) =>
       request.kind === 'warm' ? { kind: 'ready', id: request.id } : { kind: 'error', id: request.id, message: 'no' },
     );
-    const result = await createEffectRunner(() => fake.worker).run(flip, picture());
+    const result = await createEffectRunner(() => fake.worker, noEncoding).run(flip, picture());
     expect([...result.subarray(12, 16)]).toEqual([255, 0, 0, 255]);
   });
 
   it('falls back for good when the worker crashes or cannot start', async () => {
     const crashing = fakeWorker(() => 'crash');
-    const runner = createEffectRunner(() => crashing.worker);
+    const runner = createEffectRunner(() => crashing.worker, noEncoding);
     expect([...(await runner.run(flip, picture())).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
     expect(crashing.terminated()).toBe(true);
     await runner.run(flip, picture());
@@ -87,7 +95,7 @@ describe('effect runner', () => {
     const none = createEffectRunner(() => {
       attempts++;
       return null;
-    });
+    }, noEncoding);
     expect([...(await none.run(flip, picture())).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
     await none.run(flip, picture());
     // It does not keep trying to start a worker that cannot start.
@@ -101,7 +109,7 @@ describe('effect runner', () => {
     const runner = createEffectRunner(() => {
       started++;
       return fake.worker;
-    });
+    }, noEncoding);
     await runner.warm();
     const source = picture();
     await runner.run(flip, source);
@@ -117,7 +125,7 @@ describe('effect runner', () => {
 
   it('stops the worker when the studio closes and applies later effects on this thread', async () => {
     const fake = fakeWorker(applyInFake);
-    const runner = createEffectRunner(() => fake.worker);
+    const runner = createEffectRunner(() => fake.worker, noEncoding);
     await runner.warm();
     runner.dispose();
     expect(fake.terminated()).toBe(true);
@@ -128,12 +136,51 @@ describe('effect runner', () => {
   it('applies effects on this thread when making the worker throws', async () => {
     const runner = createEffectRunner(() => {
       throw new Error('workers are off');
-    });
+    }, noEncoding);
     await runner.warm();
     expect([...(await runner.run(flip, picture())).subarray(12, 16)]).toEqual([255, 0, 0, 255]);
   });
 
   it('has no worker to start outside a browser', () => {
     expect(startEffectWorker()).toBeNull();
+  });
+});
+
+describe('encoding a picture for the gallery', () => {
+  const page = { width: 4, height: 2 };
+  const encodeHere = (): Promise<{ png: Uint8Array; thumbnail: Uint8Array }> =>
+    Promise.resolve({ png: new Uint8Array([7, 7]), thumbnail: new Uint8Array([7]) });
+
+  it('encodes in the worker from a copy taken at once, so painting on afterwards changes nothing', async () => {
+    const fake = fakeWorker(applyInFake);
+    const runner = createEffectRunner(() => fake.worker, encodeHere);
+    const paint = picture();
+    const mask = createSurface(4, 2, rgba(0, 0, 0, 0));
+    const encoding = runner.encode({ ...page, paint, mask }, 'meadow');
+    paint.data[0] = 1;
+    const files = await encoding;
+    expect([...files.png]).toEqual([255, 1, 1]);
+    expect([...files.thumbnail]).toEqual([9]);
+    const sent = fake.received[0];
+    if (sent?.kind !== 'encode') throw new Error('Expected an encode request.');
+    expect(sent).toMatchObject({ width: 4, height: 2, pageId: 'meadow' });
+    // Both copies are handed over, not copied again.
+    expect(fake.transfers[0]).toEqual([sent.paint.buffer, sent.mask?.buffer]);
+  });
+
+  it('sends no mask for a plain picture', async () => {
+    const fake = fakeWorker(applyInFake);
+    const files = await createEffectRunner(() => fake.worker, encodeHere).encode(
+      { ...page, paint: picture(), mask: null },
+      null,
+    );
+    expect([...files.png]).toEqual([255, 0, 0]);
+  });
+
+  it('encodes on this thread when the worker reports an error or cannot start', async () => {
+    const failing = fakeWorker((request) => ({ kind: 'error', id: request.id, message: 'no' }));
+    const doc = { ...page, paint: picture(), mask: null };
+    expect([...(await createEffectRunner(() => failing.worker, encodeHere).encode(doc, null)).png]).toEqual([7, 7]);
+    expect([...(await createEffectRunner(() => null, encodeHere).encode(doc, null)).png]).toEqual([7, 7]);
   });
 });
