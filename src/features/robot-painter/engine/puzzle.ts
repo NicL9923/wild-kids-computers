@@ -146,7 +146,7 @@ export function stepPuzzle(puzzle: Puzzle, program: ValidProgram): Generator<Run
  * A neutral note a screen can speak and show. Each one says what is different, never that
  * the child did badly. Geometry is in canvas units so a screen can point at the place.
  */
-type Hint =
+export type Hint =
   /** The robot stopped at the step cap with blocks still to run. */
   | { readonly kind: 'step-limit' }
   /** A move would have left the canvas, so the robot stayed put. */

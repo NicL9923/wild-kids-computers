@@ -69,6 +69,69 @@ const move = (point: Point) => fireEvent.pointerMove(window, { clientX: point.x,
 const up = (point: Point) => fireEvent.pointerUp(window, { clientX: point.x, clientY: point.y });
 const key = (element: Element, name: string) => fireEvent.keyDown(element, { key: name });
 
+/** A toolbox: a click on the pear acts at once; the apple is carried as usual. */
+function Toolbox({ kit, log }: { kit: ReturnType<typeof fakeKit>; log: Log & { clicks: string[] } }) {
+  const carry = useCarry<Fruit, Place>(kit, {
+    kind: 'targets',
+    onDrop: (item, target) => log.drops.push(`${item} -> ${target}`),
+    onClick: (item) => {
+      if (item !== 'pear') return false;
+      log.clicks.push(item);
+      return true;
+    },
+  });
+  return (
+    <div>
+      <button type='button' {...carry.item('apple')}>
+        apple
+      </button>
+      <button type='button' {...carry.item('pear')}>
+        pear
+      </button>
+      <div {...carry.target('basket')}>basket</div>
+    </div>
+  );
+}
+
+describe('useCarry with a click that acts', () => {
+  function renderToolbox() {
+    const kit = fakeKit();
+    const log = { drops: [] as string[], clicks: [] as string[] };
+    render(<Toolbox kit={kit} log={log} />);
+    placeAt(screen.getByText('apple'), 0, 0, 100, 100);
+    placeAt(screen.getByText('pear'), 0, 200, 100, 100);
+    placeAt(screen.getByText('basket'), 400, 0, 200, 200);
+    return { log, apple: screen.getByText('apple'), pear: screen.getByText('pear') };
+  }
+
+  it('runs the click instead of picking the item up, by pointer and by keyboard', () => {
+    const { log, pear } = renderToolbox();
+    down(pear, { x: 50, y: 250 });
+    up({ x: 51, y: 250 });
+    expect(pear.dataset.carried).toBe('false');
+    key(pear, 'Enter');
+    expect(pear.dataset.carried).toBe('false');
+    expect(log.clicks).toEqual(['pear', 'pear']);
+  });
+
+  it('still carries the item when it is dragged', () => {
+    const { log, pear } = renderToolbox();
+    down(pear, { x: 50, y: 250 });
+    move({ x: 450, y: 50 });
+    up({ x: 450, y: 50 });
+    expect(log).toEqual({ drops: ['pear -> basket'], clicks: [] });
+  });
+
+  it('picks the item up as usual when the click does not act', () => {
+    const { log, apple } = renderToolbox();
+    down(apple, { x: 50, y: 50 });
+    up({ x: 50, y: 50 });
+    expect(apple.dataset.carried).toBe('true');
+    up({ x: 450, y: 50 });
+    expect(log).toEqual({ drops: ['apple -> basket'], clicks: [] });
+  });
+});
+
 describe('useCarry with drop targets', () => {
   it('moves an item onto a target by press, drag, and release, and marks it picked up on the way', () => {
     const { kit, log, apple, basket } = renderPicnic();

@@ -28,5 +28,11 @@
     "source": "Original SVG drawn for this repository: the seed pod and the popped seed pod for Pop the seed pods",
     "author": "Wild Flowers Tech",
     "license": "MIT"
+  },
+  {
+    "files": "activities/robot-painter/*.svg",
+    "source": "Original SVG drawn for this repository: the robot painter's robot and the pictures of its four activities",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
   }
 ]
