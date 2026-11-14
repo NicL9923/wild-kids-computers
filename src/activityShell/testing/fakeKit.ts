@@ -58,6 +58,7 @@ export function createFakeKit<S = never>(options: { state?: KitState<S> } = {}):
     },
     hint: (say) => calls.push({ call: 'hint', say: say?.id ?? null }),
     roundComplete: (outcome) => calls.push({ call: 'round-complete', outcome: outcome ?? null }),
+    stepSolved: unexpected('stepSolved'),
     get state(): KitState<S> {
       if (state === undefined) throw new Error('This test gave the kit no saved state');
       return state;
