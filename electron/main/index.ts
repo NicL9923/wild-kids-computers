@@ -11,10 +11,12 @@ import { applyNetworkSwitches, hardenSession, sessionControls } from './networkB
 import { exportPicture, printPicture } from './pictureOutput.ts';
 import { osFamily } from './platformInfo.ts';
 import { resolveStartUrl } from './startUrl.ts';
-import { readTestMode } from './testMode.ts';
+import { readTestMode, stripDebugSwitches } from './testMode.ts';
 import { createWindowControl } from './windowControl.ts';
 
-const testMode = readTestMode(process.env);
+// Test hooks and debugging switches work only unpackaged. The packaged app ignores both.
+stripDebugSwitches(app.commandLine, app.isPackaged);
+const testMode = readTestMode(process.env, app.isPackaged);
 if (testMode.userDataDir !== undefined) app.setPath('userData', testMode.userDataDir);
 
 const os = osFamily(process.platform);
