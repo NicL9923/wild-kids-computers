@@ -97,6 +97,12 @@ async function startApp(userDataDir: string, testInfo: TestInfo): Promise<Launch
       },
     });
     const page = await app.firstWindow();
+    // Tests drive input through the debugging protocol, never through the operating system. The
+    // display's real pointer rests at the middle of the screen, over the middle of the window, so
+    // without this a button there gets hover events no test sent, and speaks over the round.
+    await app.evaluate(({ BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) window.setIgnoreMouseEvents(true);
+    });
     await page.waitForLoadState('domcontentloaded');
     const launched = app;
     return {
