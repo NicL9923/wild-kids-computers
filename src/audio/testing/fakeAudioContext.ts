@@ -83,6 +83,8 @@ class FakeAudioBuffer {
   readonly channels: Float32Array[] = [];
   readonly label: string;
   readonly length: number;
+  /** Seconds. Decoded clips last one second. */
+  readonly duration = 1;
   constructor(label: string, length = 0) {
     this.label = label;
     this.length = length;

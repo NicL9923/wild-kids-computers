@@ -95,6 +95,9 @@ export interface AudioEngine {
   dispose(): Promise<void>;
 }
 
+/** How long after a clip's length to stop waiting for its end event. */
+const END_MARGIN_SECONDS = 1;
+
 const SILENT_CONTINUOUS: ContinuousSound = Object.freeze({ set: () => undefined, stop: () => undefined });
 
 function clamp01(value: number): number {
@@ -199,15 +202,22 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     resume(target);
     const buffer = await decode(target, clip, url);
     if (buffer === null || generation !== speechGeneration) return;
+    // A context the browser keeps suspended, such as before the first click in the browser build,
+    // would hold the clip forever. Skip it so a sequence never stalls.
+    if (target.context.state !== 'running') return;
 
     await new Promise<void>((resolve) => {
       const source = target.context.createBufferSource();
       source.buffer = buffer;
       source.connect(target.voice);
       let finished = false;
+      // If the end event never arrives, for example because the system suspended audio mid-clip,
+      // settle anyway a little after the clip's length.
+      const fallback = setTimeout(() => finish(), (buffer.duration + END_MARGIN_SECONDS) * 1000);
       const finish = () => {
         if (finished) return;
         finished = true;
+        clearTimeout(fallback);
         if (current?.source === source) current = undefined;
         source.disconnect();
         resolve();

@@ -142,6 +142,33 @@ describe('speak', () => {
     await expect(engine.speak(strings.find)).resolves.toBeUndefined();
   });
 
+  it('skips a clip while the browser keeps the context suspended, so a sequence never stalls', async () => {
+    const { context, environment } = harness();
+    context.state = 'suspended';
+    context.resume = () => Promise.resolve();
+    const engine = createAudioEngine({ environment, sfx, testLog: true });
+    await expect(engine.speakSequence([strings.find, strings.b])).resolves.toBeUndefined();
+    expect(context.sources).toEqual([]);
+    expect(engine.testLog?.map((entry) => entry.name)).toEqual(['audio-test.find', 'audio-test.b']);
+  });
+
+  it('settles a clip whose end event never arrives, a second after its length', async () => {
+    vi.useFakeTimers();
+    try {
+      const { context, environment } = harness();
+      const engine = createAudioEngine({ environment, sfx, testLog: false });
+      let settled = false;
+      void engine.speak(strings.find).then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(context.sources).toHaveLength(1);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('resumes a suspended context before playing', async () => {
     const { context, environment } = harness();
     context.state = 'suspended';
