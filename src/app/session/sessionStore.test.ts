@@ -156,17 +156,6 @@ describe('session start', () => {
     ]);
   });
 
-  it('records a document the platform could not read and still starts', async () => {
-    const fake = createFakeBridge();
-    fake.failNext('read', 'app', new BridgeError('io', 'disk unplugged'));
-    const store = createSessionStore({ bridge: fake.bridge });
-    await store.start();
-    expect(store.getSnapshot().status).toBe('needs-first-launch');
-    expect(store.getSnapshot().loadProblems).toEqual([
-      { document: 'app', status: 'unreadable', problem: 'disk unplugged' },
-    ]);
-  });
-
   it('asks for a profile when the last active one no longer exists', async () => {
     const { store } = await startSession({ documents: savedApp([FOX], 'gone-kid') });
     expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', activeProfile: null });
@@ -862,5 +851,55 @@ describe('bridge calls that never answer', () => {
     });
     // Nothing is left holding a queue, so quitting can flush.
     expect(await hasSettled(store.flush())).toBe(true);
+  });
+});
+
+describe('saved things that cannot be opened at start', () => {
+  it('shows that the saved things could not be opened when the profiles read never answers, and opens them on retry', async () => {
+    const { fake, timers, store } = storeWithDeadlines({ documents: savedApp([FOX, OWL], null) });
+    const read = fake.bridge.documents.read.bind(fake.bridge.documents);
+    const hung = hangCalls<string | null>();
+    fake.bridge.documents.read = (name) => (name === 'profiles' ? hung.call(name) : read(name));
+    const started = store.start();
+    await settle();
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await started;
+    expect(store.getSnapshot()).toMatchObject({ status: 'unavailable', profiles: [] });
+
+    // The late answer of the first read is dropped; only a retry opens the saved things.
+    hung.answerAll(json({ version: 1, profiles: [FOX] }));
+    await settle();
+    expect(store.getSnapshot().status).toBe('unavailable');
+
+    fake.bridge.documents.read = read;
+    await store.retryStart();
+    expect(store.getSnapshot()).toMatchObject({ status: 'needs-profile', profiles: [FOX, OWL] });
+    // Nothing was written while the saved things were unknown, so no profile was overwritten.
+    expect(fake.calls.filter((call) => call.startsWith('documents.write'))).toEqual([]);
+    // Only the document that failed is read again.
+    expect(fake.calls.filter((call) => call === 'documents.read app')).toHaveLength(1);
+  });
+
+  it.each(['app', 'profiles'] as const)(
+    'never falls through to first launch when the %s document is unreadable',
+    async (name) => {
+      const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+      fake.failNext('read', name, new BridgeError('io', 'disk unplugged'));
+      await store.start();
+      expect(store.getSnapshot().status).toBe('unavailable');
+      expect(store.getSnapshot().activeProfile).toBeNull();
+      await store.retryStart();
+      expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: FOX });
+    },
+  );
+
+  it('applies an update made while the saved things were unavailable to the opened value', async () => {
+    const { fake, store } = storeWithDeadlines({ documents: savedApp([FOX], FOX.id) });
+    fake.failNext('read', 'app', new BridgeError('io', 'disk unplugged'));
+    await store.start();
+    store.updateApp({ kioskLock: false });
+    await store.retryStart();
+    await store.flush();
+    expect(saved(fake, 'app', appDocument)).toMatchObject({ firstLaunchDone: true, lastActiveProfileId: FOX.id });
   });
 });

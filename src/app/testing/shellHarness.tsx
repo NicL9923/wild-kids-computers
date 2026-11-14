@@ -55,7 +55,12 @@ export function savedProfiles(
   return documents;
 }
 
-export async function renderShell(path: string, options: FakeBridgeOptions = {}): Promise<ShellHarness> {
+export interface ShellOptions extends FakeBridgeOptions {
+  /** Runs on the fake bridge before the session starts, such as to make a read fail. */
+  beforeStart?: (fake: FakeBridge) => void;
+}
+
+export async function renderShell(path: string, options: ShellOptions = {}): Promise<ShellHarness> {
   const windowCalls: string[] = [];
   let closeListener: ((request: CloseRequest) => void) | null = null;
   const window: Partial<PlatformBridge['window']> = {
@@ -78,6 +83,7 @@ export async function renderShell(path: string, options: FakeBridgeOptions = {})
     ...options.window,
   };
   const fake = createFakeBridge({ ...options, window });
+  options.beforeStart?.(fake);
   const audio = createAudioEngine({
     environment: {
       createContext: () => null,

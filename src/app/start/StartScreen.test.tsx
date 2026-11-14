@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { strings as homeStrings } from '../home/strings.ts';
 import { strings as choiceStrings } from '../profile-choice/strings.ts';
 import { strings as profileStrings } from '../profiles/strings.ts';
+import { strings as activityShellStrings } from '../../activityShell/strings.ts';
+import { BridgeError } from '../../core/platform/bridge.ts';
 import { strings as shellStrings } from '../shell/strings.ts';
+import { strings as startStrings } from './strings.ts';
 import { renderShell, savedProfiles } from '../testing/shellHarness.tsx';
 
 afterEach(cleanup);
@@ -35,6 +38,21 @@ describe('start screen', () => {
     await screen.findByRole('navigation', { name: homeStrings.title.text });
     expect(harness.store.getSnapshot().activeProfile?.id).toBe(FOX.id);
     expect(screen.queryByRole('button', { name: homeStrings.changePlayer.text })).toBeNull();
+  });
+
+  it('says calmly, in the youngest band, that the saved things did not open, and opens them on try again', async () => {
+    const harness = await renderShell('/', {
+      documents: savedProfiles([FOX, OWL], FOX.id),
+      beforeStart: (fake) => fake.failNext('read', 'profiles', new BridgeError('io', 'disk asleep')),
+    });
+    await screen.findByRole('heading', { level: 1, name: startStrings.unavailable.text });
+    expect(harness.spoken()).toContain(startStrings.unavailable.id);
+    expect(html.getAttribute('data-band')).toBe('band-3-5');
+    expect(screen.getByRole('button', { name: activityShellStrings.soundOff.text })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: shellStrings.tryAgain.text }));
+    await screen.findByRole('heading', { level: 1, name: choiceStrings.heading.text });
+    expect(harness.store.getSnapshot().profiles).toEqual([FOX, OWL]);
   });
 
   it('gets a child from the home map back to the profile choice in one click', async () => {

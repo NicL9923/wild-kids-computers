@@ -146,6 +146,8 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **`recordStep` never moves the furthest step back.** Replaying an early step keeps later ones open, and a step solved but not left still opens the next one.
 - **`setKioskLock` saves the lock and applies it to the window in one call.** A screen cannot save the choice and forget to apply it, or the reverse. A failed apply becomes the session's save problem.
 - **A profile being deleted cannot be made active.** Its files are on their way out, so loading its settings would bring some of them back.
+- **Every bridge call the session makes ends after 10 seconds** as an `io` failure, so one call that never answers cannot hold the document's queue or the start of the app. A document is a small JSON file, so 10 seconds passes only when something is wrong. A timed-out read counts as unreadable for that attempt and sets nothing aside, since the file may be fine.
+- **When the app or profiles document cannot be read at start, by a timeout or any other read failure, the app shows a calm "try again" screen instead of first launch.** Defaults in their place would hide the children's profiles, and the next write would replace the real files. The start screen offers one control to try again; an adult can still close the app. Before this, a read the platform refused fell through to first launch. A corrupt document is still set aside and replaced with defaults, because its data is already lost.
 
 ### App shell
 

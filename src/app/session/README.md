@@ -12,12 +12,14 @@ The session holds the saved documents of the app and of the active profile, and 
 - **A failed write never rejects.** The change stays on screen, and `useStorageProblems().saveProblem` says what failed. The next successful write of the same target clears it.
 - **A bad value throws at once.** Updates are checked against the document's schema before anything changes. A value the schema rejects is a bug in the caller.
 - **Picture calls resolve to a result**, `{ ok: true, value }` or `{ ok: false, error }`, and never reject.
+- **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable for that attempt and sets nothing aside; a timed-out write is a `saveProblem`. A late answer is dropped.
+- **The app never guesses at the children it has.** When the app or profiles document cannot be read, the status is `unavailable`, nothing is replaced with defaults, and nothing is written until `retryStart()` reads them.
 
 ## Hooks
 
 | Hook                                 | What it gives                                                                                                   |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `useSessionStatus()`                 | `'loading'`, `'needs-first-launch'`, `'needs-profile'`, or `'ready'`                                            |
+| `useSessionStatus()`                 | `'loading'`, `'unavailable'`, `'needs-first-launch'`, `'needs-profile'`, or `'ready'`                           |
 | `useAppDocument()`                   | `app`, `updateApp(change)`, and `setKioskLock(on)`, which saves the lock and applies it to the window           |
 | `useProfiles()`                      | `profiles`, `createProfile`, `updateProfile`, `deleteProfile`, and `chooseProfile(id \| null)`                  |
 | `useActiveProfile()`                 | The active `Profile`, or null                                                                                   |
@@ -30,13 +32,14 @@ The session holds the saved documents of the app and of the active profile, and 
 | `useTestInfo()`                      | The seed, difficulty, band, and activity an end-to-end test passed, or null                                     |
 | `useSessionLength()`                 | `isLimitReached()`, `playedMs()`, and `grantPlayTime(ms)`. Nothing re-renders on time. Call them when needed.   |
 | `useStorageProblems()`               | `saveProblem`, the newest failed write, and `loadProblems`, documents that came back as defaults                |
-| `useSessionStore()`                  | The store itself, for `flush()` before quitting                                                                 |
+| `useSessionStore()`                  | The store itself, for `flush()` before quitting and `retryStart()` from the start screen                        |
 
 ## Status
 
 | Status               | When                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------- |
 | `loading`            | The app or profiles document is loading, or the chosen profile's settings or progress are |
+| `unavailable`        | The app or profiles document could not be read. The start screen offers to try again.     |
 | `needs-first-launch` | `firstLaunchDone` is false, or no profile exists, such as after the last one is deleted   |
 | `needs-profile`      | Profiles exist and none is active                                                         |
 | `ready`              | A profile is active and loaded                                                            |
@@ -125,7 +128,7 @@ if (!result.ok) showProblem(result.error.code);
 
 ## Tests
 
-[testing/fakeBridge.ts](testing/fakeBridge.ts) is a `PlatformBridge` for unit tests. Documents and pictures live in memory, every call is logged in order, and window and output calls throw unless the test configures them. `holdWrites()` parks writes so a test controls when each one finishes, and `failNext(...)` makes one call reject. Create a store with `createSessionStore({ bridge, audio, clock })`, where `clock` gives `now()` and `monotonic()`, to pin time.
+[testing/fakeBridge.ts](testing/fakeBridge.ts) is a `PlatformBridge` for unit tests. Documents and pictures live in memory, every call is logged in order, and window and output calls throw unless the test configures them. `holdWrites()` parks writes so a test controls when each one finishes, and `failNext(...)` makes one call reject. Create a store with `createSessionStore({ bridge, audio, clock, timers })`, where `clock` gives `now()` and `monotonic()`, to pin time, and `timers` is a manual scheduler that steps the bridge call deadline.
 
 ```ts
 const fake = createFakeBridge({ documents: { app: '...', profiles: '...' }, test: { seed: 7 } });

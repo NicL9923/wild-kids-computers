@@ -49,6 +49,11 @@ import { isSessionLimitReached, type SessionClock } from './sessionLength.ts';
 export type SessionStatus =
   /** The app or profiles document, or the active profile's settings or progress, is loading. */
   | 'loading'
+  /**
+   * The app or profiles document could not be read, so the app cannot know which children it has.
+   * Nothing is replaced with defaults and nothing is written until `retryStart()` reads them.
+   */
+  | 'unavailable'
   /** First launch is not done, or no profile exists. */
   | 'needs-first-launch'
   /** Profiles exist and none is active. */
@@ -149,6 +154,11 @@ export interface SessionStore {
   readonly getSnapshot: () => SessionSnapshot;
   /** Loads the app and profiles documents and the last active profile. Call once. */
   readonly start: () => Promise<void>;
+  /**
+   * With status `unavailable`, reads the app and profiles documents that could not be read, and
+   * goes on as `start` does once both are open. A retry already running is reused.
+   */
+  readonly retryStart: () => Promise<void>;
   /** Resolves when every write queued so far has settled. Call before quitting. */
   readonly flush: () => Promise<void>;
   /** Whether a read or write is queued or running, so quitting now could drop a write. */
@@ -276,6 +286,11 @@ class Cell<T> {
   value: T;
   loaded = false;
   writeQueued = false;
+  /**
+   * Set for a document the app cannot start without, when its read failed. The cell then stays
+   * unloaded with its value untouched, so nothing writes defaults over the saved file.
+   */
+  unreadable = false;
   /** Updates made before the load finished, oldest first. They apply in one queued task. */
   readonly early: EarlyUpdate<T>[] = [];
   readonly ready: Promise<void>;
@@ -283,10 +298,13 @@ class Cell<T> {
 
   readonly name: DocumentName;
   readonly spec: DocumentSpec<T>;
+  /** The app cannot go on without the saved value: defaults would hide or overwrite it. */
+  readonly required: boolean;
 
-  constructor(name: DocumentName, spec: DocumentSpec<T>) {
+  constructor(name: DocumentName, spec: DocumentSpec<T>, required = false) {
     this.name = name;
     this.spec = spec;
+    this.required = required;
     this.value = spec.defaults();
     this.ready = new Promise((resolve) => {
       this.markReady = resolve;
@@ -343,8 +361,10 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   const clock = options.clock ?? systemClock;
   const queues = createSerialQueues();
   const listeners = new Set<() => void>();
-  const app = new Cell(documentNames.app, appDocument);
-  const profiles = new Cell(documentNames.profiles, profilesDocument);
+  // Defaults in place of either would hide the children's profiles, and the next write would
+  // replace them, so the app waits for both.
+  const app = new Cell(documentNames.app, appDocument, true);
+  const profiles = new Cell(documentNames.profiles, profilesDocument, true);
   /** Profiles whose files are being removed. Their pictures take no more changes. */
   const removed = new Set<string>();
   let active: ActiveProfile | null = null;
@@ -384,6 +404,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   }
 
   function statusOf(): SessionStatus {
+    if (app.unreadable || profiles.unreadable) return 'unavailable';
     if (!app.loaded || !profiles.loaded) return 'loading';
     if (!app.value.firstLaunchDone || profiles.value.profiles.length === 0) return 'needs-first-launch';
     if (active === null) return 'needs-profile';
@@ -427,13 +448,24 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     void readInto(cell);
   }
 
-  async function readInto<T>(cell: Cell<T>): Promise<void> {
+  /**
+   * `queued` false reads at once instead of behind the document's queue. Only a retry of a
+   * required document does that: while it is unloaded, the only tasks on its queue are updates
+   * waiting for this very read, so a queued read would wait for them forever.
+   */
+  async function readInto<T>(cell: Cell<T>, queued = true): Promise<void> {
+    const read = () => loadDocument(bridge.documents, cell.name, cell.spec);
     let result: LoadResult<T>;
     try {
-      result = await queues.run(cell.name, () => loadDocument(bridge.documents, cell.name, cell.spec));
+      result = await (queued ? queues.run(cell.name, read) : read());
     } catch (error) {
       // loadDocument never throws on bad data. This covers a bridge that broke its contract.
       result = { value: cell.spec.defaults(), status: 'unreadable', problem: toBridgeError(error).message };
+    }
+    cell.unreadable = cell.required && result.status === 'unreadable';
+    if (cell.unreadable) {
+      emit();
+      return;
     }
     if (result.status === 'reset' || result.status === 'unreadable') {
       loadProblems = [...loadProblems, { document: cell.name, status: result.status, problem: result.problem ?? '' }];
@@ -634,8 +666,29 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
 
   // ---- the store --------------------------------------------------------------------------
 
+  /**
+   * Reads the required documents that are not open yet, and once both are, makes the last active
+   * profile active and turns kiosk lock back on. With either unreadable it returns, and the status
+   * says `unavailable`. `before` is work that must finish before a profile becomes active, such
+   * as reading the test info that fixes the seed of the first round.
+   */
+  async function open(queued: boolean, before?: Promise<void>): Promise<void> {
+    await Promise.all([
+      app.loaded ? undefined : readInto(app, queued),
+      profiles.loaded ? undefined : readInto(profiles, queued),
+      before,
+    ]);
+    if (!app.loaded || !profiles.loaded) return;
+    const last = app.value.lastActiveProfileId;
+    if (last !== null && profiles.value.profiles.some((p) => p.id === last)) activate(last);
+    if (app.value.kioskLock) void setKioskLock(true);
+    emit();
+    await Promise.all([active?.settings.ready, active?.progress.ready]);
+  }
+
   audio?.onVolumeChange(onEngineVolume);
   let started = false;
+  let retrying: Promise<void> | null = null;
 
   return {
     subscribe(listener) {
@@ -647,18 +700,23 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     async start() {
       if (started) throw new Error('The session already started.');
       started = true;
-      const info = bridge.info().then(
-        (result) => result.test ?? null,
-        () => null,
-      );
-      load(app);
-      load(profiles);
-      [testInfo] = await Promise.all([info, app.ready, profiles.ready]);
-      const last = app.value.lastActiveProfileId;
-      if (last !== null && profiles.value.profiles.some((p) => p.id === last)) activate(last);
-      if (app.value.kioskLock) void setKioskLock(true);
-      emit();
-      await Promise.all([active?.settings.ready, active?.progress.ready]);
+      const info = (async () => {
+        try {
+          testInfo = (await bridge.info()).test ?? null;
+        } catch {
+          // Not a test run, or a bridge that could not say: the app runs as usual.
+        }
+      })();
+      await open(true, info);
+    },
+
+    retryStart() {
+      if (!started) throw new Error('The session has not started.');
+      if (statusOf() !== 'unavailable') return Promise.resolve();
+      retrying ??= open(false).finally(() => {
+        retrying = null;
+      });
+      return retrying;
     },
 
     flush: () => queues.settled(),
