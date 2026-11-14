@@ -69,9 +69,14 @@ export function documentFileSegments(name: ParsedDocumentName): string[] {
   return ['profile', name.profileId, `${name.kind}.json`];
 }
 
+/** Path segments of the directory that holds one directory per profile. */
+export function profilesDirSegments(): string[] {
+  return ['profile'];
+}
+
 /** Path segments of a profile's directory, which holds its documents and pictures. */
 export function profileDirSegments(profileId: string): string[] {
-  return ['profile', requireId(profileId)];
+  return [...profilesDirSegments(), requireId(profileId)];
 }
 
 /** Path segments of a profile's gallery or trash directory. */

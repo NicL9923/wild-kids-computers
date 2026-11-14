@@ -15,7 +15,8 @@ The session holds the saved documents of the app and of the active profile, and 
 - **Picture calls resolve to a result**, `{ ok: true, value }` or `{ ok: false, error }`, and never reject.
 - **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable and sets nothing aside. A late read answer is dropped.
 - **A profile whose settings or progress cannot be read does not become active.** The status is `unavailable`, the start screen offers to try again, and `retryStart()` reads them again. Updates made while they loaded are dropped. An activity whose state cannot be read shows the screen that says it did not open, and trying again reads it again.
-- **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file. Deleting a profile whose write has not ended fails with `io` after the same deadline and removes nothing.
+- **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file.
+- **Removing a profile happens at one write.** The profile list is saved without it. Until that write is answered, the profile stays listed and usable; when it fails or passes its deadline, the removal fails and the profile stays. A list write that lands after its deadline is followed by a write of the list in memory, which still names the profile. Once the write succeeds, the profile is gone for good, and its documents and pictures are deleted afterwards, after any work already queued for them ends. Files a removal left behind, because the deletion failed or the app stopped first, are deleted at the next start, but only when the profile list was read from a saved file.
 - **The app never guesses at the children it has.** When the app or profiles document cannot be read, the status is `unavailable`, nothing is replaced with defaults, and nothing is written until `retryStart()` reads them.
 
 ## Hooks
@@ -122,7 +123,7 @@ const { isLimitReached } = useSessionLength();
 if (isLimitReached()) navigate({ to: '/rest' });
 ```
 
-Delete a profile. Its documents and pictures go too, after any write already queued for it lands. When it was active, no profile is active afterwards:
+Delete a profile. It is removed when the list without it is saved, and its documents and pictures are deleted afterwards. When it was active, no profile is active afterwards:
 
 ```ts
 const result = await deleteProfile(profile.id);

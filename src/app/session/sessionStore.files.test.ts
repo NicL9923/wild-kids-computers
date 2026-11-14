@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { createFileStore } from '../../../electron/main/fileStore.ts';
 import { createRandom } from '../../core/activityKit/random.ts';
 import { createManualScheduler } from '../../core/activityKit/scheduler.ts';
@@ -80,12 +81,19 @@ async function startOverFiles(profiles: Profile[], voiceVolume: number) {
   return { files, timers, store, readsRunning: () => reading > 0 };
 }
 
-/** Lets real file reads finish until the active profile is loaded. */
+/**
+ * Waits for the active profile to load. Real file calls take real time, which a count of event
+ * loop turns does not bound under load, so this waits for the store to say so.
+ */
 async function untilReady(store: SessionStore): Promise<void> {
-  for (let turns = 0; store.getSnapshot().status !== 'ready'; turns++) {
-    if (turns > 200) throw new Error(`Still ${store.getSnapshot().status} after 200 turns.`);
-    await turn();
-  }
+  if (store.getSnapshot().status === 'ready') return;
+  await new Promise<void>((resolve) => {
+    const stop = store.subscribe(() => {
+      if (store.getSnapshot().status !== 'ready') return;
+      stop();
+      resolve();
+    });
+  });
 }
 
 interface Volumes {
@@ -260,5 +268,134 @@ describe('a profile document that could not be read', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', activeProfile: KID });
     expect(store.getSnapshot().settings).toMatchObject({ voiceVolume: 0.2, sessionLengthMinutes: 15 });
     expect(store.progressOf('old')).toMatchObject({ furthestStep: 7 });
+  });
+});
+
+/** A picture file: the PNG signature and one byte that tells pictures apart. */
+const png = (value: number) => Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, value]);
+
+/** Kid and pal, each with settings and one picture, on the real file store. */
+async function twoChildren() {
+  const files = createFileStore(root);
+  const app = { ...appDocument.defaults(), firstLaunchDone: true, lastActiveProfileId: KID.id };
+  await files.documents.write('app', JSON.stringify(app));
+  await files.documents.write('profiles', JSON.stringify({ version: 1, profiles: [KID, PAL] }));
+  for (const profile of [KID, PAL]) {
+    await files.documents.write(documentNames.settings(profile.id), JSON.stringify(settingsDocument.defaults()));
+    await files.pictures.save(profile.id, { id: `${profile.id}-art`, png: png(1), thumbnail: png(2) });
+  }
+  return files;
+}
+
+function sessionOver(files: ReturnType<typeof createFileStore>, documents = files.documents) {
+  const timers = createManualScheduler({ wall: 0 });
+  const store = createSessionStore({
+    bridge: { ...createFakeBridge().bridge, documents, pictures: files.pictures },
+    timers,
+  });
+  return { store, timers };
+}
+
+/** Every profile the saved list names, with its settings and pictures, as they are on disk. */
+async function listedOnDisk(files: ReturnType<typeof createFileStore>) {
+  const text = await files.documents.read('profiles');
+  const listed = z.object({ profiles: z.array(z.object({ id: z.string() })) }).parse(JSON.parse(text ?? '{}'));
+  return Promise.all(
+    listed.profiles.map(async ({ id }) => ({
+      id,
+      settings: (await files.documents.read(documentNames.settings(id))) !== null,
+      pictures: (await files.pictures.list(id, 'gallery')).map((picture) => picture.id).toSorted(),
+    })),
+  );
+}
+
+describe('removing a profile', () => {
+  it('never deletes the files of a listed profile when its deletion lands after the deadline', async () => {
+    const files = await twoChildren();
+    const gate = Promise.withResolvers<void>();
+    const reached = Promise.withResolvers<void>();
+    const documents = {
+      ...files.documents,
+      async removeProfile(profileId: string) {
+        reached.resolve();
+        await gate.promise;
+        await files.documents.removeProfile(profileId);
+      },
+    };
+    const { store, timers } = sessionOver(files, documents);
+    await store.start();
+    await untilReady(store);
+    const removal = store.deleteProfile(KID.id);
+    await reached.promise;
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    await removal;
+    // What the reviewer's probe did next, when it could: the child works on in the profile.
+    if (store.getSnapshot().profiles.some((p) => p.id === KID.id)) {
+      store.chooseProfile(KID.id);
+      await untilReady(store);
+      store.updateSettings({ voiceVolume: 0.9 });
+      await store.pictures().save({ id: 'fresh-work', png: png(3), thumbnail: png(4) });
+    }
+    gate.resolve();
+    await store.flush();
+
+    for (const profile of await listedOnDisk(files)) {
+      expect(profile, `${profile.id} is listed`).toMatchObject({ settings: true });
+      expect(profile.pictures, `${profile.id} is listed`).toContain(`${profile.id}-art`);
+    }
+    expect(store.getSnapshot().profiles.map((p) => p.id)).toEqual([PAL.id]);
+  });
+
+  it('keeps a profile whose list write passed its deadline usable, and on disk when the write lands late', async () => {
+    const files = await twoChildren();
+    const { store, timers } = sessionOver(files);
+    await store.start();
+    await untilReady(store);
+    const profilesFile = path.join(root, 'profiles.json');
+    const reached = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    renames.hold = (target) => {
+      if (target !== profilesFile) return null;
+      renames.hold = null;
+      reached.resolve();
+      return released.promise;
+    };
+    const removal = store.deleteProfile(KID.id);
+    await reached.promise;
+    timers.advance(SESSION_CALL_DEADLINE_MS);
+    expect(await removal).toMatchObject({ ok: false, error: { code: 'io' } });
+    expect(store.getSnapshot().profiles.map((p) => p.id)).toEqual([KID.id, PAL.id]);
+
+    store.chooseProfile(KID.id);
+    await untilReady(store);
+    store.updateSettings({ voiceVolume: 0.9 });
+    expect(await store.pictures().save({ id: 'fresh-work', png: png(3), thumbnail: png(4) })).toMatchObject({
+      ok: true,
+    });
+    released.resolve();
+    await store.flush();
+
+    expect(await listedOnDisk(files)).toEqual([
+      { id: KID.id, settings: true, pictures: ['fresh-work', `${KID.id}-art`].toSorted() },
+      { id: PAL.id, settings: true, pictures: [`${PAL.id}-art`] },
+    ]);
+    expect(await settingsOnDisk(files, KID.id)).toMatchObject({ voiceVolume: 0.9 });
+  });
+
+  it('removes on the next start the files a removal left behind when the app stopped before deleting them', async () => {
+    const files = await twoChildren();
+    // The deletion never happens: the app stops between the list write and the cleanup.
+    const documents = { ...files.documents, removeProfile: () => new Promise<void>(() => undefined) };
+    const first = sessionOver(files, documents);
+    await first.store.start();
+    expect(await first.store.deleteProfile(KID.id)).toEqual({ ok: true, value: undefined });
+    expect(await files.documents.listProfiles()).toEqual([KID.id, PAL.id]);
+    expect(await listedOnDisk(files)).toEqual([{ id: PAL.id, settings: true, pictures: [`${PAL.id}-art`] }]);
+
+    const second = sessionOver(files);
+    await second.store.start();
+    await second.store.flush();
+    expect(await files.documents.listProfiles()).toEqual([PAL.id]);
+    expect(await listedOnDisk(files)).toEqual([{ id: PAL.id, settings: true, pictures: [`${PAL.id}-art`] }]);
   });
 });

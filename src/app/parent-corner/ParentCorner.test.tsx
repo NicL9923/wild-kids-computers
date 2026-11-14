@@ -136,7 +136,7 @@ describe('parent corner', () => {
 
   it('says so and keeps the profile when the deletion fails', async () => {
     const harness = await openCorner();
-    harness.fake.failNext('removeProfile', OWL.id, new Error('disk full'));
+    harness.fake.failNext('write', 'profiles', new Error('disk full'));
     const row = rowOf(OWL.id);
     fireEvent.click(within(row).getByRole('button', { name: strings.delete.text }));
     fireEvent.click(
