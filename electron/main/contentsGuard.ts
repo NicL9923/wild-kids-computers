@@ -1,6 +1,5 @@
-import type { WebContents } from 'electron';
 import type { OsFamily } from '../../src/core/platform/bridge.ts';
-import { blockedShortcut } from './shortcuts.ts';
+import { blockedShortcut, type KeyInput } from './shortcuts.ts';
 
 export interface ContentsGuardOptions {
   os: OsFamily;
@@ -8,14 +7,28 @@ export interface ContentsGuardOptions {
   devRun: boolean;
 }
 
-function deny(event: { preventDefault(): void }): void {
+function deny(event: Cancellable): void {
   event.preventDefault();
 }
 
-type GuardedContents = Pick<
-  WebContents,
-  'on' | 'setWindowOpenHandler' | 'setWebRTCIPHandlingPolicy' | 'setVisualZoomLevelLimits' | 'setZoomFactor'
-> & { closeDevTools(): void };
+type Cancellable = { preventDefault(): void };
+
+/** The parts of WebContents the guard uses, one overload per event, so a test can supply them. */
+export interface GuardedContents {
+  on(event: 'will-navigate', listener: (event: Cancellable) => void): unknown;
+  on(event: 'will-frame-navigate', listener: (event: Cancellable) => void): unknown;
+  on(event: 'will-redirect', listener: (event: Cancellable) => void): unknown;
+  on(event: 'will-attach-webview', listener: (event: Cancellable) => void): unknown;
+  on(event: 'did-finish-load', listener: () => void): unknown;
+  on(event: 'zoom-changed', listener: () => void): unknown;
+  on(event: 'devtools-opened', listener: () => void): unknown;
+  on(event: 'before-input-event', listener: (event: Cancellable, input: KeyInput) => void): unknown;
+  setWindowOpenHandler(handler: () => { action: 'deny' }): void;
+  setWebRTCIPHandlingPolicy(policy: 'disable_non_proxied_udp'): void;
+  setVisualZoomLevelLimits(minimumLevel: number, maximumLevel: number): Promise<void>;
+  setZoomFactor(factor: number): void;
+  closeDevTools(): void;
+}
 
 /**
  * Applies to every web contents the app creates: layer 6 of the network block, the WebRTC
@@ -34,7 +47,14 @@ export function guardContents(contents: GuardedContents, options: ContentsGuardO
   // which a probe showed by counting UDP packets, so the policy is set per web contents.
   contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
 
-  void contents.setVisualZoomLevelLimits(1, 1);
+  // Pinch zoom. Electron 45 rejects this call until the page has a main frame, which it does not
+  // have when web-contents-created fires, so the limit is set again after every load.
+  contents.on('did-finish-load', () => {
+    contents.setVisualZoomLevelLimits(1, 1).catch((error: unknown) => {
+      console.error('The pinch zoom limit did not apply.', error);
+    });
+  });
+  // Ctrl or Command plus the wheel, and any other page zoom the shortcut block misses.
   contents.on('zoom-changed', () => contents.setZoomFactor(1));
 
   if (options.devRun) return;

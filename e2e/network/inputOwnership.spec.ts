@@ -177,6 +177,26 @@ test('every shortcut the toy desktop menus show reaches the page, and the window
   expect(await windowFacts()).toEqual({ windows: 1, zoom: 1, devtools: false });
 });
 
+test('the page cannot be zoomed by a trackpad pinch, Ctrl and the wheel, or the keyboard', async () => {
+  const { app, page } = launched;
+  const scale = () => page.evaluate(() => window.visualViewport?.scale ?? 0);
+  // A trackpad pinch. Without the limit the same gesture doubles the scale.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.synthesizePinchGesture', { x: 400, y: 300, scaleFactor: 2, gestureSourceType: 'mouse' });
+  await app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    contents?.sendInputEvent({ type: 'mouseWheel', x: 400, y: 300, deltaY: 240, modifiers: ['control'] });
+    contents?.sendInputEvent({ type: 'mouseWheel', x: 400, y: 300, deltaY: -240, modifiers: ['control'] });
+  });
+  await pressNative([
+    { keyCode: '=', modifiers: [process.platform === 'darwin' ? 'meta' : 'control'] },
+    { keyCode: '+', modifiers: [process.platform === 'darwin' ? 'meta' : 'control', 'shift'] },
+  ]);
+  await page.waitForTimeout(300);
+  expect(await scale()).toBe(1);
+  expect(await windowFacts()).toEqual({ windows: 1, zoom: 1, devtools: false });
+});
+
 test('the application menu holds only the edit commands', async () => {
   const roles = await launched.app.evaluate(({ Menu }) =>
     (Menu.getApplicationMenu()?.items ?? []).flatMap((item) =>
