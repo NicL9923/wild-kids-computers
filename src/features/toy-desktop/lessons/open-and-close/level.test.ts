@@ -106,6 +106,7 @@ describe('open and close parts', () => {
       resize: false,
       openMaximized: true,
       systemSound: false,
+      hiddenCommands: [],
     });
     expect(level.desktop.settings.iconSize).toBe('large');
   });
@@ -122,6 +123,7 @@ describe('open and close parts', () => {
       resize: false,
       openMaximized: false,
       systemSound: false,
+      hiddenCommands: [],
     });
     expect(level.desktop.settings.iconSize).toBe('medium');
   });

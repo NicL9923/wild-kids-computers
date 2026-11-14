@@ -34,7 +34,7 @@ const TRASH_TOOLS: readonly { command: CommandId; glyph?: Glyph; emoji?: 'folder
  * dragging or by a click to pick up and a click to place.
  */
 export function FileExplorerApp({ windowId, app }: { readonly windowId: string; readonly app: FileExplorerState }) {
-  const { desktop, kit, sayName, highlight, open } = useDesktopContext();
+  const { desktop, kit, sayName, highlight, open, parts } = useDesktopContext();
   const { state, dispatch } = desktop;
   const items = explorerItems(state.fs, app);
   const inTrash = app.folderId === TRASH_ID || isTrashed(state.fs, app.folderId);
@@ -45,7 +45,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
     onDrop: (item, target) => send({ type: 'move', nodeId: item, toId: target }),
   });
   const searching = app.search.text.trim() !== '';
-  const tools = inTrash ? TRASH_TOOLS : FOLDER_TOOLS;
+  const tools = (inTrash ? TRASH_TOOLS : FOLDER_TOOLS).filter(({ command }) => !parts.hiddenCommands.includes(command));
 
   return (
     <div className='td-explorer'>
@@ -66,7 +66,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
             {t(COMMAND_NAMES[command])}
           </button>
         ))}
-        <div className='td-search'>
+        <div className='td-search' data-highlight-key='search'>
           <ControlGlyph glyph='search' className='td-search-glyph' />
           <ToyTextField
             windowId={windowId}
@@ -89,6 +89,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
               type='button'
               className='td-place'
               data-place={place.id}
+              data-highlight-key={`place:${place.id}`}
               aria-current={app.folderId === place.id && !searching ? 'page' : undefined}
               {...carry.target(place.id)}
               {...sayName(place.label)}
@@ -119,14 +120,16 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
                   <button
                     type='button'
                     className='td-item-open'
+                    data-highlight-key={`item:${node.id}`}
                     onFocus={() => {
                       if (!selected) send({ type: 'select', nodeId: node.id });
                     }}
-                    onClick={() =>
-                      node.kind === 'folder'
-                        ? send({ type: 'open-node', nodeId: node.id })
-                        : open({ type: 'open-file', fileId: node.id })
-                    }
+                    onClick={() => {
+                      // Nothing in the trash opens, so a click there picks the item for Restore.
+                      if (inTrash) send({ type: 'select', nodeId: node.id });
+                      else if (node.kind === 'folder') send({ type: 'open-node', nodeId: node.id });
+                      else open({ type: 'open-file', fileId: node.id });
+                    }}
                   >
                     <Emoji id={nodePicture(node)} decorative className='td-item-picture' />
                     <span className='td-item-name' id={`${windowId}-${node.id}-name`}>
@@ -160,6 +163,7 @@ export function FileExplorerApp({ windowId, app }: { readonly windowId: string; 
                     }}
                     style={{ touchAction: 'none' }}
                     className='td-item-grip'
+                    data-highlight-key={`move:${node.id}`}
                     aria-labelledby={`${windowId}-move ${windowId}-${node.id}-name`}
                     {...sayName(strings.moveItem)}
                   >

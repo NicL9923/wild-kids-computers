@@ -35,6 +35,11 @@ export interface DesktopParts {
   readonly openMaximized?: boolean;
   /** The toy computer's sound button and volume slider in the menu bar. */
   readonly systemSound?: boolean;
+  /**
+   * Commands no menu, toolbar, or shortcut offers, such as Empty trash in a lesson where emptying
+   * it would take away the file the child is looking for.
+   */
+  readonly hiddenCommands?: readonly CommandId[];
 }
 
 /** Everything on, as on a real computer. */
@@ -48,6 +53,7 @@ export const ALL_PARTS: Required<DesktopParts> = {
   resize: true,
   openMaximized: false,
   systemSound: true,
+  hiddenCommands: [],
 };
 
 export function withDefaults(parts: DesktopParts = {}): Required<DesktopParts> {

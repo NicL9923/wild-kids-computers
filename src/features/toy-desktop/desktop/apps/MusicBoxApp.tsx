@@ -23,7 +23,7 @@ const ROWS = Array.from({ length: TUNE_NOTES }, (_, row) => TUNE_NOTES - 1 - row
  * on a steady beat from the activity's scope and sounds each step's notes.
  */
 export function MusicBoxApp({ windowId, app }: { readonly windowId: string; readonly app: MusicBoxState }) {
-  const { desktop, kit, sayName, highlight } = useDesktopContext();
+  const { desktop, kit, sayName, highlight, parts } = useDesktopContext();
   const { state, dispatch } = desktop;
 
   useEffect(() => {
@@ -50,16 +50,18 @@ export function MusicBoxApp({ windowId, app }: { readonly windowId: string; read
           <ControlGlyph glyph={app.playing ? 'stop' : 'play'} />
           {t(app.playing ? strings.stop : strings.play)}
         </button>
-        <button
-          type='button'
-          className='td-tool td-tool-text'
-          data-music-command='clear'
-          disabled={!isCommandEnabled(state, windowId, 'clear', toyClipboard)}
-          {...sayName(strings.clear)}
-          onClick={() => dispatch({ type: 'command', windowId, command: 'clear' })}
-        >
-          {t(strings.clear)}
-        </button>
+        {!parts.hiddenCommands.includes('clear') && (
+          <button
+            type='button'
+            className='td-tool td-tool-text'
+            data-music-command='clear'
+            disabled={!isCommandEnabled(state, windowId, 'clear', toyClipboard)}
+            {...sayName(strings.clear)}
+            onClick={() => dispatch({ type: 'command', windowId, command: 'clear' })}
+          >
+            {t(strings.clear)}
+          </button>
+        )}
       </div>
       <fieldset className='td-music-grid'>
         <legend className='wk-visually-hidden'>{t(strings.musicGrid)}</legend>

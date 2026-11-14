@@ -260,7 +260,7 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
       if (plainKeyOnControl) return;
     }
     const command = commandForKey(state, front.id, event, os, toyClipboard);
-    if (command === null) return;
+    if (command === null || parts.hiddenCommands.includes(command)) return;
     event.preventDefault();
     dispatch({ type: 'command', windowId: front.id, command });
   };
