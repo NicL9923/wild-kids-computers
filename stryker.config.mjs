@@ -25,6 +25,9 @@ const config = {
     // Every activity's level generator, toy desktop lessons included.
     'src/features/*/activities/*/level.ts',
     'src/features/toy-desktop/lessons/*/level.ts',
+    // The alphabet and choice rules every letters and reading level generator builds on.
+    'src/features/early-learning/reading/alphabet.ts',
+    'src/features/early-learning/reading/choices.ts',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html'],

@@ -209,6 +209,9 @@
 }
 
 .rd-tiles {
+  margin: 0;
+  border: 0;
+  padding-inline: 0;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -225,22 +228,41 @@
   border-radius: var(--wk-radius-card);
 }
 
-/* Picture cards for matching. */
-.rd-cards {
+/* Picture cards for matching, as big as the stage allows and never past 280px. */
+.rd-stage-board {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.rd-board {
   display: grid;
-  grid-template-columns: repeat(var(--rd-columns), minmax(0, 1fr));
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.rd-cards {
+  --rd-card: min(
+    calc((100cqw - (var(--rd-columns) - 1) * var(--wk-space-container)) / var(--rd-columns)),
+    calc((100cqh - (var(--rd-rows) - 1) * var(--wk-space-container) - var(--wk-press-depth)) / var(--rd-rows)),
+    280px
+  );
+  display: grid;
+  grid-template-columns: repeat(var(--rd-columns), var(--rd-card));
+  grid-auto-rows: var(--rd-card);
   gap: var(--wk-space-container);
-  width: min(100%, calc(var(--rd-columns) * (var(--wk-target-large) * 1.5 + var(--wk-space-container))));
-  align-self: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .rd-card {
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 1;
-  min-width: calc(var(--wk-target-large) * 1.1);
-  max-height: 30vh;
+  width: 100%;
+  height: 100%;
   padding: 0;
   border: var(--wk-border-width) solid var(--wk-color-primary-base);
   border-radius: var(--wk-radius-card);
@@ -302,4 +324,47 @@
 .rd-picture-button img {
   width: 80%;
   height: 80%;
+}
+
+/* After two misses, the box the next letter goes in stands out with a thick solid edge. */
+.rd-slot[data-hint='true'] {
+  border-style: solid;
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+}
+
+/* A round with many tiles: smaller tiles and picture, still at least the band's large target. */
+.rd-stage[data-crowded='true'] {
+  --rd-size: max(var(--wk-target-large), min(15vh, 9vw));
+}
+
+.rd-stage[data-crowded='true'] .rd-picture-button {
+  width: min(calc(var(--rd-size) * 1.5), 28vh);
+  height: min(calc(var(--rd-size) * 1.5), 28vh);
+}
+
+/* The sentence's last place carries its period, so the child sees where the sentence ends. */
+.rd-slot[data-last='true'] {
+  position: relative;
+  margin-inline-end: calc(var(--wk-space-item) * 1.5);
+}
+
+.rd-slot[data-last='true']::after {
+  content: '.';
+  position: absolute;
+  inset-inline-start: calc(100% + var(--wk-space-unit));
+  bottom: 12%;
+  color: var(--wk-color-text);
+  font-size: calc(var(--rd-size) * 0.4);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.rd-picture-small img {
+  width: 76%;
+  height: 76%;
+}
+
+.rd-stage .rd-picture-small {
+  width: min(var(--rd-size), 20vh);
+  height: min(var(--rd-size), 20vh);
 }
