@@ -104,7 +104,10 @@ export interface LeadCutOptions {
    * one in the window. A shorter first pause is taken only when no other pause follows it there.
    */
   readonly minPauseMs: number;
-  /** Shorter quiet gaps are part of speech, such as the closure before a stop, never the break. */
+  /**
+   * Shorter quiet gaps are part of speech, such as the closure before a stop, never the break.
+   * A sound shorter than this between two pauses is a click, and the pauses count as one.
+   */
   readonly shortestPauseMs: number;
   /** The pause must start inside this window, in ms from the start. */
   readonly earliestPauseMs: number;
@@ -163,15 +166,39 @@ export function findPauses(
 }
 
 /**
+ * Joins a short pause to the next one when only a click lies between them: a sound shorter than
+ * `shortestPauseMs`. The letter sound "/ks/" ends its lead-in with a 30 ms dip, a 20 ms click,
+ * and then the 370 ms break. A pause of `minPauseMs` or more is never joined to what follows,
+ * because a word can start with a burst that short, such as the "h" of "horse".
+ */
+function mergeClicks(pauses: readonly Pause[], options: LeadCutOptions): Pause[] {
+  const merged: Pause[] = [];
+  for (const pause of pauses) {
+    const previous = merged.at(-1);
+    const soundMs = previous === undefined ? Infinity : pause.startMs - (previous.startMs + previous.lengthMs);
+    if (previous !== undefined && previous.lengthMs < options.minPauseMs && soundMs < options.shortestPauseMs) {
+      merged[merged.length - 1] = {
+        startMs: previous.startMs,
+        lengthMs: pause.startMs + pause.lengthMs - previous.startMs,
+        resumeAt: pause.resumeAt,
+      };
+    } else {
+      merged.push(pause);
+    }
+  }
+  return merged;
+}
+
+/**
  * The pause after the lead-in: the earliest pause of at least `shortestPauseMs` that starts
  * inside the window. A later pause is never taken for it, because cutting there would drop the
  * first words. Throws when there is no such pause, and when the cut is ambiguous: the earliest
- * pause is shorter than `minPauseMs` and a pause at least as long follows it in the window, so
- * either could be the break. In every clip generated so far the break started 810 to 1300 ms in;
+ * pause is shorter than `minPauseMs` and a longer one follows it in the window, so the longer one
+ * could as well be the break. In every clip generated so far the break started 810 to 1300 ms in;
  * a later, shorter gap is the closure of a stop inside the speech, which is no rival.
  */
 function leadPause(samples: Float32Array, options: LeadCutOptions = DEFAULT_LEAD_CUT): Pause {
-  const inWindow = findPauses(samples, options).filter(
+  const inWindow = mergeClicks(findPauses(samples, options), options).filter(
     (pause) =>
       pause.lengthMs >= options.shortestPauseMs &&
       pause.startMs >= options.earliestPauseMs &&
@@ -184,7 +211,7 @@ function leadPause(samples: Float32Array, options: LeadCutOptions = DEFAULT_LEAD
     );
   }
   const rival =
-    first.lengthMs < options.minPauseMs ? later.find((pause) => pause.lengthMs >= first.lengthMs) : undefined;
+    first.lengthMs < options.minPauseMs ? later.find((pause) => pause.lengthMs > first.lengthMs) : undefined;
   if (rival !== undefined) {
     throw new Error(
       `The pause after the lead-in is ambiguous: the first one, at ${String(first.startMs)} ms, lasts only ${String(first.lengthMs)} ms, and one of ${String(rival.lengthMs)} ms follows at ${String(rival.startMs)} ms.`,
