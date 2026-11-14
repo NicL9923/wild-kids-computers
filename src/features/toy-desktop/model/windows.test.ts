@@ -227,13 +227,18 @@ describe('moving and resizing', () => {
     ['maximized', { maximized: true }, 'resize-window', 'maximized'],
     ['minimized', { minimized: true }, 'resize-window', 'minimized'],
     ['minimized', { minimized: true }, 'move-window', 'minimized'],
+    ['minimized maximized', { minimized: true, maximized: true }, 'unmaximize-window', 'minimized'],
   ] as const)('refuses to change a %s window', (_label, flags, type, reason) => {
     const start = buildDesktop({ windows: [{ app: 'notepad', ...flags }, { app: 'calculator' }] });
     const action: DesktopAction =
       type === 'resize-window'
         ? { type, windowId: 'w1', width: 600, height: 400 }
-        : { type, windowId: 'w1', x: 10, y: 10 };
-    expect(act(start, action).events).toEqual([{ type: 'rejected', action: type, reason }]);
+        : type === 'move-window'
+          ? { type, windowId: 'w1', x: 10, y: 10 }
+          : { type, windowId: 'w1' };
+    const { state, events } = act(start, action);
+    expect(events).toEqual([{ type: 'rejected', action: type, reason }]);
+    expect(state).toBe(start);
   });
 
   it('refuses a size that is not a number', () => {
@@ -322,6 +327,19 @@ describe('minimize, maximize, and restore', () => {
     const { state, events } = act(start, { type: 'maximize-window', windowId: 'w1' });
     expect(win(state, 1)).toMatchObject({ id: 'w1', maximized: true, minimized: false });
     expect(events.map((event) => event.type)).toEqual(['window-restored', 'window-maximized', 'window-focused']);
+  });
+
+  it('restoring the size of a window put away while maximized leaves it down in the task strip', () => {
+    // The restore button is in the title bar, which a minimized window does not show. Focus stays
+    // on a window the child can see.
+    const { state } = act(
+      buildDesktop({ windows: [{ app: 'calculator' }, { app: 'notepad' }] }),
+      { type: 'maximize-window', windowId: 'w2' },
+      { type: 'minimize-window', windowId: 'w2' },
+      { type: 'unmaximize-window', windowId: 'w2' },
+    );
+    expect(state.focusedWindowId).toBe('w1');
+    expect(state.windows.find((window) => window.id === 'w2')).toMatchObject({ minimized: true, maximized: true });
   });
 
   it('maximizing a maximized window, or restoring a normal one, reports nothing', () => {

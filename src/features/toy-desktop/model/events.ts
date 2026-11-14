@@ -24,7 +24,7 @@ export type RejectReason =
   | 'command-disabled'
   /** `MAX_WINDOWS` windows are open already. */
   | 'too-many-windows'
-  /** A minimized window cannot be moved, resized, or focused until it is restored. */
+  /** A minimized window cannot be moved, resized, restored to its size, or focused until it is restored. */
   | 'minimized'
   /** A maximized window cannot be resized until it is restored. */
   | 'maximized'

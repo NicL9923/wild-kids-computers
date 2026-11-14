@@ -349,7 +349,10 @@ function maximizeWindow(state: DesktopState, window: WindowState): Transition {
   return { state: front.state, events: [...events, ...front.events] };
 }
 
-function unmaximizeWindow(state: DesktopState, window: WindowState): Transition {
+function unmaximizeWindow(state: DesktopState, window: WindowState): Step {
+  // The restore button is in the title bar, which a minimized window does not show. Focusing a
+  // minimized window would put focus on a window the child cannot see.
+  if (window.minimized) return 'minimized';
   if (!window.maximized) return done(state);
   const restored = { ...window, maximized: false };
   const front = bringToFront(replaceWindow(state, restored), restored);
