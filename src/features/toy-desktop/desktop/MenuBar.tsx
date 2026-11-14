@@ -43,7 +43,10 @@ export function MenuBar() {
   const { desktop, kit, sayName, highlight, parts, focusContent } = useDesktopContext();
   const { state, dispatch } = desktop;
   const front = focusedWindow(state);
-  const menus = front === undefined ? [] : menuBar(state, front.id, toyClipboard);
+  const menus = (front === undefined ? [] : menuBar(state, front.id, toyClipboard)).map((menu) => ({
+    ...menu,
+    items: menu.items.filter((item) => !parts.hiddenCommands.includes(item.command)),
+  }));
   // A menu belongs to one window. When another window comes forward, it is closed.
   const [opened, setOpened] = useState<{ menu: MenuId; windowId: string } | null>(null);
   const open = front !== undefined && opened?.windowId === front.id ? opened.menu : null;

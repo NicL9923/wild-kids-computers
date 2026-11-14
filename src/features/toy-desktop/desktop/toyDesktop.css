@@ -280,6 +280,19 @@
   }
 }
 
+/* A window clips what lies outside it, so a pointed-at title bar draws its ring inside. */
+.td-title[data-highlight='true'] {
+  outline-offset: calc(var(--wk-focus-width) * -2);
+  box-shadow: none;
+  animation-name: td-point-inside;
+}
+
+@keyframes td-point-inside {
+  50% {
+    outline-offset: calc(var(--wk-focus-width) * -2 - 4px * var(--wk-motion-scale));
+  }
+}
+
 /* ---- menu bar ---- */
 
 .td-menu-bar {
@@ -1109,6 +1122,15 @@ button.td-resize[data-carry-item] {
   border: var(--wk-border-width) solid var(--td-edge);
   border-radius: var(--td-radius);
   background: var(--td-chrome);
+}
+
+/* The grip draws smaller than a target so it leaves the picture clear, but it takes a click
+   anywhere in a full target around it. */
+.td-item-grip::before {
+  position: absolute;
+  inset: calc(var(--wk-target-min) * -0.125 - var(--wk-border-width));
+  border-radius: inherit;
+  content: '';
 }
 
 .td-item-grip[data-carried='true'] {

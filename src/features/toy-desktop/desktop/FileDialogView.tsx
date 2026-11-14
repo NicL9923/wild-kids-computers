@@ -85,6 +85,7 @@ export function FileDialogView({ window, layer }: { readonly window: WindowState
               type='button'
               className='td-list-item'
               data-dialog-item={node.name}
+              data-highlight-key={`item:${node.id}`}
               aria-pressed={node.id === dialog.selectedId}
               onClick={() => run({ type: 'select', nodeId: node.id })}
             >
@@ -127,6 +128,7 @@ export function FileDialogView({ window, layer }: { readonly window: WindowState
           className='wk-button'
           data-variant='primary'
           data-dialog-action='confirm'
+          data-highlight-key='dialog:confirm'
           disabled={!saving && dialog.selectedId === null}
           {...sayName(saving ? (dialog.replaceId === null ? strings.save : strings.replace) : strings.open)}
           onClick={() => run({ type: 'confirm' })}
