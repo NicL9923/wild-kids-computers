@@ -5,6 +5,7 @@ import { Emoji } from '../../../../components/ui/Emoji.tsx';
 import { t } from '../../../../core/strings/defineStrings.ts';
 import { emojiNames } from '../../../../core/strings/shared/index.ts';
 import { KeyboardPicture, type KeyMark } from '../../shared/KeyboardPicture.tsx';
+import { KeyPlayArea } from '../../shared/KeyPlayArea.tsx';
 import { PATH, START_X, type JumpLevel, type StopKind } from './level.ts';
 import './spaceAndEnter.css';
 import { strings } from './strings.ts';
@@ -37,6 +38,7 @@ const percentX = (x: number) => `${String((x / PATH.width) * 100)}%`;
  * A critter walks along a path toward home. Space jumps it over logs and rocks; Enter opens
  * gates and the door of home. The right key lights up on the keyboard picture. The other key at a
  * stop gets a neutral nudge that says which key to use. Space anywhere else is a happy hop.
+ * The path is the play area that keeps Space and Enter from the shell's buttons.
  */
 export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<JumpLevel>) {
   const [walk, setWalk] = useState<WalkState>(() => startWalk(START_X));
@@ -130,7 +132,7 @@ export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<Jump
 
   return (
     <div className='jump-stage' data-phase={walk.phase} data-stop={walk.stop}>
-      <div className='jump-path-area'>
+      <KeyPlayArea className='jump-path-area' label={t(strings.path)}>
         <div className='jump-path'>
           <svg className='jump-ground' viewBox={`0 0 ${String(PATH.width)} ${String(PATH.height)}`} aria-hidden='true'>
             <rect className='jump-grass' x={0} y={GROUND_Y} width={PATH.width} height={PATH.height - GROUND_Y} />
@@ -174,7 +176,7 @@ export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<Jump
             <Emoji id={level.critter} />
           </div>
         </div>
-      </div>
+      </KeyPlayArea>
       <div className='jump-keyboard'>
         <KeyboardPicture label={t(emojiNames.keyboard)} marks={marks} />
       </div>

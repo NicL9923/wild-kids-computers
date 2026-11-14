@@ -14,6 +14,7 @@ import {
   spokenIds,
 } from '../support/activity.ts';
 import { readAudioLog } from '../support/audioLog.ts';
+import { tabTo } from '../support/keyboard.ts';
 import type { LaunchedApp } from '../support/launchApp.ts';
 
 const SEED = 20_261_114;
@@ -50,8 +51,8 @@ forEachBand(activity.bands, (band) => {
     expect(spoken).toContain(letterNames.b.id);
     expect(spoken).toContain(numbers['7'].id);
     expect((await readAudioLog(page)).some((entry) => entry.kind === 'sfx' && entry.name === 'pop')).toBe(true);
-    // Tab is a party key here, so it did not move focus to a control.
-    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    // Tab is a party key here, so focus stayed on the meadow and did not move to a control.
+    expect(await page.evaluate(() => document.activeElement?.hasAttribute('data-key-area'))).toBe(true);
     await settled(page);
     await saveBandScreenshot(page, band, activity.id);
     await expectAccessible(page);
@@ -73,6 +74,10 @@ forEachBand(activity.bands, (band) => {
     // A letter on the focused control still parties; Enter there presses the control instead.
     await page.keyboard.press('m');
     await expect(stage(page)).toHaveAttribute('data-arrived', '1');
+    // Tab comes back to the meadow, where Space brings a friend again.
+    await tabTo(page, page.locator('[data-key-area]'));
+    await page.keyboard.press('Space');
+    await expect(stage(page)).toHaveAttribute('data-arrived', '2');
   });
 
   test('a click on the meadow says once to use the keys', async () => {
