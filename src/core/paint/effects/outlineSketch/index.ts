@@ -39,10 +39,17 @@ function lookup(size: number, shrink: number, small: number): Lookup {
 }
 
 /**
- * Each channel as seen over white paper, averaged over shrink by shrink blocks, three bytes per
- * shrunk pixel. A transparent pixel reads as white, so it never makes an edge.
+ * Writes every pixel faded toward white into output, keeping alpha, and returns each channel as
+ * seen over white paper, averaged over shrink by shrink blocks, three bytes per shrunk pixel. A
+ * transparent pixel reads as white, so it never makes an edge. Both in one pass over the picture.
  */
-function shrinkOverWhite(input: Uint8ClampedArray, width: number, height: number, shrink: number): Uint8Array {
+function fadeAndShrink(
+  input: Uint8ClampedArray,
+  output: Uint8ClampedArray,
+  width: number,
+  height: number,
+  shrink: number,
+): Uint8Array {
   const sw = Math.ceil(width / shrink);
   const sh = Math.ceil(height / shrink);
   const value = new Uint8Array(sw * sh * 3);
@@ -56,15 +63,22 @@ function shrinkOverWhite(input: Uint8ClampedArray, width: number, height: number
     for (let y = by * shrink; y < bottom; y++) {
       for (let x = 0, i = y * width * 4; x < width; x++, i += 4) {
         const s = slot[x] ?? 0;
+        const r = input[i] ?? 0;
+        const g = input[i + 1] ?? 0;
+        const b = input[i + 2] ?? 0;
         const alpha = input[i + 3] ?? 0;
+        output[i] = FADED[r] ?? 0;
+        output[i + 1] = FADED[g] ?? 0;
+        output[i + 2] = FADED[b] ?? 0;
+        output[i + 3] = alpha;
         if (alpha === 255) {
-          sums[s] = (sums[s] ?? 0) + (input[i] ?? 0);
-          sums[s + 1] = (sums[s + 1] ?? 0) + (input[i + 1] ?? 0);
-          sums[s + 2] = (sums[s + 2] ?? 0) + (input[i + 2] ?? 0);
+          sums[s] = (sums[s] ?? 0) + r;
+          sums[s + 1] = (sums[s + 1] ?? 0) + g;
+          sums[s + 2] = (sums[s + 2] ?? 0) + b;
         } else {
-          sums[s] = (sums[s] ?? 0) + 255 - div255((255 - (input[i] ?? 0)) * alpha);
-          sums[s + 1] = (sums[s + 1] ?? 0) + 255 - div255((255 - (input[i + 1] ?? 0)) * alpha);
-          sums[s + 2] = (sums[s + 2] ?? 0) + 255 - div255((255 - (input[i + 2] ?? 0)) * alpha);
+          sums[s] = (sums[s] ?? 0) + 255 - div255((255 - r) * alpha);
+          sums[s + 1] = (sums[s + 1] ?? 0) + 255 - div255((255 - g) * alpha);
+          sums[s + 2] = (sums[s + 2] ?? 0) + 255 - div255((255 - b) * alpha);
         }
       }
     }
@@ -123,20 +137,10 @@ function lineStrength(value: Uint8Array, width: number, height: number): Float64
   return line;
 }
 
-/** Fades every pixel toward white, keeping alpha. */
-function fade(input: Uint8ClampedArray, output: Uint8ClampedArray): void {
-  for (let i = 0; i < input.length; i += 4) {
-    output[i] = FADED[input[i] ?? 0] ?? 0;
-    output[i + 1] = FADED[input[i + 1] ?? 0] ?? 0;
-    output[i + 2] = FADED[input[i + 2] ?? 0] ?? 0;
-    output[i + 3] = input[i + 3] ?? 0;
-  }
-}
-
 /**
  * Draws the line strength, blended up from the shrunk size, in ink over the faded picture.
- * A full-size pixel blends the shrunk pixels around it, so a shrunk pixel with a line reaches
- * full-size pixels up to one shrunk pixel away, and only those need drawing.
+ * A full-size pixel blends the shrunk pixel it falls in with neighbors at most one shrunk pixel
+ * away, so only full-size pixels in or next to a shrunk pixel with a line need drawing.
  */
 function drawInk(
   input: Uint8ClampedArray,
@@ -150,18 +154,26 @@ function drawInk(
   const sh = Math.ceil(height / shrink);
   const columns = lookup(width, shrink, sw);
   const rows = lookup(height, shrink, sh);
+  // Mark every shrunk pixel next to a line, so each full-size pixel near a line is drawn once.
+  const near = new Uint8Array(sw * sh);
   for (let by = 0; by < sh; by++) {
     for (let bx = 0; bx < sw; bx++) {
       if ((line[by * sw + bx] ?? 0) === 0) continue;
-      const x0 = Math.max(0, (bx - 1) * shrink);
-      const x1 = Math.min(width, (bx + 2) * shrink);
-      const y0 = Math.max(0, (by - 1) * shrink);
-      const y1 = Math.min(height, (by + 2) * shrink);
-      for (let y = y0; y < y1; y++) {
+      for (let ny = Math.max(0, by - 1); ny <= Math.min(sh - 1, by + 1); ny++) {
+        near.fill(1, ny * sw + Math.max(0, bx - 1), ny * sw + Math.min(sw - 1, bx + 1) + 1);
+      }
+    }
+  }
+  for (let by = 0; by < sh; by++) {
+    for (let bx = 0; bx < sw; bx++) {
+      if (near[by * sw + bx] === 0) continue;
+      const x1 = Math.min(width, (bx + 1) * shrink);
+      const y1 = Math.min(height, (by + 1) * shrink);
+      for (let y = by * shrink; y < y1; y++) {
         const top = (rows.first[y] ?? 0) * sw;
         const bottom = (rows.second[y] ?? 0) * sw;
         const fy = rows.weight[y] ?? 0;
-        for (let x = x0; x < x1; x++) {
+        for (let x = bx * shrink; x < x1; x++) {
           const left = columns.first[x] ?? 0;
           const right = columns.second[x] ?? 0;
           const fx = columns.weight[x] ?? 0;
@@ -174,7 +186,6 @@ function drawInk(
           const g = 255 - (255 - (input[i + 1] ?? 0)) * KEEP;
           const b = 255 - (255 - (input[i + 2] ?? 0)) * KEEP;
           // The clamped array rounds each channel, half to even, the same on every machine.
-          // Neighboring lines write a pixel more than once, always with the same value.
           output[i] = r + (INK_R - r) * ink;
           output[i + 1] = g + (INK_G - g) * ink;
           output[i + 2] = b + (INK_B - b) * ink;
@@ -202,9 +213,8 @@ export default defineEffect({
     }
     const { width, height } = source;
     const shrink = Math.max(1, Math.round(width / EDGE_WIDTH));
-    const value = shrinkOverWhite(source.data, width, height, shrink);
+    const value = fadeAndShrink(source.data, target.data, width, height, shrink);
     const line = lineStrength(value, Math.ceil(width / shrink), Math.ceil(height / shrink));
-    fade(source.data, target.data);
     drawInk(source.data, target.data, width, height, shrink, line);
   },
 });

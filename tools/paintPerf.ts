@@ -3,7 +3,7 @@ import { cpus } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { rgba } from '../src/core/paint/color.ts';
-import { createDocument, DOCUMENT_HEIGHT, DOCUMENT_WIDTH } from '../src/core/paint/document.ts';
+import { createDocument, DOCUMENT_HEIGHT, DOCUMENT_WIDTH, type PaintDocument } from '../src/core/paint/document.ts';
 import { History } from '../src/core/paint/history.ts';
 import { cos, sin, TAU } from '../src/core/paint/math.ts';
 import { startStroke, type StrokePainter } from '../src/core/paint/session.ts';
@@ -12,7 +12,6 @@ import round from '../src/core/paint/tips/round.ts';
 import soft from '../src/core/paint/tips/soft.ts';
 import brush from '../src/core/paint/tools/brush/index.ts';
 import fill from '../src/core/paint/tools/fill/index.ts';
-import { paintScene } from '../src/core/paint/testing/scenes.ts';
 import type { BrushTip, PaintEffect, ToolPoint, ToolSettings } from '../src/core/paint/types.ts';
 
 /**
@@ -99,6 +98,20 @@ function measureStroke(tip: BrushTip, size: number, speed: number, painter: Stro
   return stats(samples.slice(60));
 }
 
+/** Paper with three thick colored scribbles across it. */
+function paintedPicture(): PaintDocument {
+  const doc = createDocument();
+  const history = new History(doc);
+  const colors = [rgba(220, 60, 50), rgba(90, 180, 70), rgba(40, 90, 220)];
+  colors.forEach((color, k) => {
+    const stroke = startStroke(history, brush, settings({ color, size: 90 }));
+    stroke.begin(pointAt(k * 2));
+    for (let step = 1; step < 200; step++) stroke.move(pointAt(k * 2 + step * 0.05));
+    stroke.end();
+  });
+  return doc;
+}
+
 function isEffectModule(value: unknown): value is { default: PaintEffect } {
   return typeof value === 'object' && value !== null && 'default' in value;
 }
@@ -121,9 +134,8 @@ function measureEffects(effects: readonly PaintEffect[]): { id: string; first: n
   for (const effect of effects) {
     if (effect.group !== 'whole-picture') continue;
     const id = effect.id;
-    // The test scene, not blank paper, so an effect whose cost depends on the picture has edges to find.
-    const doc = createDocument();
-    paintScene(doc);
+    // A painted picture, not blank paper, so an effect whose cost depends on the picture has edges to find.
+    const doc = paintedPicture();
     const source = cloneSurface(doc.paint);
     const target = cloneSurface(doc.paint);
     const first = time(() => effect.apply(source, target));
