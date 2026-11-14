@@ -50,8 +50,15 @@ export const SOUNDS_OUT_OF_VIEW: readonly AlertSound[] = ALERT_SOUNDS.slice(LIST
  * Which controls a round may use and how many, by difficulty. One kind at low difficulty, a mix at
  * high. The scrolling list and the text field come last: one needs scrolling, the other typing.
  */
-export const DIFFICULTY: readonly { readonly kinds: readonly ControlKind[]; readonly count: number }[] = [
-  { kinds: ['checkbox', 'radio'], count: 1 },
+interface ControlsRow {
+  readonly kinds: readonly ControlKind[];
+  readonly count: number;
+}
+
+const EASIEST: ControlsRow = { kinds: ['checkbox', 'radio'], count: 1 };
+
+export const DIFFICULTY: readonly ControlsRow[] = [
+  EASIEST,
   { kinds: ['checkbox', 'radio', 'dropdown'], count: 1 },
   { kinds: ['dropdown', 'slider', 'list'], count: 1 },
   { kinds: ['checkbox', 'radio', 'dropdown', 'slider'], count: 2 },
@@ -130,8 +137,7 @@ function targetFor(kind: ControlKind, random: ReturnType<typeof createRandom>, s
  */
 export function generateLevel(seed: number, difficulty: number, _band: Band): ControlsLevel {
   const random = createRandom(seed);
-  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? DIFFICULTY[0];
-  if (row === undefined) throw new Error('controls: no difficulty table');
+  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? EASIEST;
   const startNames = random.pick([true, false]);
   const kinds = random.sample(row.kinds, row.count);
   const targets = kinds.map((kind) => targetFor(kind, random, startNames));

@@ -36,17 +36,16 @@ function hintFor(fault: Fault): HighlightTarget {
 function isWrongTry(fault: Fault, { events }: Transition, action: DesktopAction): boolean {
   switch (fault.kind) {
     case 'sound-muted':
-      // Putting windows away or making them bigger does not bring the sound back.
-      return hasEvent(events, 'window-minimized') || hasEvent(events, 'window-maximized');
+      // Putting a window away does not bring the sound back.
+      return hasEvent(events, 'window-minimized');
     case 'window-off-side':
       // A carry keeps the whole window inside the desktop, so any move of it is the fix.
       return false;
     default:
-      // Choosing another window in the task strip, or putting another window away.
-      return (
-        (action.type === 'activate-window' && action.windowId !== fault.windowId) ||
-        hasEvent(events, 'window-minimized', (event) => event.windowId !== fault.windowId)
-      );
+      // Choosing another window in the task strip, or putting the front window away. Choosing the
+      // hidden window itself fixes it, and a fix is never a try. The hidden window is never in
+      // front, so it is never the one put away.
+      return action.type === 'activate-window' || hasEvent(events, 'window-minimized');
   }
 }
 

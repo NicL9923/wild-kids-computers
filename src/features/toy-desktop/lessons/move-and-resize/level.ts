@@ -9,6 +9,9 @@ import { LESSON_DESKTOP_SIZE, type LessonLevel } from '../harness/lesson.ts';
 /** The picture the window shows, so it is easy to tell which window is the one to move. */
 const WINDOW_PICTURE = 'Fox';
 
+/** The only window's id: `buildDesktop` numbers windows from w1. */
+export const WINDOW_ID = 'w1';
+
 /** The window's size when the round starts, in desktop units. */
 export const START_SIZE = { width: 360, height: 260 } as const;
 

@@ -34,18 +34,25 @@ export type PartsMode = 'name' | 'clue';
 /** Parts whose job a young child knows from daily life: these are asked by what they do first. */
 const EASY_CLUES: readonly PartId[] = ['screen', 'keyboard', 'speaker'];
 
-/** Per difficulty: how many parts are on the desk, and what the child hears. */
-export const DIFFICULTY: readonly {
+interface PartsRow {
+  /** How many parts are on the desk. */
   readonly parts: number;
+  /** What the child hears. */
   readonly mode: PartsMode;
-  readonly targets: 'all' | 'easy';
-}[] = [
-  { parts: 3, mode: 'name', targets: 'all' },
-  { parts: 4, mode: 'name', targets: 'all' },
-  { parts: 5, mode: 'name', targets: 'all' },
-  { parts: 6, mode: 'name', targets: 'all' },
-  { parts: 6, mode: 'clue', targets: 'easy' },
-  { parts: 6, mode: 'clue', targets: 'all' },
+  /** True when only the parts in `EASY_CLUES` are asked for. */
+  readonly easyOnly: boolean;
+}
+
+const EASIEST: PartsRow = { parts: 3, mode: 'name', easyOnly: false };
+
+/** Per difficulty: how many parts are on the desk, and what the child hears. */
+export const DIFFICULTY: readonly PartsRow[] = [
+  EASIEST,
+  { parts: 4, mode: 'name', easyOnly: false },
+  { parts: 5, mode: 'name', easyOnly: false },
+  { parts: 6, mode: 'name', easyOnly: false },
+  { parts: 6, mode: 'clue', easyOnly: true },
+  { parts: 6, mode: 'clue', easyOnly: false },
 ];
 
 export interface PartsLevel {
@@ -62,9 +69,8 @@ export interface PartsLevel {
  */
 export function generateLevel(seed: number, difficulty: number, _band: Band): PartsLevel {
   const random = createRandom(seed);
-  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? DIFFICULTY[0];
-  if (row === undefined) throw new Error('parts-of-a-computer: no difficulty table');
+  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? EASIEST;
   const parts = PARTS.slice(0, row.parts);
-  const pool = row.targets === 'easy' ? parts.filter((part) => EASY_CLUES.includes(part)) : parts;
+  const pool = row.easyOnly ? parts.filter((part) => EASY_CLUES.includes(part)) : parts;
   return { parts, target: random.pick(pool), mode: row.mode };
 }

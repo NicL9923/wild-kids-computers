@@ -77,8 +77,15 @@ const PAIRS: readonly MenuCase[] = [
  * Each difficulty changes one thing: which apps, whether the instruction names the menu, and from
  * 6 two commands in a row. The pools are the design; the level test pins them.
  */
-export const DIFFICULTY: readonly { readonly cases: readonly MenuCase[]; readonly named: boolean }[] = [
-  { cases: SHORT_MENUS, named: true },
+interface MenusRow {
+  readonly cases: readonly MenuCase[];
+  readonly named: boolean;
+}
+
+const EASIEST: MenusRow = { cases: SHORT_MENUS, named: true };
+
+export const DIFFICULTY: readonly MenusRow[] = [
+  EASIEST,
   { cases: [...SHORT_MENUS, ...NOTEPAD], named: true },
   { cases: [...NOTEPAD, ...LONG_MENUS], named: true },
   { cases: [...SHORT_MENUS, ...NOTEPAD, ...LONG_MENUS], named: false },
@@ -150,13 +157,12 @@ const PARTS: DesktopParts = {
 /** One app's window with its menu bar. The child finds the command they hear and runs it. */
 export function generateLevel(seed: number, difficulty: number, _band: Band): MenusLevel {
   const random = createRandom(seed);
-  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? DIFFICULTY[0];
-  if (row === undefined) throw new Error('menus: no difficulty table');
+  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? EASIEST;
   const chosen = random.pick(row.cases);
   const desktop = buildDesktop({
     size: LESSON_DESKTOP_SIZE,
     files: {
-      Pictures: { Fox: picture('fox'), Rainbow: picture('rainbow'), Sunflower: picture('sunflower') },
+      Pictures: { Fox: picture('fox'), Rainbow: picture('rainbow') },
       Music: {
         Song: tune([
           [0, 0],

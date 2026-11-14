@@ -19,19 +19,25 @@ const VIEWER_PICTURE = 'Fox';
  * Places for windows that never overlap, so the one window hiding behind another is the only
  * hidden one and "the window behind" is never ambiguous.
  */
+const FIRST_SLOT: Rect = { x: 24, y: 24, width: 460, height: 290 };
+
 export const SLOTS: readonly Rect[] = [
-  { x: 24, y: 24, width: 460, height: 290 },
+  FIRST_SLOT,
   { x: 540, y: 24, width: 460, height: 290 },
   { x: 24, y: 334, width: 460, height: 290 },
 ];
 
 /** Per difficulty: the problems a round may pose, how many at once, and how many windows are open. */
-export const DIFFICULTY: readonly {
+interface FixItRow {
   readonly kinds: readonly FaultKind[];
   readonly faults: number;
   readonly windows: number;
-}[] = [
-  { kinds: ['sound-muted', 'window-minimized'], faults: 1, windows: 2 },
+}
+
+const EASIEST: FixItRow = { kinds: ['sound-muted', 'window-minimized'], faults: 1, windows: 2 };
+
+export const DIFFICULTY: readonly FixItRow[] = [
+  EASIEST,
   { kinds: ['window-minimized', 'window-behind'], faults: 1, windows: 2 },
   { kinds: ['sound-muted', 'window-minimized', 'window-behind'], faults: 1, windows: 2 },
   { kinds: ['window-behind', 'window-off-side'], faults: 1, windows: 2 },
@@ -70,7 +76,7 @@ const WINDOWS_USED: Readonly<Record<FaultKind, number>> = {
  * Kinds for a round: distinct, and together using no more windows than are open. Drawn again
  * until they fit; with three windows and at most two window problems, most draws do.
  */
-function kindsFor(row: (typeof DIFFICULTY)[number], random: ReturnType<typeof createRandom>): FaultKind[] {
+function kindsFor(row: FixItRow, random: ReturnType<typeof createRandom>): FaultKind[] {
   for (;;) {
     const kinds = random.sample(row.kinds, row.faults);
     const used = kinds.reduce((sum, kind) => sum + WINDOWS_USED[kind], 0);
@@ -84,12 +90,10 @@ function kindsFor(row: (typeof DIFFICULTY)[number], random: ReturnType<typeof cr
  */
 export function generateLevel(seed: number, difficulty: number, _band: Band): FixItLevel {
   const random = createRandom(seed);
-  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? DIFFICULTY[0];
-  if (row === undefined) throw new Error('fix-it: no difficulty table');
+  const row = DIFFICULTY[Math.min(Math.max(difficulty, 1), DIFFICULTY.length) - 1] ?? EASIEST;
   const apps = random.sample(APPS, row.windows);
   const windows: WindowSpec[] = apps.map((app, index) => {
-    const slot = SLOTS[index] ?? SLOTS[0];
-    if (slot === undefined) throw new Error('fix-it: no slot');
+    const slot = SLOTS[index] ?? FIRST_SLOT;
     return {
       ...(app === 'picture-viewer' ? { file: VIEWER_PICTURE } : { app }),
       at: { x: slot.x, y: slot.y },

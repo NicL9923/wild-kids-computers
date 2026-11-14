@@ -23,6 +23,8 @@ type FinishStep = 'maximize' | 'minimize';
 export interface SwitchLevel extends LessonLevel {
   /** The app whose window the child brings to the front. */
   readonly target: AppKind;
+  /** The id of the target's window. `buildDesktop` numbers windows from w1 in the order given. */
+  readonly targetWindow: string;
   /** The open apps, back to front. */
   readonly apps: readonly AppKind[];
   readonly hiding: Hiding;
@@ -85,6 +87,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Sw
   }));
   return {
     target,
+    targetWindow: `w${String(apps.indexOf(target) + 1)}`,
     apps,
     hiding,
     finish: difficulty >= 5 ? ['maximize', 'minimize'] : ['maximize'],

@@ -1,13 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { createToyClipboard } from '../../../../app/inputGuards.ts';
 import type { Band } from '../../../../core/bands.ts';
+import { withDefaults } from '../../desktop/parts.ts';
 import { reduce, type DesktopAction } from '../../model/desktop.ts';
+import { nodeAtPath } from '../../model/fileSystem.ts';
 import { isFaultFixed, type Fault } from '../../model/faults.ts';
 import { findWindow, type DesktopState } from '../../model/state.ts';
 import activity from './activity.ts';
 import { DIFFICULTY, generateLevel, SLOTS, type FixItLevel } from './level.ts';
 import { faultInstruction, fixSteps } from './steps.ts';
 import { strings } from './strings.ts';
+
+/** The apps a window may show. Never settings, which has nothing to fix. */
+const FIVE_APPS: readonly string[] = ['notepad', 'picture-viewer', 'file-explorer', 'music-box', 'calculator'];
+
+/** The window a problem moves away from its slot: the one pushed off, or the one laid over another. */
+function movedWindow(fault: Fault): string[] {
+  if (fault.kind === 'window-off-side') return [fault.windowId];
+  if (fault.kind === 'window-behind') return [fault.coveredBy];
+  return [];
+}
 
 const SEEDS = Array.from({ length: 200 }, (_, index) => index * 7_919 + 11);
 const env = () => ({ clipboard: createToyClipboard() });
@@ -51,6 +63,30 @@ function problems(level: FixItLevel): string[] {
     if (isFaultFixed(level.desktop, fault)) found.push(`${fault.kind} is fixed already`);
   }
   if (level.parts?.systemSound !== kinds.includes('sound-muted')) found.push('the sound button shows for nothing');
+  for (const fault of level.faults) {
+    if (fault.kind === 'window-off-side' && fault.side !== 'left') found.push('a window off the right side');
+  }
+  // Every window is one of the five apps, and the ones no problem moved stand in their own slot.
+  const moved = new Set(level.faults.flatMap(movedWindow));
+  for (const window of level.desktop.windows) {
+    if (!FIVE_APPS.includes(window.app.kind)) found.push(`${window.id} is ${window.app.kind}`);
+    // Window w1 opened in the first slot, w2 in the second, and so on.
+    const slot = SLOTS[Number(window.id.slice(1)) - 1];
+    if (slot === undefined) {
+      found.push(`${window.id} has no slot`);
+      continue;
+    }
+    if (moved.has(window.id)) continue;
+    const { x, y, width, height } = window.rect;
+    if (x !== slot.x || y !== slot.y || width !== slot.width || height !== slot.height) {
+      found.push(`${window.id} left its slot`);
+    }
+  }
+  const fox = nodeAtPath(level.desktop.fs, 'Fox');
+  if (fox?.kind !== 'picture' || fox.pictureId !== 'fox') found.push('no fox picture');
+  for (const window of level.desktop.windows) {
+    if (window.app.kind === 'picture-viewer' && window.app.fileId !== fox?.id) found.push('the viewer shows no fox');
+  }
   // Fix them in order: each fix works and undoes no other.
   let state = level.desktop;
   level.faults.forEach((fault, index) => {
@@ -96,6 +132,29 @@ describe('fix it difficulty', () => {
       expect(levels.every((level) => level.faults.length === row.faults)).toBe(true);
       expect(levels.every((level) => level.desktop.windows.length === row.windows)).toBe(true);
     });
+  });
+
+  it('shows the task strip and movable windows with no buttons, and the sound button only when needed', () => {
+    // No window buttons: a closed window could not be fixed, and a window off the left edge shows
+    // only the right end of its title bar, where buttons would cover the part to grab.
+    const { systemSound: _sound, ...parts } = withDefaults(generateLevel(1, 1, 'band-6-8').parts);
+    expect(parts).toEqual({
+      icons: [],
+      menuBar: false,
+      taskStrip: true,
+      launcher: [],
+      windowControls: [],
+      move: true,
+      resize: false,
+      openMaximized: false,
+    });
+  });
+
+  it('uses every one of the five apps across seeds', () => {
+    const apps = new Set(
+      SEEDS.flatMap((seed) => generateLevel(seed, 5, 'band-9-12').desktop.windows.map((window) => window.app.kind)),
+    );
+    expect(apps).toEqual(new Set(FIVE_APPS));
   });
 
   it('places windows apart, so the one behind another is the only hidden one', () => {
@@ -162,6 +221,10 @@ describe('fix it steps', () => {
     const fixed = reduce(level.desktop, back, env());
     expect(step.done(fixed.state, fixed.events)).toBe(true);
     expect(step.wrong?.(fixed, back)).toBe(false);
+    // Choosing another window in the strip is no try for a window off the side.
+    const other = level.desktop.windows.find((window) => window.id !== fault.windowId)?.id ?? 'none';
+    const pick: DesktopAction = { type: 'activate-window', windowId: other };
+    expect(step.wrong?.(reduce(level.desktop, pick, env()), pick)).toBe(false);
     // A move by the model alone that leaves it mostly off is still no try.
     const short: DesktopAction = { type: 'move-window', windowId: fault.windowId, x: -200, y: 40 };
     expect(step.wrong?.(reduce(level.desktop, short, env()), short)).toBe(false);
@@ -187,8 +250,27 @@ describe('fix it steps', () => {
     if (step === undefined) throw new Error('no step');
     const away: DesktopAction = { type: 'minimize-window', windowId: 'w1' };
     expect(step.wrong?.(reduce(level.desktop, away, env()), away)).toBe(true);
+    const look: DesktopAction = { type: 'focus-window', windowId: 'w1' };
+    expect(step.wrong?.(reduce(level.desktop, look, env()), look)).toBe(false);
+    // Choosing a window in the strip neither fixes the sound nor makes anything worse.
+    const pick: DesktopAction = { type: 'activate-window', windowId: 'w1' };
+    expect(step.wrong?.(reduce(level.desktop, pick, env()), pick)).toBe(false);
     const louder: DesktopAction = { type: 'set-volume', volume: 60 };
     const fixed = reduce(level.desktop, louder, env());
     expect(step.done(fixed.state, fixed.events)).toBe(true);
+  });
+});
+
+describe('fix it tries for a minimized window', () => {
+  it('counts putting another window away as a try, and looking at one as nothing', () => {
+    const level = levelWith('window-minimized');
+    const [fault] = level.faults;
+    const [step] = fixSteps(level);
+    if (fault?.kind !== 'window-minimized' || step === undefined) throw new Error('no minimized step');
+    const other = level.desktop.windows.find((window) => window.id !== fault.windowId)?.id ?? 'none';
+    const away: DesktopAction = { type: 'minimize-window', windowId: other };
+    expect(step.wrong?.(reduce(level.desktop, away, env()), away)).toBe(true);
+    const look: DesktopAction = { type: 'focus-window', windowId: other };
+    expect(step.wrong?.(reduce(level.desktop, look, env()), look)).toBe(false);
   });
 });

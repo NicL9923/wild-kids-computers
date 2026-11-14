@@ -5,7 +5,6 @@ import activity from '../../src/features/toy-desktop/lessons/switch-windows/acti
 import { generateLevel, type SwitchLevel } from '../../src/features/toy-desktop/lessons/switch-windows/level.ts';
 import { FIND } from '../../src/features/toy-desktop/lessons/switch-windows/steps.ts';
 import { strings } from '../../src/features/toy-desktop/lessons/switch-windows/strings.ts';
-import { windowsOf } from '../../src/features/toy-desktop/model/goals.ts';
 import { expectAccessible } from '../support/accessibility.ts';
 import { expectInstructionSpoken, forEachBand, openActivity, REVIEW_SIZES, spokenIds } from '../support/activity.ts';
 import { tabTo } from '../support/keyboard.ts';
@@ -22,14 +21,9 @@ test.afterEach(async () => {
   launched = undefined;
 });
 
-const targetId = (level: SwitchLevel) => windowsOf(level.desktop, level.target)[0]?.id ?? 'none';
+const targetId = (level: SwitchLevel) => level.targetWindow;
 const task = (page: Page, windowId: string) => page.locator(`[data-task-window="${windowId}"]`);
 const windowById = (page: Page, windowId: string) => page.locator(`[data-window="${windowId}"]`);
-
-function findInstruction(level: SwitchLevel) {
-  if (level.target === 'settings') throw new Error('settings is never a target');
-  return FIND[level.target];
-}
 
 forEachBand(activity.bands, (band) => {
   test('brings the hidden window to the front from the task strip, makes it fill the screen, and the round ends', async () => {
@@ -39,7 +33,7 @@ forEachBand(activity.bands, (band) => {
     const level = generateLevel(roundSeed(SEED, 0), min, band);
     const windowId = targetId(level);
     await expect(page.locator('[data-task-window]')).toHaveCount(level.apps.length);
-    await expectInstructionSpoken(page, findInstruction(level));
+    await expectInstructionSpoken(page, FIND[level.target]);
     await saveReviewScreenshot(page, band, activity.id);
     await expectAccessible(page);
 

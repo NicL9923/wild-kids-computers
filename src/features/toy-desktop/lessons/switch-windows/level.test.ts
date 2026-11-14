@@ -3,6 +3,7 @@ import { createToyClipboard } from '../../../../app/inputGuards.ts';
 import type { Band } from '../../../../core/bands.ts';
 import { withDefaults } from '../../desktop/parts.ts';
 import { reduceAll, type DesktopAction } from '../../model/desktop.ts';
+import { nodeAtPath } from '../../model/fileSystem.ts';
 import { windowsOf } from '../../model/goals.ts';
 import type { DesktopState } from '../../model/state.ts';
 import { LESSON_DESKTOP_SIZE, type LessonStep } from '../harness/lesson.ts';
@@ -34,7 +35,10 @@ function play(level: SwitchLevel, actions: readonly DesktopAction[]): { state: D
   return { state, done };
 }
 
-const targetId = (level: SwitchLevel) => windowsOf(level.desktop, level.target)[0]?.id ?? 'none';
+const targetId = (level: SwitchLevel) => level.targetWindow;
+
+/** How far each window steps from the one behind it, at least, so every title bar shows. */
+const STEP_APART = 48;
 
 /** What makes a round fair: the target is open once, hidden the way the level says, and not in front. */
 function problems(level: SwitchLevel): string[] {
@@ -42,6 +46,19 @@ function problems(level: SwitchLevel): string[] {
   const { desktop, target, hiding } = level;
   const targets = windowsOf(desktop, target);
   if (targets.length !== 1) return ['the target is not open exactly once'];
+  if (targets[0]?.id !== level.targetWindow) found.push('the target window id is another window');
+  level.desktop.windows.forEach((each, index) => {
+    const before = level.desktop.windows[index - 1];
+    if (before === undefined) return;
+    if (each.rect.x - before.rect.x < STEP_APART || each.rect.y - before.rect.y < STEP_APART) {
+      found.push(`${each.id} hides the title bar of ${before.id}`);
+    }
+  });
+  const fox = nodeAtPath(level.desktop.fs, 'Fox');
+  if (fox?.kind !== 'picture' || fox.pictureId !== 'fox') found.push('no fox picture');
+  for (const viewer of windowsOf(level.desktop, 'picture-viewer')) {
+    if (viewer.app.kind === 'picture-viewer' && viewer.app.fileId !== fox?.id) found.push('the viewer shows no fox');
+  }
   if (new Set(level.apps).size !== level.apps.length) found.push('two windows of one app');
   if (desktop.windows.map((window) => window.app.kind).join() !== level.apps.join()) found.push('apps out of order');
   const window = targets[0];
@@ -101,14 +118,26 @@ describe('switch windows difficulty', () => {
   });
 
   it('shows only the task strip and the two window buttons, never close', () => {
-    const { icons, launcher, windowControls, taskStrip, menuBar } = withDefaults(generateLevel(1, 3, 'band-6-8').parts);
-    expect({ icons, launcher, windowControls, taskStrip, menuBar }).toEqual({
+    // No close button: a closed window could never be found. Windows move, so a child can push
+    // one aside to look behind it.
+    expect(withDefaults(generateLevel(1, 3, 'band-6-8').parts)).toEqual({
       icons: [],
+      menuBar: false,
+      taskStrip: true,
       launcher: [],
       windowControls: ['minimize', 'maximize'],
-      taskStrip: true,
-      menuBar: false,
+      move: true,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
     });
+  });
+
+  it('hides the target at every depth of the stack but the front across seeds', () => {
+    const depths = new Set(
+      SEEDS.map((seed) => generateLevel(seed, 7, 'band-9-12')).map((level) => level.apps.indexOf(level.target)),
+    );
+    expect([...depths].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3]);
   });
 });
 
@@ -144,6 +173,18 @@ describe('switch windows steps', () => {
     expect(find.wrong?.(reduceAll(level.desktop, [right], env()), right)).toBe(false);
     expect(find.hint?.(level.desktop)).toEqual({ kind: 'task', windowId: targetId(level) });
     expect(find.nudge).toBe(strings.lookAtStrip);
+  });
+
+  it.each([
+    ['notepad', strings.findNotepad],
+    ['picture-viewer', strings.findPictureViewer],
+    ['file-explorer', strings.findFileExplorer],
+    ['music-box', strings.findMusicBox],
+    ['calculator', strings.findCalculator],
+  ] as const)('names the %s window to find', (app, handle) => {
+    const level = SEEDS.map((seed) => generateLevel(seed, 5, 'band-9-12')).find((each) => each.target === app);
+    if (level === undefined) throw new Error(`no round asks for ${app}`);
+    expect(switchSteps(level)[0]?.instruction).toBe(handle);
   });
 
   it('asks for the maximize and minimize buttons, and counts the other one as a try', () => {

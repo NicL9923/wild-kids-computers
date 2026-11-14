@@ -2,10 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { createToyClipboard } from '../../../../app/inputGuards.ts';
 import type { Band } from '../../../../core/bands.ts';
 import { reduceAll, type DesktopAction } from '../../model/desktop.ts';
+import { withDefaults } from '../../desktop/parts.ts';
+import { nodeAtPath } from '../../model/fileSystem.ts';
 import { MIN_WINDOW_SIZE, type Rect } from '../../model/geometry.ts';
 import { LESSON_DESKTOP_SIZE } from '../harness/lesson.ts';
 import activity from './activity.ts';
-import { EDGE, fitsOutline, GAP, generateLevel, isInPlace, START_SIZE, type MoveResizeLevel } from './level.ts';
+import {
+  EDGE,
+  fitsOutline,
+  GAP,
+  generateLevel,
+  isInPlace,
+  START_SIZE,
+  WINDOW_ID,
+  type MoveResizeLevel,
+} from './level.ts';
 import { moveResizeSteps } from './steps.ts';
 
 const SEEDS = Array.from({ length: 200 }, (_, index) => index * 7_919 + 11);
@@ -161,7 +172,8 @@ describe('move and resize steps', () => {
         env(),
       ).state;
     const edge = level.tolerance;
-    expect(resize.done(fitAt(edge, -edge), [])).toBe(true);
+    // Larger sizes, so the smallest window size never clamps the check.
+    expect(resize.done(fitAt(edge, edge), [])).toBe(true);
     expect(resize.done(fitAt(edge + 1, 0), [])).toBe(false);
     expect(resize.done(fitAt(0, edge + 1), [])).toBe(false);
     expect(resize.done(fitAt(0, 0, edge + 1), [])).toBe(false);
@@ -173,7 +185,47 @@ describe('move and resize steps', () => {
     const focused = reduceAll(level.desktop, [{ type: 'focus-window', windowId: 'w1' }], env());
     expect(move.wrong?.(focused, { type: 'focus-window', windowId: 'w1' })).toBe(false);
     expect(resize.wrong?.(focused, { type: 'focus-window', windowId: 'w1' })).toBe(false);
+    const grow = { type: 'resize-window', windowId: 'w1', width: 300, height: 200 } as const;
+    expect(move.wrong?.(reduceAll(level.desktop, [grow], env()), grow)).toBe(true);
+    expect(resize.wrong?.(reduceAll(level.desktop, [grow], env()), grow)).toBe(true);
+    const away = { type: 'move-window', windowId: 'w1', x: 40, y: 40 } as const;
+    expect(resize.wrong?.(reduceAll(level.desktop, [away], env()), away)).toBe(true);
     expect(move.hint?.(level.desktop)).toEqual({ kind: 'title-bar', windowId: 'w1' });
     expect(resize.hint?.(level.desktop)).toEqual({ kind: 'resize', windowId: 'w1' });
+  });
+});
+
+describe('move and resize desktop', () => {
+  it('shows one fox window with only a title bar and a corner, and nothing else on the desktop', () => {
+    const level = generateLevel(1, 1, 'band-6-8');
+    // No window buttons: a minimized window with no task strip could never come back.
+    expect(withDefaults(level.parts)).toEqual({
+      icons: [],
+      menuBar: false,
+      taskStrip: false,
+      launcher: [],
+      windowControls: [],
+      move: true,
+      resize: true,
+      openMaximized: false,
+      systemSound: false,
+    });
+    const [window] = level.desktop.windows;
+    expect(window?.id).toBe(WINDOW_ID);
+    const fox = nodeAtPath(level.desktop.fs, 'Fox');
+    expect(fox?.kind === 'picture' ? fox.pictureId : null).toBe('fox');
+    expect(window?.app.kind === 'picture-viewer' ? window.app.fileId : null).toBe(fox?.id);
+  });
+
+  it('grows and shrinks the height too from difficulty 4', () => {
+    const heights = new Set(SEEDS.map((seed) => Math.sign(generateLevel(seed, 4, 'band-6-8').outline.height - 260)));
+    expect([...heights].toSorted((a, b) => a - b)).toEqual([-1, 1]);
+  });
+
+  it('finds nothing in place on a desktop with no window', () => {
+    const empty = { ...generateLevel(1, 1, 'band-6-8').desktop, windows: [] };
+    const box = { x: 24, y: 24, width: 360, height: 260 };
+    expect(isInPlace(empty, box, 52)).toBe(false);
+    expect(fitsOutline(empty, box, 52)).toBe(false);
   });
 });

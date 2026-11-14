@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createToyClipboard } from '../../../../app/inputGuards.ts';
 import type { Band } from '../../../../core/bands.ts';
+import { withDefaults } from '../../desktop/parts.ts';
 import { BRIGHTNESS, LIST_VISIBLE_ROWS, type SettingsAction } from '../../model/apps/settingsPanel.ts';
 import { reduce, reduceAll, type DesktopAction } from '../../model/desktop.ts';
 import type { DesktopState } from '../../model/state.ts';
@@ -18,6 +19,19 @@ import {
 } from './level.ts';
 import { controlSteps, targetInstruction } from './steps.ts';
 import { strings } from './strings.ts';
+
+/** The values each control may be asked for: never the value it starts at. */
+const VALUES: Readonly<Record<ControlTarget['kind'], readonly string[]>> = {
+  checkbox: ['true', 'false'],
+  radio: ['pond', 'hills', 'night-sky'],
+  dropdown: ['small', 'large'],
+  slider: ['lowest', 'middle'],
+  text: ['Fox', 'Owl', 'Frog', 'Bee'],
+  list: ['harp', 'splash', 'ding', 'frog', 'bubbles', 'chime', 'wood-block'],
+};
+
+const targetOf = (level: ControlsLevel, kind: ControlTarget['kind']) =>
+  level.targets.find((each) => each.kind === kind);
 
 const SEEDS = Array.from({ length: 200 }, (_, index) => index * 7_919 + 11);
 const env = () => ({ clipboard: createToyClipboard() });
@@ -61,6 +75,11 @@ function solve(target: ControlTarget): DesktopAction[] {
 function problems(level: ControlsLevel): string[] {
   const found: string[] = [];
   const kinds = level.targets.map((target) => target.kind);
+  for (const target of level.targets) {
+    if (!VALUES[target.kind].includes(String(target.value)))
+      found.push(`${target.kind} asks for ${String(target.value)}`);
+  }
+  if (targetOf(level, 'checkbox')?.value === level.desktop.settings.showNames) found.push('the box already shows that');
   if (new Set(kinds).size !== kinds.length) found.push('a control repeats');
   for (const target of level.targets) {
     if (isMatched(level.desktop, target)) found.push(`${target.kind} already matches`);
@@ -242,5 +261,48 @@ describe('controls steps', () => {
     expect(slider.wrong?.(run(passing), passing)).toBe(false);
     expect(radio.hint?.(level.desktop)).toEqual({ kind: 'key', key: 'setting:wallpaper' });
     expect(slider.hint?.(level.desktop)).toEqual({ kind: 'key', key: 'setting:brightness' });
+  });
+});
+
+describe('controls desktop', () => {
+  it('starts every setting at the panel default, away from any value a card asks for', () => {
+    const { showNames: _names, computerName: _name, ...rest } = generateLevel(1, 8, 'band-9-12').desktop.settings;
+    expect(rest).toEqual({ wallpaper: 'meadow', iconSize: 'medium', brightness: 100, alertSound: 'bell' });
+  });
+
+  it('starts the names shown in some rounds and hidden in others', () => {
+    const starts = new Set(SEEDS.map((seed) => generateLevel(seed, 1, 'band-6-8').desktop.settings.showNames));
+    expect(starts).toEqual(new Set([true, false]));
+  });
+
+  it('shows the settings window and two icons, so names and icon size show what they change', () => {
+    const level = generateLevel(1, 1, 'band-6-8');
+    expect(level.desktop.windows.map((window) => window.app.kind)).toEqual(['settings']);
+    expect(withDefaults(level.parts)).toEqual({
+      icons: [{ app: 'notepad' }, { app: 'music-box' }],
+      menuBar: false,
+      taskStrip: false,
+      launcher: [],
+      windowControls: [],
+      move: false,
+      resize: false,
+      openMaximized: false,
+      systemSound: false,
+    });
+  });
+
+  it.each([
+    ['checkbox', 'setting:showNames'],
+    ['radio', 'setting:wallpaper'],
+    ['dropdown', 'setting:iconSize'],
+    ['slider', 'setting:brightness'],
+    ['text', 'setting:computerName'],
+    ['list', 'setting:alertSound'],
+  ] as const)('points at the %s row of the panel', (kind, key) => {
+    const level = SEEDS.map((seed) => generateLevel(seed, 8, 'band-9-12')).find(
+      (each) => each.targets[0]?.kind === kind,
+    );
+    if (level === undefined) throw new Error(`no round starts with ${kind}`);
+    expect(controlSteps(level)[0]?.hint?.(level.desktop)).toEqual({ kind: 'key', key });
   });
 });

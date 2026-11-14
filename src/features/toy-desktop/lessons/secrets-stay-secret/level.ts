@@ -56,8 +56,10 @@ export const FACTS = [
 export type FactId = (typeof FACTS)[number]['id'];
 export type Bin = 'private' | 'share';
 
+const PRIVATE_FACTS: readonly FactId[] = FACTS.filter((fact) => fact.private).map((fact) => fact.id);
+
 export function binOf(fact: FactId): Bin {
-  return FACTS.find((each) => each.id === fact)?.private === true ? 'private' : 'share';
+  return PRIVATE_FACTS.includes(fact) ? 'private' : 'share';
 }
 
 const WORDS = ['frog', 'moon', 'kite', 'pear', 'drum', 'leaf', 'boat', 'snow'] as const;
