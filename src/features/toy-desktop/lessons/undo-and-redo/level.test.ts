@@ -224,7 +224,7 @@ describe('undo and redo layout', () => {
       expect(level.sentence !== undefined).toBe(level.apps.includes('notepad'));
       expect(level.dot !== undefined).toBe(level.apps.includes('music-box'));
       // The word comes after the start of a sentence, so taking it back leaves words behind.
-      if (level.sentence !== undefined) expect(level.sentence.before.trim()).not.toBe('');
+      expect(level.sentence?.before.trim() ?? 'no note').not.toBe('');
     }
   });
 });

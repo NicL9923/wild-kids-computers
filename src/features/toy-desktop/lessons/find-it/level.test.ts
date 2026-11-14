@@ -214,7 +214,8 @@ describe('find it layout and files', () => {
         expect(decoy.name).not.toBe(target.name);
         expect(words(decoy.name).some((word) => words(target.name).includes(word))).toBe(true);
       }
-      if (target.spec.kind === 'picture') expect(pictureSource(target.spec.pictureId).kind).toBe('emoji');
+      const art = target.spec.kind === 'picture' ? pictureSource(target.spec.pictureId).kind : 'emoji';
+      expect(art).toBe('emoji');
     }
   });
 });
