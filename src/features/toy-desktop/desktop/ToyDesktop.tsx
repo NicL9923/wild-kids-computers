@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toyClipboard } from '../../../app/inputGuards.ts';
 import type { SfxName } from '../../../audio/sfx/sfxNames.ts';
 import type { Band } from '../../../core/bands.ts';
@@ -37,6 +37,11 @@ export interface ToyDesktopProps {
   readonly parts?: DesktopParts;
   /** A control to point at, such as after a couple of tries. */
   readonly highlight?: HighlightTarget | null;
+  /**
+   * Lesson marks drawn on the desktop under every window, such as the outline a window should
+   * fill. Called with the scale, CSS pixels per desktop unit, so marks can be placed in units.
+   */
+  readonly backdrop?: (scale: number) => ReactNode;
 }
 
 /** The music box's notes, lowest first. */
@@ -95,7 +100,7 @@ function isControlTarget(target: EventTarget): boolean {
  * The desktop scales its window places to fit the monitor, while the controls inside keep the
  * band's real target size and text size. Nothing here touches real files or the real clipboard.
  */
-export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = null }: ToyDesktopProps) {
+export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = null, backdrop }: ToyDesktopProps) {
   const parts = useMemo(() => withDefaults(partsIn), [partsIn]);
   const os = usePlatformOs();
   const viewport = useRef<HTMLDivElement | null>(null);
@@ -296,6 +301,7 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
               style={{ width: state.size.width * fit.scale, height: state.size.height * fit.scale }}
             >
               <DesktopIcons />
+              {backdrop?.(fit.scale)}
               {state.windows
                 .filter((window) => !window.minimized)
                 .toSorted(byWindowNumber)
