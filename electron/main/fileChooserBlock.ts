@@ -16,9 +16,6 @@ const FILE_CHOOSER_COMMANDS: ReadonlyArray<readonly [string, Record<string, unkn
   ['Page.setInterceptFileChooserDialog', { enabled: true, cancel: true }],
 ];
 
-/** Electron's reason when the web contents itself goes away. Nothing is left to guard then. */
-const TARGET_CLOSED = 'target closed';
-
 /**
  * Stops every system file chooser the page could open, whatever opened it: a click on a file
  * input in the document or in any shadow root, a label, the keyboard, `showPicker()`, or a
@@ -27,8 +24,11 @@ const TARGET_CLOSED = 'target closed';
  * and opens no debugging port. The app never needs a chooser: export uses the bridge's save
  * dialog, which the main process shows.
  *
- * It must run before the first load: the commands queue until the page exists. A detach other
- * than the web contents closing turns the block back on.
+ * It must run before the first load: the commands queue until the page exists. Any detach while
+ * the web contents lives turns the block back on. Electron gives the same reason, "target closed",
+ * for its session detached from a live page and for a web contents that is closing, and reports
+ * the closing one destroyed only after the detach, so the check waits one task. Reattaching at once
+ * to a closing web contents would detach again, over and over, on Electron 45.3.2.
  */
 export function blockFileChoosers(
   debug: ChooserDebugger,
@@ -48,8 +48,10 @@ export function blockFileChoosers(
       });
     }
   };
-  debug.on('detach', (_event, reason) => {
-    if (reason !== TARGET_CLOSED && !isDestroyed()) apply();
+  debug.on('detach', () => {
+    setImmediate(() => {
+      if (!isDestroyed()) apply();
+    });
   });
   apply();
 }
