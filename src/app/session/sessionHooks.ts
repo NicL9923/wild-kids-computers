@@ -57,7 +57,7 @@ export function useAppDocument(): {
 /** Every profile, and the functions that add, change, remove, and choose them. */
 export function useProfiles(): {
   profiles: readonly Profile[];
-  createProfile: (profile: NewProfile) => Profile;
+  createProfile: (profile: NewProfile) => Promise<BridgeResult<Profile>>;
   updateProfile: (profileId: string, update: Update<NewProfile>) => void;
   deleteProfile: (profileId: string) => Promise<BridgeResult<void>>;
   chooseProfile: (profileId: string | null) => void;

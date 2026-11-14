@@ -99,6 +99,21 @@ describe('parent corner', () => {
     expect('name' in (harness.store.getSnapshot().profiles[1] ?? {})).toBe(false);
   });
 
+  it('keeps the new child dialog open and says so when the child could not be added, and adds them on try again', async () => {
+    const harness = await openCorner();
+    harness.fake.failNext('write', 'profiles', new Error('disk full'));
+    fireEvent.click(screen.getByRole('button', { name: strings.addChild.text }));
+    const dialog = await screen.findByRole('dialog', { name: strings.addTitle.text });
+    fireEvent.change(within(dialog).getByLabelText(strings.nameLabel.text), { target: { value: 'Bo' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: strings.save.text }));
+    await within(dialog).findByText(strings.addProblem.text);
+    expect(harness.store.getSnapshot().profiles.map((p) => p.id)).toEqual([FOX.id, OWL.id]);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: strings.save.text }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: strings.addTitle.text })).toBeNull());
+    expect(harness.store.getSnapshot().profiles.map((p) => p.name)).toEqual([undefined, 'Ada', 'Bo']);
+  });
+
   it('deletes a profile only after a confirmation that names what is lost, and keeps it on cancel', async () => {
     const harness = await openCorner();
     const row = rowOf(OWL.id);

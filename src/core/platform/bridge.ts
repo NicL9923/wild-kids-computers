@@ -39,11 +39,6 @@ export interface DocumentStore {
   setAside(name: DocumentName): Promise<boolean>;
   /** Deletes every document and picture of a profile. Missing data is not an error. */
   removeProfile(profileId: string): Promise<void>;
-  /**
-   * The ids of every profile that has documents or pictures stored, sorted. The session removes
-   * the data of an id its profile list does not name, which a removal left behind.
-   */
-  listProfiles(): Promise<string[]>;
 }
 
 export interface PictureSummary {

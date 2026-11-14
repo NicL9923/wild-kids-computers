@@ -13,10 +13,11 @@ The session holds the saved documents of the app and of the active profile, and 
 - **A failed write never rejects.** The change stays on screen, and `useStorageProblems().saveProblem` says what failed. The next successful write of the same target clears it.
 - **A bad value throws at once.** Updates are checked against the document's schema before anything changes. A value the schema rejects is a bug in the caller.
 - **Picture calls resolve to a result**, `{ ok: true, value }` or `{ ok: false, error }`, and never reject.
-- **No bridge call holds the session forever.** Every call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable and sets nothing aside. A late read answer is dropped.
+- **No bridge call holds the session forever, except the profile list write of a creation or a removal.** Every other call the store makes ends after `SESSION_CALL_DEADLINE_MS` as an `io` failure. A timed-out read counts as unreadable and sets nothing aside. A late read answer is dropped.
 - **A profile whose settings or progress cannot be read does not become active.** The status is `unavailable`, the start screen offers to try again, and `retryStart()` reads them again. Updates made while they loaded are dropped. An activity whose state cannot be read shows the screen that says it did not open, and trying again reads it again.
 - **A deadline never changes the order of writes.** A document write past its deadline is a `saveProblem` at once, but later writes of that document wait until it really ends, and how it ends replaces the problem: landed clears it, failed says why. Until then the document in memory is the truth: choosing the profile again, or opening the activity state again, keeps it instead of reading the file.
-- **Removing a profile happens at one write.** The profile list is saved without it. Until that write is answered, the profile stays listed and usable; when it fails or passes its deadline, the removal fails and the profile stays. A list write that lands after its deadline is followed by a write of the list in memory, which still names the profile. Once the write succeeds, the profile is gone for good, and its documents and pictures are deleted afterwards, after any work already queued for them ends. Files a removal left behind, because the deletion failed or the app stopped first, are deleted at the next start, but only when the profile list was read from a saved file.
+- **Creating a profile waits for the list that names it.** `createProfile` resolves once that write really ends, however long it takes. Until it succeeds the profile is not listed, so nothing can choose it or save its work. When it fails, nothing is added and `saveProblem` says why.
+- **Removing a profile happens at one write.** The profile list is saved without it, and `deleteProfile` resolves once that write really ends, however long it takes. Until then the profile stays as it was. When it fails, the profile stays exactly as before. When it succeeds, the profile is gone, the session leaves it, and its documents and pictures are deleted once, after any work already queued for them ends. A deletion that fails is not tried again: nothing but an adult's confirmed removal deletes stored data, and leftover files are never read.
 - **The app never guesses at the children it has.** When the app or profiles document cannot be read, the status is `unavailable`, nothing is replaced with defaults, and nothing is written until `retryStart()` reads them.
 
 ## Hooks
@@ -66,8 +67,9 @@ Create a profile during first launch, then finish:
 ```ts
 const { createProfile, chooseProfile } = useProfiles();
 const { updateApp, setKioskLock } = useAppDocument();
-const profile = createProfile({ avatarId: 'fox', colorId: 'sky', band: 'band-3-5' });
-chooseProfile(profile.id);
+const created = await createProfile({ avatarId: 'fox', colorId: 'sky', band: 'band-3-5' });
+if (!created.ok) return showProblem(); // Nothing was added. The adult can try again.
+chooseProfile(created.value.id);
 await setKioskLock(kioskChosen);
 updateApp({ firstLaunchDone: true });
 ```
@@ -123,7 +125,7 @@ const { isLimitReached } = useSessionLength();
 if (isLimitReached()) navigate({ to: '/rest' });
 ```
 
-Delete a profile. It is removed when the list without it is saved, and its documents and pictures are deleted afterwards. When it was active, no profile is active afterwards:
+Delete a profile, only after an adult confirmed it. It is removed when the list without it is saved, and its documents and pictures are deleted afterwards. When it was active, no profile is active afterwards:
 
 ```ts
 const result = await deleteProfile(profile.id);

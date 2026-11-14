@@ -95,6 +95,26 @@ describe('first launch', () => {
     });
   });
 
+  it('stays on the band step and says so when the player could not be saved, and goes on once it is', async () => {
+    const harness = await renderShell('/');
+    await heading(strings.animalHeading.text);
+    fireEvent.click(screen.getByRole('radio', { name: profileStrings['avatar-fox'].text }));
+    next();
+    fireEvent.click(await screen.findByRole('radio', { name: profileStrings['color-sky'].text }));
+    next();
+    fireEvent.click(await screen.findByRole('radio', { name: new RegExp(profileStrings['band-band-3-5'].text) }));
+    harness.fake.failNext('write', 'profiles', new Error('disk full'));
+    next();
+    await screen.findByText(strings.saveProblem.text);
+    expect(screen.getByRole('heading', { level: 1, name: strings.bandHeading.text })).toBeDefined();
+    expect(harness.store.getSnapshot()).toMatchObject({ profiles: [], activeProfile: null });
+
+    next();
+    await heading(strings.soundHeading.text);
+    expect(harness.store.getSnapshot().profiles).toHaveLength(1);
+    expect(harness.store.getSnapshot().activeProfile?.id).toBe(harness.store.getSnapshot().profiles[0]?.id);
+  });
+
   it('resumes at the sound check with the saved profile when the app closed midway', async () => {
     const fox = { id: 'fox-kid', avatarId: 'fox', colorId: 'sky', band: 'band-3-5' } as const;
     const harness = await renderShell('/', {

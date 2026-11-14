@@ -18,7 +18,6 @@ function fakeBridge(): { bridge: BridgeImplementation; calls: string[] } {
       write: unexpected('documents.write'),
       setAside: unexpected('documents.setAside'),
       removeProfile: unexpected('documents.removeProfile'),
-      listProfiles: unexpected('documents.listProfiles'),
     },
     pictures: {
       save: unexpected('pictures.save'),
@@ -70,7 +69,6 @@ describe('handleBridgeCall', () => {
     ['an extra argument', 'documents.read', ['app', 'more'], 'argument (all): Too big'],
     ['document text that is not a string', 'documents.write', ['app', 42], 'argument 1'],
     ['an unsafe profile id', 'documents.removeProfile', ['../../home'], 'argument 0: not a safe id'],
-    ['an argument to a call that takes none', 'documents.listProfiles', ['../../home'], 'argument (all): Too big'],
     [
       'picture bytes as a plain array',
       'pictures.save',

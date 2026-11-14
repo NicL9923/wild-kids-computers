@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createManualScheduler } from '../../core/activityKit/scheduler.ts';
 import { createQuitFlow, QUIT_DEADLINE_MS } from './closeRequest.ts';
 import { createQuitWorkRegistry } from './quitWork.ts';
+import { appDocument, type Profile } from '../../core/storage/schemas.ts';
+import { createSessionStore } from '../session/sessionStore.ts';
+import { createFakeBridge } from '../session/testing/fakeBridge.ts';
+
+const KID: Profile = { id: 'kid', avatarId: 'fox', colorId: 'sky', band: 'band-6-8' };
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -126,6 +131,48 @@ describe('quitting with unsaved work', () => {
     await settle();
     expect(quit).toBe(true);
     expect(calls).toEqual(['save hang', 'quit']);
+  });
+
+  it('quits at its own deadline while a profile removal waits for a list write that never ends', async () => {
+    const timers = createManualScheduler({ wall: 0 });
+    const fake = createFakeBridge({
+      documents: {
+        app: JSON.stringify({ ...appDocument.defaults(), firstLaunchDone: true }),
+        profiles: JSON.stringify({ version: 1, profiles: [KID] }),
+      },
+    });
+    // The session's own deadlines never fire here: the removal must not need them to let go.
+    const session = createSessionStore({ bridge: fake.bridge, timers: createManualScheduler({ wall: 0 }) });
+    await session.start();
+    fake.holdWrites();
+    const removal = session.deleteProfile(KID.id);
+    await fake.heldWritesReach(1);
+    const calls: string[] = [];
+    const flow = createQuitFlow({
+      window: {
+        acknowledgeCloseRequest: async () => undefined,
+        quit: async () => {
+          calls.push('quit');
+        },
+      },
+      askParent: async () => true,
+      work: createQuitWorkRegistry(),
+      session,
+      setTimeout: (callback, ms) => timers.setTimeout(callback, ms),
+    });
+    let quit: boolean | null = null;
+    void flow.quit().then((result) => (quit = result));
+    await settle();
+    expect(quit).toBeNull();
+    timers.advance(QUIT_DEADLINE_MS);
+    await settle();
+    expect(quit).toBe(true);
+    expect(calls).toEqual(['quit']);
+    // The removal is still waiting for its write: quitting decided nothing about it.
+    let removed: unknown = null;
+    void removal.then((result) => (removed = result));
+    await settle();
+    expect(removed).toBeNull();
   });
 
   it('runs one quit at a time when the adult closes twice quickly', async () => {

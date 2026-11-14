@@ -69,6 +69,8 @@ export default function FirstLaunch() {
   const [hearing, setHearing] = useState<Hearing>('not-tried');
   const [kiosk, setKiosk] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const step = steps[index] ?? 'kiosk';
   const isLast = index === steps.length - 1;
   useSpeakOnShow(INSTRUCTION[step]);
@@ -80,17 +82,26 @@ export default function FirstLaunch() {
     if (say.length > 0) void audio.speakSequence(say);
   };
 
-  const saveProfile = () => {
+  /** Whether the profile is saved. A new one exists only once the list that names it is saved. */
+  const saveProfile = async (): Promise<boolean> => {
     const profile = profileFromDraft(draft);
-    if (profile === null) return;
-    if (profileId === null) {
-      const created = createProfile(profile);
-      setProfileId(created.id);
-      chooseProfile(created.id);
-    } else {
+    if (profile === null) return false;
+    if (profileId !== null) {
       // Back from a later step: change the saved profile instead of adding a second one.
       updateProfile(profileId, () => profile);
+      return true;
     }
+    setSaving(true);
+    setSaveFailed(false);
+    const created = await createProfile(profile);
+    setSaving(false);
+    if (!created.ok) {
+      setSaveFailed(true);
+      return false;
+    }
+    setProfileId(created.value.id);
+    chooseProfile(created.value.id);
+    return true;
   };
 
   const next = async () => {
@@ -100,7 +111,7 @@ export default function FirstLaunch() {
       void audio.speak(MISSING[lacking]);
       return;
     }
-    if (step === 'band') saveProfile();
+    if (step === 'band' && !(await saveProfile())) return;
     if (!isLast) {
       setIndex(index + 1);
       return;
@@ -241,8 +252,10 @@ export default function FirstLaunch() {
           ))}
         </ol>
         <div className='wk-setup-next'>
-          <output className='wk-setup-missing'>{missing === null ? '' : t(missing)}</output>
-          <Button variant='primary' disabled={finishing} onClick={() => void next()}>
+          <output className='wk-setup-missing'>
+            {missing !== null ? t(missing) : saveFailed ? t(strings.saveProblem) : ''}
+          </output>
+          <Button variant='primary' disabled={finishing || saving} onClick={() => void next()}>
             {t(isLast ? strings.finish : strings.next)}
           </Button>
         </div>

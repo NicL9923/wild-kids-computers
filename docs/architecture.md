@@ -186,7 +186,7 @@ export const strings = defineStrings('pop-the-seed-pods', {
 
 The contract covers:
 
-- **Documents.** Read, write, and set aside a named JSON document, remove everything of one profile, and list the ids of profiles that have anything stored. Names come from a fixed set of patterns in `src/core/platform/names.ts`, such as `profiles` and `profile/<id>/progress`.
+- **Documents.** Read, write, and set aside a named JSON document, and remove everything of one profile. Names come from a fixed set of patterns in `src/core/platform/names.ts`, such as `profiles` and `profile/<id>/progress`.
 - **Pictures.** Save a PNG with its thumbnail, list, read, copy, move to trash, restore, and purge, per profile. Purge works only on a trashed picture.
 - **Window.** Fullscreen, kiosk lock, close request, and quit. Every close attempt calls the renderer's `onCloseRequest` listener with `{ kioskLock }`. The renderer calls `acknowledgeCloseRequest()` at once and `quit()` when it is done: under kiosk lock after the parent gate passes, and without it right after saving. Without an answer within 3 seconds, the main process destroys the window, because a hung page never finishes its unload handlers. Before it calls `quit()`, the renderer's quit flow (`src/app/kiosk/closeRequest.ts`) finishes the work screens hold in its registry, such as an unsaved picture, and the session's queued writes. The browser build cannot hold a close request, so there the page holds the close back with `beforeunload` while anything is unsaved. Work that has not finished after 5 seconds no longer holds the app open.
 - **Export and print.** Save a PNG to a place the adult chooses, and print a PNG.
