@@ -39,14 +39,15 @@ describe('createScopeLifetime', () => {
   });
 });
 
-describe('useChildScope', () => {
-  function setup() {
-    const clock = createManualScheduler({ wall: 0 });
-    const parent = createScope(clock);
-    const hook = renderHook(() => useChildScope({ scope: parent, clock }));
-    return { clock, parent, hook, child: hook.result.current };
-  }
+/** A child scope under a parent scope on a manual clock, as an attempt sits in a round. */
+function setup() {
+  const clock = createManualScheduler({ wall: 0 });
+  const parent = createScope(clock);
+  const hook = renderHook(() => useChildScope({ scope: parent, clock }));
+  return { clock, parent, hook, child: hook.result.current };
+}
 
+describe('useChildScope', () => {
   it('runs its timers on the parent clock, and cancels only its own when it unmounts', () => {
     const { clock, parent, hook, child } = setup();
     const ran: string[] = [];
