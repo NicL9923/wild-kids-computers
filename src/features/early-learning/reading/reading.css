@@ -1,0 +1,305 @@
+/*
+ * The letters and reading activities share one look: a prompt on top (a picture, a sound to
+ * hear, letters to read) and big answer buttons below. Letters use the app face, which has the
+ * single-story a and g early readers learn. Every value is a token.
+ */
+
+.rd-stage {
+  /* Answer buttons grow with tall windows, never below the band's large target. */
+  --rd-size: max(calc(var(--wk-target-large) * 1.1), min(20vh, 12vw));
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--wk-space-container);
+  justify-items: center;
+  padding-bottom: var(--wk-space-container);
+}
+
+.rd-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  align-content: center;
+  gap: var(--wk-space-container);
+  min-height: 0;
+  width: 100%;
+}
+
+/* A pictured word: the biggest thing on screen, because the child names it first. */
+.rd-picture {
+  display: block;
+  width: min(36vh, 300px);
+  height: min(36vh, 300px);
+}
+
+.rd-picture-small {
+  display: block;
+  width: min(24vh, 200px);
+  height: min(24vh, 200px);
+}
+
+/* The button that says the sound or word again. Round, so it never reads as an answer. */
+.rd-listen {
+  display: grid;
+  place-items: center;
+  width: calc(var(--rd-size) * 1.15);
+  height: calc(var(--rd-size) * 1.15);
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.rd-listen:hover {
+  background: var(--wk-color-selected);
+}
+
+.rd-listen img {
+  width: 62%;
+  height: 62%;
+}
+
+.rd-choices {
+  margin: 0;
+  padding: 0 0 var(--wk-press-depth);
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  max-width: 100%;
+}
+
+.rd-choice,
+.rd-tile {
+  min-width: var(--rd-size);
+  min-height: var(--rd-size);
+  padding: 0 var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  font: inherit;
+  font-size: calc(var(--rd-size) * 0.5);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rd-choice[data-look='word'],
+.rd-tile[data-look='word'] {
+  font-size: calc(var(--rd-size) * 0.28);
+}
+
+.rd-choice:hover:not(:disabled),
+.rd-tile:hover {
+  background: var(--wk-color-selected);
+}
+
+/* A choice already tried steps back: dashed edge and lighter text, so it is not color alone. */
+.rd-choice[data-tried='true'] {
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--wk-color-text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* After two tries the answer stands out with a thick edge and a slow, small grow. */
+.rd-choice[data-hint='true'],
+.rd-card[data-hint='true'],
+.rd-tile[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  animation: rd-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes rd-hint {
+  to {
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+}
+
+.rd-choice[data-answer='true'] {
+  border-width: calc(var(--wk-border-width) * 2);
+  background: var(--wk-color-selected);
+}
+
+.rd-choice:disabled:not([data-tried='true'], [data-answer='true']) {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Places for letters or words: a dashed box until filled, then a solid one. */
+.rd-slots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-item);
+  max-width: 100%;
+}
+
+.rd-slot {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: var(--rd-size);
+  min-height: var(--rd-size);
+  padding: 0 var(--wk-space-item);
+  border: var(--wk-border-width) dashed var(--wk-color-border);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+  color: var(--wk-color-text);
+  font-size: calc(var(--rd-size) * 0.5);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.rd-slot[data-look='word'] {
+  min-width: calc(var(--rd-size) * 1.3);
+  font-size: calc(var(--rd-size) * 0.28);
+}
+
+.rd-slot[data-filled='true'] {
+  border-style: solid;
+  border-color: var(--wk-color-primary-base);
+  background: var(--wk-color-surface);
+}
+
+/* A faint letter to match, for the youngest: the shape to look for, not the answer to read. */
+.rd-slot-guide {
+  color: var(--wk-color-text-muted);
+  opacity: 0.45;
+}
+
+.rd-slot-guide[data-filled='true'] {
+  opacity: 1;
+}
+
+/* A letter in a row the child reads, not presses: a flat box with no press shadow. */
+.rd-shown {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: var(--rd-size);
+  min-height: var(--rd-size);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  font-size: calc(var(--rd-size) * 0.5);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.rd-end-mark {
+  align-self: end;
+  font-size: calc(var(--wk-target-large) * 0.4);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.rd-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  max-width: 100%;
+  padding-bottom: var(--wk-press-depth);
+}
+
+/* A tile that left its place leaves an outline, so the row does not jump. */
+.rd-tile-home {
+  min-width: var(--rd-size);
+  min-height: var(--rd-size);
+  border: var(--wk-border-width) dashed var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+}
+
+/* Picture cards for matching. */
+.rd-cards {
+  display: grid;
+  grid-template-columns: repeat(var(--rd-columns), minmax(0, 1fr));
+  gap: var(--wk-space-container);
+  width: min(100%, calc(var(--rd-columns) * (var(--wk-target-large) * 1.5 + var(--wk-space-container))));
+  align-self: center;
+}
+
+.rd-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: calc(var(--wk-target-large) * 1.1);
+  max-height: 30vh;
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.rd-card img {
+  width: 72%;
+  height: 72%;
+}
+
+.rd-card:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+/* The card the child picked first: lifted, with a thick edge. */
+.rd-card[aria-pressed='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  translate: 0 calc(var(--wk-press-depth) * -2 * var(--wk-motion-scale));
+}
+
+/* A matched card rests: no shadow, a solid success edge, and a check in the corner. */
+.rd-card[data-matched='true'] {
+  border-color: var(--wk-color-success);
+  border-width: calc(var(--wk-border-width) * 2);
+  box-shadow: none;
+  cursor: default;
+}
+
+.rd-card-check {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  display: grid;
+  place-items: center;
+  width: 28%;
+  height: 28%;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-success);
+  color: var(--wk-color-on-success);
+}
+
+.rd-card-check svg {
+  width: 60%;
+  height: 60%;
+}
+
+/* A pictured word that says its name when pressed: the biggest thing on screen. */
+.rd-picture-button {
+  width: min(calc(var(--rd-size) * 1.8), 36vh);
+  height: min(calc(var(--rd-size) * 1.8), 36vh);
+  border-radius: var(--wk-radius-card);
+}
+
+.rd-picture-button img {
+  width: 80%;
+  height: 80%;
+}
