@@ -19,6 +19,12 @@ const SFX_NAMES = [
   'stamp',
   'fill',
   'snap',
+  // The music box's five notes, lowest first: a pentatonic scale, so any mix sounds pleasant.
+  'note-1',
+  'note-2',
+  'note-3',
+  'note-4',
+  'note-5',
 ] as const;
 
 export type SfxName = (typeof SFX_NAMES)[number];
