@@ -79,15 +79,11 @@ export default function FindTheKeyActivity({ level, kit }: ActivityProps<KeyLeve
         ref={card}
         type='button'
         className='findkey-card'
-        aria-label={t(strings.letter)}
-        aria-describedby='findkey-letter'
         onPointerEnter={() => void kit.speak(name)}
         onFocus={() => void kit.speak(name)}
         onClick={() => void kit.speak(name)}
       >
-        <span id='findkey-letter' className='findkey-upper'>
-          {t(name).toUpperCase()}
-        </span>
+        <span className='findkey-upper'>{t(name).toUpperCase()}</span>
         <span className='findkey-lower' aria-hidden='true'>
           {t(name)}
         </span>

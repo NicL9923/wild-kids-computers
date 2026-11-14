@@ -33,7 +33,8 @@
   box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
-  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  /* An outline, not a border, so each screen of the scene is exactly the window's size. */
+  outline: var(--wk-border-width) solid var(--wk-color-primary-base);
   border-radius: var(--wk-radius-card);
   /* Faint dots show the scene moving even where it is empty. */
   background-color: var(--wk-color-meadow-sky);
@@ -61,9 +62,10 @@
 }
 
 .trackpad-thing {
-  padding: 6%;
-  box-sizing: border-box;
-  border: calc(var(--wk-border-width) * 2) solid transparent;
+  padding: 0;
+  border: 0;
+  outline: calc(var(--wk-border-width) * 2) solid transparent;
+  outline-offset: calc(var(--wk-border-width) * 2);
   border-radius: var(--wk-radius-round);
   background: transparent;
   cursor: pointer;
@@ -75,14 +77,19 @@
 
 /* Ready to tap: a white disc and a dashed ring. Tapped: a solid ring. */
 .trackpad-thing[data-ready='true'] {
-  border-style: dashed;
-  border-color: var(--wk-color-primary-base);
+  outline-style: dashed;
+  outline-color: var(--wk-color-primary-base);
   background: var(--wk-color-surface);
 }
 
 .trackpad-thing[data-tapped='true'] {
-  border-color: var(--wk-color-success);
+  outline-color: var(--wk-color-success);
   background: var(--wk-color-surface);
+}
+
+.trackpad-thing[data-ready='true'] img,
+.trackpad-thing[data-tapped='true'] img {
+  scale: 0.86;
 }
 
 .trackpad-edge-arrow {

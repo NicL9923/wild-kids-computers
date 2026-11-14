@@ -110,20 +110,20 @@
   fill: var(--wk-color-primary-base);
 }
 
-.jump-gate-board rect {
+.jump-gate-rail,
+.jump-gate-picket {
   fill: var(--wk-profile-marigold);
   stroke: var(--wk-color-primary-base);
-  stroke-width: 2;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
 }
 
-.jump-gate-brace {
-  stroke: var(--wk-color-primary-base);
-  stroke-width: 6;
-  stroke-linecap: round;
+.jump-gate-latch {
+  fill: var(--wk-color-primary-base);
 }
 
 .jump-gate-board {
-  transform-origin: 10px 55px;
+  transform-origin: 12px 50px;
   transition:
     scale calc(var(--wk-duration-calm) * var(--wk-motion-scale)) var(--wk-ease-out),
     opacity var(--wk-duration-calm) var(--wk-ease-out);
@@ -136,5 +136,5 @@
 }
 
 .jump-keyboard {
-  width: min(100%, calc(var(--wk-target-min) * 16));
+  width: min(100%, calc(var(--wk-target-min) * 12));
 }

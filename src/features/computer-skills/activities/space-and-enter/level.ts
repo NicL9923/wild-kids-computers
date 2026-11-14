@@ -19,7 +19,7 @@ export const START_X = 80;
 export const FIRST_STOP_X = 240;
 export const LAST_STOP_X = 920;
 /** How far before a stop the critter stands to wait, and how far past it a jump lands. */
-export const STAND_GAP = 66;
+export const STAND_GAP = 76;
 /** How far before a stop the right key already works while the critter keeps walking. */
 export const EARLY_WINDOW = 150;
 

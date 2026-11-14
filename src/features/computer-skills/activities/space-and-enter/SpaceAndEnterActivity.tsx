@@ -18,7 +18,7 @@ const OTHER_KEYS_BEFORE_HELP = 2;
 const GROUND_Y = 250;
 const CRITTER_SIZE = 84;
 const THING_SIZE = 64;
-const GATE_SIZE = 70;
+const GATE_SIZE = 80;
 const HOME_SIZE = 150;
 
 const SAY_AT: Readonly<Record<StopKind, typeof strings.pressSpace>> = {
@@ -182,18 +182,27 @@ export default function SpaceAndEnterActivity({ level, kit }: ActivityProps<Jump
   );
 }
 
-/** A small wooden gate. Open, the board swings away and leaves the posts. */
+/**
+ * A garden gate between two posts: pointed pickets on two rails, with a round latch. Open, the
+ * gate swings back against the left post and leaves the way through.
+ */
 function Gate({ label }: { label: string }) {
   return (
     <>
-      <svg className='jump-gate-art' viewBox='0 0 70 110' aria-hidden='true'>
-        <rect className='jump-post' x={0} y={0} width={10} height={110} rx={3} />
-        <rect className='jump-post' x={60} y={0} width={10} height={110} rx={3} />
+      <svg className='jump-gate-art' viewBox='0 0 100 100' aria-hidden='true'>
+        <path className='jump-post' d='M0 100 V12 L6 2 L12 12 V100 Z' />
+        <path className='jump-post' d='M88 100 V12 L94 2 L100 12 V100 Z' />
         <g className='jump-gate-board'>
-          <rect x={12} y={18} width={46} height={14} rx={3} />
-          <rect x={12} y={56} width={46} height={14} rx={3} />
-          <rect x={12} y={90} width={46} height={12} rx={3} />
-          <path d='M14 30 L56 60' className='jump-gate-brace' />
+          <rect className='jump-gate-rail' x={12} y={34} width={76} height={9} rx={3} />
+          <rect className='jump-gate-rail' x={12} y={72} width={76} height={9} rx={3} />
+          {[18, 40, 62].map((x) => (
+            <path
+              key={x}
+              className='jump-gate-picket'
+              d={`M${String(x)} 96 V24 L${String(x + 10)} 14 L${String(x + 20)} 24 V96 Z`}
+            />
+          ))}
+          <circle className='jump-gate-latch' cx={80} cy={56} r={5} />
         </g>
       </svg>
       <span className='wk-visually-hidden'>{label}</span>

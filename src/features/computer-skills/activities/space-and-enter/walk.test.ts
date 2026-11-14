@@ -92,7 +92,8 @@ describe('the walk', () => {
 
   it('takes a press early while it keeps walking, only inside the window', () => {
     const path = level('keeps-walking');
-    const far = startWalk(START_X);
+    // From the very start of the path, the first stop is well past the window.
+    const far = startWalk(0);
     expect(isNear(far, path)).toBe(false);
     expect(press(far, path, 'space').result).toBe('hop');
     // 150 units before the place to wait, the window opens.

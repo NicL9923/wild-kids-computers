@@ -26,7 +26,8 @@
   aspect-ratio: 5 / 3;
   overflow: auto;
   overscroll-behavior: contain;
-  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  /* An outline, not a border, so the picture fills the viewport exactly and nothing scrolls at zoom 1. */
+  outline: var(--wk-border-width) solid var(--wk-color-primary-base);
   border-radius: var(--wk-radius-card);
   background: var(--wk-color-meadow-sky);
 }

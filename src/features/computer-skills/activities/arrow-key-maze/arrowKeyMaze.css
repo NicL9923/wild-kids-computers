@@ -25,18 +25,7 @@
 
 .maze-board {
   position: relative;
-  max-width: 100cqw;
-  max-height: 100cqh;
-  width: 100cqw;
   border-radius: var(--wk-radius-small);
-}
-
-/* A tall maze is limited by height instead of width. */
-@container (aspect-ratio < 1.6) {
-  .maze-board {
-    width: auto;
-    height: 100cqh;
-  }
 }
 
 .maze-walls {
@@ -74,10 +63,13 @@
 }
 
 .maze-snack {
-  padding: 8%;
-  box-sizing: border-box;
-  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  outline: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  outline-offset: calc(var(--wk-border-width) * 2);
   border-radius: var(--wk-radius-round);
+}
+
+.maze-snack img {
+  scale: 0.8;
 }
 
 .maze-snack[data-arrived='true'] {
@@ -118,5 +110,5 @@
 }
 
 .maze-keys {
-  width: calc(var(--wk-target-min) * 4);
+  width: calc(var(--wk-target-min) * 5);
 }

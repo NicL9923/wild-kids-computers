@@ -120,7 +120,10 @@ export default function ArrowKeyMazeActivity({ level, kit }: ActivityProps<MazeL
       <div className='maze-board-area'>
         <div
           className='maze-board'
-          style={{ aspectRatio: `${String(level.columns)} / ${String(level.rows)}` }}
+          style={{
+            aspectRatio: `${String(level.columns)} / ${String(level.rows)}`,
+            width: `min(100cqw, calc(100cqh * ${String(level.columns)} / ${String(level.rows)}))`,
+          }}
           data-at={`${String(at.x)},${String(at.y)}`}
           data-arrived={arrived}
         >

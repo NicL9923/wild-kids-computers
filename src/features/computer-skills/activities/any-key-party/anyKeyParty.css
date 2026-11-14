@@ -72,5 +72,5 @@
 }
 
 .party-keyboard {
-  width: min(100%, calc(var(--wk-target-min) * 12));
+  width: min(100%, calc(var(--wk-target-min) * 9));
 }

@@ -145,8 +145,7 @@
   stroke-linejoin: round;
 }
 
-.dials-control[data-matched='true'] .dials-knob,
-.dials-control[data-matched='true'] .dials-dial-button {
+.dials-control[data-matched='true'] .dials-knob {
   background-color: var(--wk-color-surface);
 }
 
