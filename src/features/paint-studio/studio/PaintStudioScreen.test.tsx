@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderShell, savedProfiles, type ShellHarness } from '../../../app/testing/shellHarness.tsx';
 import { strings } from '../strings.ts';
 import { WORKER_DEADLINES } from '../worker/effectRunner.ts';
@@ -62,6 +62,12 @@ class SilentWorker extends EventTarget {
   terminate(): void {}
 }
 
+// The studio and the gallery are lazy route modules. Under the full suite with coverage, their
+// first transform can take seconds, so they load once here instead of inside a timed test.
+beforeAll(async () => {
+  await Promise.all([import('../PaintStudio.tsx'), import('../gallery/PaintGallery.tsx')]);
+}, 60_000);
+
 beforeEach(() => {
   encodeHere = 'works';
   SilentWorker.encodes = 0;
@@ -101,7 +107,7 @@ async function openStudioAndPaint(): Promise<ShellHarness> {
   return shell;
 }
 
-describe('leaving the studio while its worker never answers', () => {
+describe('leaving the studio while its worker never answers', { timeout: 20_000 }, () => {
   it('saves through this thread once the deadline passes, and leaves', async () => {
     const shell = await openStudioAndPaint();
     vi.useFakeTimers();
