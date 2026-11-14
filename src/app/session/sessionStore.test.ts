@@ -16,6 +16,7 @@ import {
   type Profile,
   type Settings,
 } from '../../core/storage/schemas.ts';
+import { createRandom } from '../../core/activityKit/random.ts';
 import { createSessionStore, type SessionStore } from './sessionStore.ts';
 import { createFakeBridge, type FakeBridge, type FakeBridgeOptions } from './testing/fakeBridge.ts';
 
@@ -84,6 +85,40 @@ function saved<T>(fake: FakeBridge, name: DocumentName, spec: DocumentSpec<T>): 
 
 /** Lets every pending promise and timer run, so a test sees what is still blocked. */
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/**
+ * Parks every document read that matches, so a test decides when each one finishes. Reads are
+ * the I/O edge, so the store's own code runs for real around them.
+ */
+function holdReads(fake: FakeBridge, matches: (name: DocumentName) => boolean) {
+  const read = fake.bridge.documents.read;
+  const parked: Array<() => void> = [];
+  let releasing = false;
+  fake.bridge.documents.read = async (name) => {
+    const text = await read(name);
+    if (!releasing && matches(name)) await new Promise<void>((resolve) => parked.push(resolve));
+    return text;
+  };
+  return {
+    async reach(count: number): Promise<void> {
+      while (parked.length < count) await settle();
+    },
+    /** Lets the parked read at this position, modulo the number parked, finish. */
+    releaseOne(position: number): void {
+      if (parked.length === 0) return;
+      parked.splice(position % parked.length, 1)[0]?.();
+    },
+    releaseAll(): void {
+      for (const release of parked.splice(0)) release();
+    },
+    /** Lets every read finish, including reads that start while the earlier ones finish. */
+    async drain(): Promise<void> {
+      releasing = true;
+      this.releaseAll();
+      await settle();
+    },
+  };
+}
 
 /** Waits until the store's snapshot passes the check. */
 async function until(store: SessionStore, check: () => boolean): Promise<void> {
@@ -384,6 +419,65 @@ describe('writes', () => {
       voiceVolume: 0.3,
       muted: true,
     });
+  });
+
+  it('saves an update made while loading even when the profile is left and chosen again before the load ends', async () => {
+    const { store, fake } = await startSession({
+      documents: savedApp([FOX, OWL], null, { voiceVolume: 0.8 }),
+    });
+    const name = documentNames.settings(FOX.id);
+    const reads = holdReads(fake, (read) => read === name);
+    store.chooseProfile(FOX.id);
+    await reads.reach(1);
+    store.updateSettings({ voiceVolume: 0.2 });
+    store.chooseProfile(OWL.id);
+    store.chooseProfile(FOX.id);
+    reads.releaseAll();
+    await reads.drain();
+    await until(store, () => store.getSnapshot().status === 'ready');
+    await store.flush();
+
+    expect(store.getSnapshot().settings.voiceVolume).toBe(0.2);
+    expect(saved(fake, name, settingsDocument).voiceVolume).toBe(0.2);
+  });
+
+  it('keeps memory and disk in step through random profile switches, updates, and slow reads', async () => {
+    const profiles: Profile[] = [FOX, OWL, { ...FOX, id: 'cat-kid', avatarId: 'cat' }];
+    // Updates change one field at a time, so a stale copy of another field shows up on disk.
+    const fields = ['voiceVolume', 'effectsVolume'] as const;
+    for (let seed = 1; seed <= 20; seed++) {
+      const random = createRandom(seed);
+      const { store, fake } = await startSession({ documents: savedApp(profiles, null, { voiceVolume: 0.5 }) });
+      const reads = holdReads(fake, (read) => read.startsWith('profile/'));
+      // What each profile's settings must end as: every update applied in the order it was made.
+      const expected = new Map(profiles.map((profile) => [profile.id, { voiceVolume: 0.5, effectsVolume: 0.6 }]));
+      let activeId: string | null = null;
+      for (let step = 0; step < 80; step++) {
+        const roll = random.next();
+        if (roll < 0.25) {
+          activeId = random.pick(profiles).id;
+          store.chooseProfile(activeId);
+        } else if (roll < 0.6 && activeId !== null) {
+          const update = { [random.pick(fields)]: random.int(0, 10) / 10 };
+          store.updateSettings(update);
+          const before = expected.get(activeId) ?? { voiceVolume: 0.5, effectsVolume: 0.6 };
+          expected.set(activeId, { ...before, ...update });
+        } else if (roll < 0.85) {
+          reads.releaseOne(random.int(0, 1_000));
+        }
+        if (random.next() < 0.5) await settle();
+      }
+      await reads.drain();
+      await store.flush();
+
+      for (const profile of profiles) {
+        const disk = saved(fake, documentNames.settings(profile.id), settingsDocument);
+        expect(disk, `seed ${seed}, ${profile.id} on disk`).toMatchObject(expected.get(profile.id) ?? {});
+      }
+      if (activeId !== null) {
+        expect(store.getSnapshot().settings, `seed ${seed}, in memory`).toMatchObject(expected.get(activeId) ?? {});
+      }
+    }
   });
 
   it('shows a failed write as a problem, keeps the change on screen, and clears it after the next write', async () => {
