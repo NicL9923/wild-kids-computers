@@ -1,6 +1,4 @@
-import { Path } from '../../path.ts';
-import { drawPath, previewStroke } from '../../preview.ts';
-import { strokePolyline } from '../../raster.ts';
+import { drawPath, drawStroke, previewStroke } from '../../preview.ts';
 import { defineTool, type ShapeSettings } from '../../types.ts';
 import { shapePath } from './shapePaths.ts';
 
@@ -21,8 +19,6 @@ export default defineTool({
       };
       const outline = shapePath(shape.kind, box);
       if (shape.style === 'filled') return drawPath(ctx, outline, ctx.settings.color);
-      const stroked = new Path();
-      for (const contour of outline.contours) strokePolyline(stroked, contour, ctx.settings.size, true);
-      return drawPath(ctx, stroked, ctx.settings.color);
+      return drawStroke(ctx, outline.contours, ctx.settings.size, true, ctx.settings.color);
     }),
 });

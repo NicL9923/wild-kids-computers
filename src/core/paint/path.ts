@@ -131,20 +131,3 @@ export function ellipseSegments(radius: number, tolerance: number): number {
   const step = Math.sqrt((8 * tolerance) / radius);
   return Math.min(1024, Math.max(8, Math.ceil(TAU / step)));
 }
-
-/**
- * The signed area of a contour. Positive means clockwise on screen, where y points down.
- * The stroker uses it to give every piece of an outline the same winding.
- */
-export function signedArea(contour: readonly number[]): number {
-  let area = 0;
-  const n = contour.length;
-  for (let i = 0; i + 1 < n; i += 2) {
-    const x0 = contour[i] ?? 0;
-    const y0 = contour[i + 1] ?? 0;
-    const x1 = contour[(i + 2) % n] ?? 0;
-    const y1 = contour[(i + 3) % n] ?? 0;
-    area += x0 * y1 - x1 * y0;
-  }
-  return area / 2;
-}

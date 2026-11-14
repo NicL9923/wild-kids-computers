@@ -1,9 +1,9 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
-import { rgba } from '../src/core/paint/color.ts';
+import { blendPixel, rgba, type Color } from '../src/core/paint/color.ts';
 import { Path } from '../src/core/paint/path.ts';
-import { fillPath, strokePolyline } from '../src/core/paint/raster.ts';
+import { fillPath, rasterizeStroke } from '../src/core/paint/raster.ts';
 import { createSurface, type Surface } from '../src/core/paint/surface.ts';
 
 /**
@@ -32,7 +32,13 @@ save('stamp-clear', createSurface(16, 16));
 // Line art for a 200 by 125 picture: a circle, a house, and a thin wall that splits the page.
 const page = createSurface(200, 125);
 const ink = rgba(30, 30, 30);
-fillPath(page, strokePolyline(new Path(), new Path().ellipse(52, 62, 34, 34).contours[0] ?? [], 4, true), ink);
-fillPath(page, strokePolyline(new Path(), [112, 100, 112, 58, 140, 30, 168, 58, 168, 100], 4, true), ink);
-fillPath(page, strokePolyline(new Path(), [96, 0, 96, 125], 1.5, false), ink);
+function line(surface: Surface, points: number[], width: number, closed: boolean, color: Color): void {
+  const clip = { x: 0, y: 0, width: surface.width, height: surface.height };
+  rasterizeStroke([points], width, closed, clip, (x, y, coverage) => {
+    blendPixel(surface.data, (y * surface.width + x) * 4, color.r, color.g, color.b, coverage);
+  });
+}
+line(page, new Path().ellipse(52, 62, 34, 34).contours[0] ?? [], 4, true, ink);
+line(page, [112, 100, 112, 58, 140, 30, 168, 58, 168, 100], 4, true, ink);
+line(page, [96, 0, 96, 125], 1.5, false, ink);
 save('coloring-page', page);

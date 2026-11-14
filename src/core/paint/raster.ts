@@ -1,5 +1,5 @@
 import { blendPixel, div255, type Color } from './color.ts';
-import { signedArea, type Path } from './path.ts';
+import type { Path } from './path.ts';
 import { EMPTY_RECT, intersectRect, isEmptyRect, rectFromBounds, type Rect } from './rect.ts';
 import type { Surface } from './surface.ts';
 
@@ -206,58 +206,127 @@ export function fillPath(surface: Surface, path: Path, color: Color, clip?: Rect
   });
 }
 
-/** Adds a closed polygon to the path with positive winding, whatever order its points came in. */
-function addWound(path: Path, points: number[]): void {
-  if (signedArea(points) < 0) {
-    const reversed: number[] = [];
-    for (let i = points.length - 2; i >= 0; i -= 2) reversed.push(points[i] ?? 0, points[i + 1] ?? 0);
-    path.polygon(reversed);
-  } else {
-    path.polygon(points);
-  }
-}
-
 /**
- * Adds the outline of a polyline to a path: a rectangle along each segment and a disc at each
- * point, which gives round joins and round caps. Every piece has the same winding, so the
- * clamped nonzero rule merges the overlaps into one solid outline.
+ * Visits every pixel within width / 2 of any of the polylines, with antialiased coverage from
+ * its distance to the nearest point on them. Ends and corners come out round. The distance is
+ * a minimum over all segments, so where segments overlap the union is exact: no seams at the
+ * joints and no doubled edges. A polyline with one point is a dot.
  */
-export function strokePolyline(path: Path, points: readonly number[], width: number, closed: boolean): Path {
+export function rasterizeStroke(
+  polylines: readonly (readonly number[])[],
+  width: number,
+  closed: boolean,
+  clip: Rect,
+  visit: CoverageVisitor,
+): Rect {
   const radius = width / 2;
-  if (radius <= 0 || points.length < 2) return path;
-  const count = points.length / 2;
-  const segments = closed ? count : count - 1;
-  for (let i = 0; i < segments; i++) {
-    const x0 = points[2 * i] ?? 0;
-    const y0 = points[2 * i + 1] ?? 0;
-    const x1 = points[(2 * i + 2) % points.length] ?? 0;
-    const y1 = points[(2 * i + 3) % points.length] ?? 0;
-    const length = Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
-    if (length === 0) continue;
-    const nx = (-(y1 - y0) / length) * radius;
-    const ny = ((x1 - x0) / length) * radius;
-    addWound(path, [x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny]);
+  if (!(radius > 0)) return EMPTY_RECT;
+  const area = strokeRect(polylines, radius, clip);
+  if (isEmptyRect(area)) return EMPTY_RECT;
+  const size = area.width * area.height;
+  if (distanceScratch.length < size) distanceScratch = new Float64Array(size);
+  const nearest = distanceScratch;
+  nearest.fill(Number.POSITIVE_INFINITY, 0, size);
+  const reach = radius + 1;
+  for (const points of polylines) {
+    const count = Math.floor(points.length / 2);
+    if (count === 0) continue;
+    const segments = count === 1 ? 1 : closed ? count : count - 1;
+    for (let i = 0; i < segments; i++) {
+      const j = (i + 1) % count;
+      markSegment(
+        nearest,
+        area,
+        points[2 * i] ?? 0,
+        points[2 * i + 1] ?? 0,
+        points[2 * j] ?? 0,
+        points[2 * j + 1] ?? 0,
+        reach,
+      );
+    }
   }
-  // A disc at every end and at every corner sharp enough to leave a gap between two rectangles.
-  // On a gentle bend the gap is far below a pixel, and a smooth curve has hundreds of those.
-  for (let i = 0; i < count; i++) {
-    const x = points[2 * i] ?? 0;
-    const y = points[2 * i + 1] ?? 0;
-    const isEnd = !closed && (i === 0 || i === count - 1);
-    if (isEnd || isSharpCorner(points, i, count)) path.ellipse(x, y, radius, radius, 1);
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let row = 0; row < area.height; row++) {
+    for (let column = 0; column < area.width; column++) {
+      const squared = nearest[row * area.width + column] ?? Number.POSITIVE_INFINITY;
+      if (squared >= reach * reach) continue;
+      const amount = radius - Math.sqrt(squared) + 0.5;
+      if (amount <= 0) continue;
+      const coverage = amount >= 1 ? 255 : Math.round(amount * 255);
+      if (coverage === 0) continue;
+      visit(area.x + column, area.y + row, coverage);
+      if (column < minX) minX = column;
+      if (column > maxX) maxX = column;
+      if (row < minY) minY = row;
+      maxY = row;
+    }
   }
-  return path;
+  if (minX > maxX) return EMPTY_RECT;
+  return { x: area.x + minX, y: area.y + minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
-function isSharpCorner(points: readonly number[], i: number, count: number): boolean {
-  const prev = (i - 1 + count) % count;
-  const next = (i + 1) % count;
-  const ax = (points[2 * i] ?? 0) - (points[2 * prev] ?? 0);
-  const ay = (points[2 * i + 1] ?? 0) - (points[2 * prev + 1] ?? 0);
-  const bx = (points[2 * next] ?? 0) - (points[2 * i] ?? 0);
-  const by = (points[2 * next + 1] ?? 0) - (points[2 * i + 1] ?? 0);
-  const lengths = Math.sqrt((ax * ax + ay * ay) * (bx * bx + by * by));
-  if (lengths === 0) return true;
-  // cos of the turn below 0.995 is a turn of more than about 5.7 degrees.
-  return (ax * bx + ay * by) / lengths < 0.995;
+let distanceScratch = new Float64Array(0);
+
+/** The pixel rectangle a stroke of this radius can touch, limited to clip. */
+export function strokeRect(polylines: readonly (readonly number[])[], radius: number, clip: Rect): Rect {
+  let x0 = Number.POSITIVE_INFINITY;
+  let y0 = Number.POSITIVE_INFINITY;
+  let x1 = Number.NEGATIVE_INFINITY;
+  let y1 = Number.NEGATIVE_INFINITY;
+  for (const points of polylines) {
+    for (let i = 0; i + 1 < points.length; i += 2) {
+      x0 = Math.min(x0, points[i] ?? 0);
+      x1 = Math.max(x1, points[i] ?? 0);
+      y0 = Math.min(y0, points[i + 1] ?? 0);
+      y1 = Math.max(y1, points[i + 1] ?? 0);
+    }
+  }
+  if (x0 > x1) return EMPTY_RECT;
+  const reach = radius + 1;
+  return intersectRect(rectFromBounds(x0 - reach, y0 - reach, x1 + reach, y1 + reach), clip);
+}
+
+/** Lowers the squared distance of each pixel center near one segment, row by row within reach. */
+function markSegment(
+  nearest: Float64Array,
+  area: Rect,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  reach: number,
+): void {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const lengthSquared = dx * dx + dy * dy;
+  const firstRow = Math.max(area.y, Math.floor(Math.min(y0, y1) - reach));
+  const lastRow = Math.min(area.y + area.height - 1, Math.ceil(Math.max(y0, y1) + reach));
+  for (let y = firstRow; y <= lastRow; y++) {
+    const py = y + 0.5;
+    // The part of the segment within reach of this row lies between these x values.
+    let low = Math.min(x0, x1);
+    let high = Math.max(x0, x1);
+    if (dy !== 0) {
+      const ta = Math.min(1, Math.max(0, (py - reach - y0) / dy));
+      const tb = Math.min(1, Math.max(0, (py + reach - y0) / dy));
+      low = Math.min(x0 + dx * ta, x0 + dx * tb);
+      high = Math.max(x0 + dx * ta, x0 + dx * tb);
+    }
+    const firstColumn = Math.max(area.x, Math.floor(low - reach));
+    const lastColumn = Math.min(area.x + area.width - 1, Math.ceil(high + reach));
+    const rowBase = (y - area.y) * area.width - area.x;
+    for (let x = firstColumn; x <= lastColumn; x++) {
+      const px = x + 0.5;
+      let t = lengthSquared === 0 ? 0 : ((px - x0) * dx + (py - y0) * dy) / lengthSquared;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+      const ex = px - (x0 + dx * t);
+      const ey = py - (y0 + dy * t);
+      const squared = ex * ex + ey * ey;
+      if (squared < (nearest[rowBase + x] ?? Number.POSITIVE_INFINITY)) nearest[rowBase + x] = squared;
+    }
+  }
 }
