@@ -1,0 +1,28 @@
+/* The numeral card on top, and the groups below it. */
+
+.match-stage {
+  container-type: size;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.match-numeral {
+  min-width: var(--wk-target-large);
+  min-height: var(--wk-target-large);
+  padding: 0 var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: var(--wk-shadow-raised);
+  font: inherit;
+  /* Grows with the window, so the numeral reads from across a room on a large screen. */
+  font-size: clamp(calc(var(--wk-target-large) * 0.62), 15cqh, calc(var(--wk-target-large) * 1.1));
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* A slimmer edge inside each group, so the busiest round keeps every thing a target wide. */
+.match-stage .math-group {
+  padding: var(--wk-space-item);
+}

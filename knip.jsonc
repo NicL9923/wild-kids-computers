@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Entry files knip cannot infer from a plugin. Tools run through npm scripts with node.
+  "entry": [
+    "electron/main/index.ts",
+    "electron/preload/index.ts",
+    "tools/*.ts",
+    // Public APIs the shell and the activity kit import. Drop each line once a consumer exists.
+    "src/app/session/sessionHooks.ts",
+    "src/audio/AudioProvider.tsx",
+    "src/audio/createAppAudio.ts",
+    "src/core/strings/shared/index.ts",
+    "e2e/support/audioLog.ts",
+  ],
+  "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "tools/**/*.ts", "e2e/**/*.ts"],
+  // tools/voice and tools/emoji have their own package.json, so their packages stay out of the
+  // app. ffmpeg and ffprobe come from PATH and only the voice tools run them.
+  "ignoreDependencies": ["svgo", "@resvg/resvg-js"],
+  "ignoreBinaries": ["ffmpeg", "ffprobe"],
+}

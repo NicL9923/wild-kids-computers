@@ -1,0 +1,45 @@
+import mask from '../../../../assets/coloring/underwater.png?no-inline';
+import thumbnail from '../../../../assets/coloring/src/underwater.svg?no-inline';
+import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
+
+export default defineColoringPage({
+  id: 'underwater',
+  order: 300,
+  title: strings.underwater,
+  bands: ['band-9-12'],
+  mask,
+  thumbnail,
+  background: { x: 0, y: 0 },
+  regions: [
+    { x: 1179, y: 132 },
+    { x: 854, y: 139 },
+    { x: 559, y: 194 },
+    { x: 879, y: 214 },
+    { x: 1211, y: 229 },
+    { x: 1338, y: 229 },
+    { x: 1105, y: 244 },
+    { x: 849, y: 289 },
+    { x: 516, y: 328 },
+    { x: 339, y: 329 },
+    { x: 663, y: 351 },
+    { x: 1239, y: 478 },
+    { x: 1414, y: 491 },
+    { x: 1399, y: 544 },
+    { x: 1107, y: 559 },
+    { x: 1213, y: 559 },
+    { x: 1302, y: 572 },
+    { x: 636, y: 608 },
+    { x: 195, y: 731 },
+    { x: 399, y: 742 },
+    { x: 804, y: 744 },
+    { x: 1508, y: 768 },
+    { x: 1064, y: 780 },
+    { x: 1159, y: 848 },
+    { x: 1200, y: 848 },
+    { x: 1123, y: 871 },
+    { x: 1235, y: 871 },
+    { x: 256, y: 876 },
+    { x: 558, y: 889 },
+  ],
+});

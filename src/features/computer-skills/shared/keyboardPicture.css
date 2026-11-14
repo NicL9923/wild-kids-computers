@@ -1,0 +1,65 @@
+/*
+ * The keyboard picture. Keys are plain light caps with dark labels. The key to press is drawn in
+ * the accent color with a thick dark ring, so it stands out by shape as well as color. A key just
+ * pressed fills with the primary color for a moment.
+ */
+
+.keypic {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.keypic-cap {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-border);
+  stroke-width: 3;
+  transition: fill var(--wk-duration-quick) var(--wk-ease-out);
+}
+
+.keypic-label {
+  fill: var(--wk-color-text);
+  font-family: var(--wk-font-family);
+  font-size: 46px;
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.keypic-symbol {
+  fill: var(--wk-color-text);
+}
+
+.keypic-stroke {
+  fill: none;
+  stroke: var(--wk-color-text);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.keypic-row-hint {
+  fill: var(--wk-color-selected);
+  stroke: var(--wk-color-primary);
+  stroke-width: 4;
+  stroke-dasharray: 14 10;
+}
+
+.keypic-key[data-mark='target'] .keypic-cap {
+  fill: var(--wk-color-accent);
+  stroke: var(--wk-color-text);
+  stroke-width: 10;
+}
+
+.keypic-key[data-mark='pressed'] .keypic-cap {
+  fill: var(--wk-color-primary);
+  stroke: var(--wk-color-primary-base);
+}
+
+.keypic-key[data-mark='pressed'] .keypic-label,
+.keypic-key[data-mark='pressed'] .keypic-symbol {
+  fill: var(--wk-color-on-primary);
+}
+
+.keypic-key[data-mark='pressed'] .keypic-stroke {
+  stroke: var(--wk-color-on-primary);
+}

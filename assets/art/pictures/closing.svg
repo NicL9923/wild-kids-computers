@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f4a7a"/><stop offset="1" stop-color="#8a8fbf"/></linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#s)"/>
+  <path d="M590 70a46 46 0 1 0 50 66 38 38 0 1 1-50-66z" fill="#f6e7b0"/>
+  <g fill="#f6e7b0"><circle cx="120" cy="80" r="3"/><circle cx="260" cy="50" r="2.5"/><circle cx="420" cy="100" r="3"/><circle cx="720" cy="60" r="2.5"/><circle cx="340" cy="170" r="2"/><circle cx="60" cy="190" r="2.5"/></g>
+  <path d="M0 320c160-50 320-60 460-30s240 10 340-20v230H0z" fill="#4f6f62"/>
+  <path d="M0 400c180-36 360-36 520-10s220 10 280 0v110H0z" fill="#3f5d50"/>
+  <!-- a burrow with a warm light, its door half closed -->
+  <path d="M440 400c0-70 44-110 100-110s100 40 100 110z" fill="#5a7f62"/>
+  <circle cx="540" cy="380" r="40" fill="#f3c46a"/>
+  <path d="M500 380a40 40 0 0 1 40-40v80a40 40 0 0 1-40-40z" fill="#8a5a3b"/>
+  <!-- sleeping flowers, closed for the night -->
+  <g stroke="#2f4a3e" stroke-width="7" stroke-linecap="round" fill="none"><path d="M160 470v-80M240 480v-60M330 470v-70M690 480v-60"/></g>
+  <g fill="#c98bc9"><path d="M160 392c-14-10-16-30 0-44 16 14 14 34 0 44z"/><path d="M330 402c-14-10-16-30 0-44 16 14 14 34 0 44z"/></g>
+  <g fill="#e8a07a"><path d="M240 422c-12-8-14-26 0-38 14 12 12 30 0 38z"/><path d="M690 422c-12-8-14-26 0-38 14 12 12 30 0 38z"/></g>
+  <!-- fireflies resting -->
+  <g fill="#f8e58c"><circle cx="210" cy="330" r="5"/><circle cx="380" cy="300" r="4"/><circle cx="660" cy="320" r="5"/><circle cx="100" cy="360" r="4"/></g>
+  <g fill="#f8e58c" opacity="0.25"><circle cx="210" cy="330" r="14"/><circle cx="380" cy="300" r="12"/><circle cx="660" cy="320" r="14"/><circle cx="100" cy="360" r="12"/></g>
+</svg>

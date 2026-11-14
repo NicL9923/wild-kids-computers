@@ -15,7 +15,7 @@ GCompris and Tux Paint are the reference points, and both show their age.
 
 ## What makes an app teach
 
-- Children learn from apps when the activity is active, engaging without distraction, meaningful, and social. Most top "educational" apps score low on these four. From memory: Hirsh-Pasek, Zosh, et al. 2015, *Psychological Science in the Public Interest*, and Meyer et al. 2021.
+- Children learn from apps when the activity is active, engaging without distraction, meaningful, and social. Most top "educational" apps score low on these four. From memory: Hirsh-Pasek, Zosh, et al. 2015, _Psychological Science in the Public Interest_, and Meyer et al. 2021.
 - Decoration that does not serve the learning goal hurts learning. From memory: Mayer's coherence principle, and Takacs, Swart, and Bus 2015 on children's e-books.
 - A 2018 meta-analysis of 36 studies of touchscreen learning in ages 0 to 5 found a moderate positive effect that depended on active interaction and adult feedback. Checked by search: [Xie et al. 2018](https://frontiersin.org/article/10.3389/fpsyg.2018.02580/full).
 
@@ -24,8 +24,8 @@ These findings support hard rules 5 and 6.
 ## Pointer and keyboard skill by age
 
 - Nielsen Norman Group tested children aged 3 to 12. For children under 9 on a desktop, dragging, scrolling, and clicking small objects with a mouse or trackpad are hard. Many younger children are more comfortable with a trackpad than a mouse. Checked: [NN/g, physical development](https://www.nngroup.com/articles/children-ux-physical-development/).
-- Most 5 and 6-year-olds can click. Drag-and-drop causes more errors, partly because children release the button early. From memory: Donker and Reitsma 2007, *Computers & Education*.
-- Larger targets help preschoolers a lot. From memory: Hourcade et al. 2004, *ACM TOCHI*.
+- Most 5 and 6-year-olds can click. Drag-and-drop causes more errors, partly because children release the button early. From memory: Donker and Reitsma 2007, _Computers & Education_.
+- Larger targets help preschoolers a lot. From memory: Hourcade et al. 2004, _ACM TOCHI_.
 - Touch-typing instruction usually starts at about ages 8 to 9. This is practitioner guidance with modest trial evidence.
 - No source was found for trackpad, hover, right-click, or scroll skill by age.
 - No study gives a validated minimum target size for each age. The sizes in the spec are estimates.
@@ -34,8 +34,8 @@ These findings support hard rule 7 and the activity order in the computer skills
 
 ## Rewards and manipulative design
 
-- Expected tangible rewards undermine intrinsic motivation. Verbal praise does not. From memory: Deci, Koestner, and Ryan 1999, *Psychological Bulletin*.
-- In a study of apps used by 160 children aged 3 to 5, about 80% of the apps had manipulative features, such as pressure from characters, fake time pressure, and lures to keep playing. Checked by search: Radesky et al. 2022, *JAMA Network Open*, doi 10.1001/jamanetworkopen.2022.17641.
+- Expected tangible rewards undermine intrinsic motivation. Verbal praise does not. From memory: Deci, Koestner, and Ryan 1999, _Psychological Bulletin_.
+- In a study of apps used by 160 children aged 3 to 5, about 80% of the apps had manipulative features, such as pressure from characters, fake time pressure, and lures to keep playing. Checked by search: Radesky et al. 2022, _JAMA Network Open_, doi 10.1001/jamanetworkopen.2022.17641.
 - The American Academy of Pediatrics issued a policy statement in January 2026 that moves away from hourly limits and toward child-centered design over engagement-driven design. Checked through secondary coverage only: [Contemporary Pediatrics](https://www.contemporarypediatrics.com/view/aap-calls-for-system-level-changes-to-improve-children-s-digital-media-environments).
 
 These findings support hard rule 4 and the session length design.

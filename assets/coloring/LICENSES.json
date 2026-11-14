@@ -1,0 +1,14 @@
+[
+  {
+    "files": "src/*.svg",
+    "source": "Original SVG line drawings made for this repository: the paint studio coloring pages",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "*.png",
+    "source": "Line-art masks rendered from src/*.svg by tools/renderColoringPages.ts",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  }
+]

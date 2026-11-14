@@ -1,0 +1,90 @@
+/*
+ * A square grid as big as the stage allows, split by a dashed mirror line. The shown half is
+ * flat; the half to fill is buttons with a raised edge. Filled squares wear the picture's paint
+ * in both halves, so the finished picture reads as one.
+ */
+
+.ms-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: var(--wk-space-container);
+  container-type: size;
+}
+
+.ms-grid {
+  --ms-gap: 3px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--ms-size), 1fr);
+  gap: var(--ms-gap);
+  width: max(
+    calc(var(--wk-target-min) * var(--ms-size) + var(--ms-gap) * (var(--ms-size) - 1)),
+    min(100cqw, calc(100cqh - var(--wk-space-container)))
+  );
+  aspect-ratio: 1;
+}
+
+.ms-cell {
+  box-sizing: border-box;
+  min-width: 0;
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface-sunken);
+}
+
+.ms-cell[data-shown='true'],
+.ms-square[data-filled='true'] {
+  background: var(--ms-paint);
+}
+
+.ms-square {
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  background: var(--wk-color-surface);
+  cursor: pointer;
+}
+
+.ms-square:hover:not([data-filled='true']) {
+  background: var(--wk-color-selected);
+}
+
+.ms-square[data-filled='true'] {
+  border-color: var(--wk-color-text);
+  cursor: default;
+}
+
+/* After two tries, the next square to fill stands out with a thick edge and a slow pulse. */
+.ms-square[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  animation: ms-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes ms-hint {
+  to {
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+}
+
+/* The mirror line runs through the middle, between the two halves. */
+.ms-grid::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.ms-grid[data-axis='vertical']::after {
+  top: calc(var(--wk-space-item) * -1);
+  bottom: calc(var(--wk-space-item) * -1);
+  left: calc(50% - var(--wk-border-width) * 2);
+  border-left: calc(var(--wk-border-width) * 4) dashed var(--wk-color-primary-base);
+}
+
+.ms-grid[data-axis='horizontal']::after {
+  left: calc(var(--wk-space-item) * -1);
+  right: calc(var(--wk-space-item) * -1);
+  top: calc(50% - var(--wk-border-width) * 2);
+  border-top: calc(var(--wk-border-width) * 4) dashed var(--wk-color-primary-base);
+}

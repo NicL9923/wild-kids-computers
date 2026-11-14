@@ -1,0 +1,427 @@
+/*
+ * The app shell's child-facing screens: first launch, the profile choice, the home map, the
+ * closing screen, and the not-found screen. Every value is a token from src/styles/tokens.css.
+ */
+
+@layer components {
+  /* ---- Picture and card choices (src/app/profiles/ChoiceGroup.tsx) ---- */
+
+  .wk-choice-group {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .wk-choice-group > .wk-field-label {
+    margin-bottom: var(--wk-space-item);
+  }
+
+  .wk-choice-options {
+    display: grid;
+    gap: var(--wk-space-item);
+  }
+
+  /* Pictures keep their own size and wrap, so a large avatar never overflows a narrow column. */
+  .wk-choice-options[data-layout='pictures'] {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .wk-choice-options[data-layout='cards'] {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15em), 1fr));
+  }
+
+  .wk-choice {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--wk-space-unit) * 2);
+    min-width: var(--wk-target-min);
+    min-height: var(--wk-target-min);
+    padding: var(--wk-space-item);
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-surface);
+    color: var(--wk-color-text);
+    font-weight: var(--wk-font-weight-bold);
+    text-align: center;
+    cursor: pointer;
+    transition: transform var(--wk-duration-base) var(--wk-ease-out);
+  }
+
+  .wk-choice-options[data-layout='cards'] .wk-choice {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: var(--wk-space-container);
+    padding-right: calc(var(--wk-target-min) * 0.5 + var(--wk-space-container));
+    text-align: start;
+  }
+
+  .wk-choice:hover {
+    transform: translateY(calc(-2px * var(--wk-motion-scale)));
+  }
+
+  /* The radio covers the whole choice, so a click anywhere picks it, and stays out of sight. */
+  .wk-choice input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .wk-choice:has(input:checked) {
+    border-color: var(--wk-color-primary);
+    background: var(--wk-color-selected);
+    outline: var(--wk-border-width) solid var(--wk-color-primary);
+  }
+
+  .wk-choice:has(input:focus-visible) {
+    outline: var(--wk-focus-width) solid var(--wk-color-focus);
+    outline-offset: var(--wk-focus-offset);
+  }
+
+  .wk-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-unit);
+  }
+
+  .wk-choice-description {
+    color: var(--wk-color-text-muted);
+    font-size: var(--wk-text-small);
+    font-weight: var(--wk-font-weight-regular);
+  }
+
+  .wk-choice-check {
+    position: absolute;
+    top: var(--wk-space-item);
+    right: var(--wk-space-item);
+    display: grid;
+    place-items: center;
+    width: calc(var(--wk-target-min) * 0.45);
+    height: calc(var(--wk-target-min) * 0.45);
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-color-primary);
+    color: var(--wk-color-on-primary);
+  }
+
+  .wk-choice-check svg {
+    width: 70%;
+    height: 70%;
+  }
+
+  /* ---- First launch ---- */
+
+  .wk-setup {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    box-sizing: border-box;
+    height: 100dvh;
+    padding: var(--wk-space-screen-edge);
+    gap: var(--wk-space-container);
+    background: var(--wk-color-page);
+  }
+
+  .wk-setup-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-container);
+  }
+
+  .wk-setup-heading {
+    margin: 0;
+    font-size: var(--wk-text-display);
+    line-height: var(--wk-line-height-tight);
+  }
+
+  .wk-setup-heading:focus {
+    outline: none;
+  }
+
+  .wk-setup-body {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    /* Room for the focus ring and the raised look of the choices inside the scroll area. */
+    padding: var(--wk-space-item);
+  }
+
+  /* Auto margins center the step and fall to zero when it is taller than the window, so it scrolls. */
+  .wk-setup-body > * {
+    width: min(100%, 1240px);
+    margin: auto;
+  }
+
+  .wk-setup-body .wk-choice-options[data-layout='pictures'] {
+    justify-content: center;
+  }
+
+  .wk-setup-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-section);
+  }
+
+  .wk-setup-name {
+    width: min(100%, 32rem);
+    margin-inline: auto;
+  }
+
+  .wk-setup-intro {
+    margin: 0 auto;
+    max-width: 48rem;
+    text-align: center;
+  }
+
+  .wk-setup-sound,
+  .wk-setup-kiosk {
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-container);
+    min-height: 100%;
+    text-align: center;
+  }
+
+  .wk-setup-kiosk .wk-switch-row {
+    width: min(100%, 44rem);
+    padding: var(--wk-space-container);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-surface);
+    text-align: start;
+  }
+
+  .wk-setup-question {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--wk-space-item);
+  }
+
+  .wk-setup-question-text {
+    margin: 0 auto var(--wk-space-item);
+    padding: 0;
+    font-size: var(--wk-text-title);
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-setup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--wk-space-container);
+  }
+
+  .wk-setup-hint {
+    max-width: 40rem;
+    margin: 0;
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-setup-hint:empty,
+  .wk-setup-missing:empty {
+    display: none;
+  }
+
+  .wk-setup-foot {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--wk-space-container);
+  }
+
+  .wk-setup-next {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--wk-space-item);
+  }
+
+  .wk-setup-missing {
+    margin: 0;
+    font-weight: var(--wk-font-weight-bold);
+  }
+
+  .wk-setup-dots {
+    display: flex;
+    gap: var(--wk-space-item);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Done, current, and next differ in fill and size, not only in color. */
+  .wk-setup-dots li {
+    width: calc(var(--wk-space-unit) * 4);
+    height: calc(var(--wk-space-unit) * 4);
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-round);
+    background: var(--wk-color-surface);
+  }
+
+  .wk-setup-dots li[data-state='done'] {
+    background: var(--wk-color-border);
+  }
+
+  .wk-setup-dots li[data-state='current'] {
+    width: calc(var(--wk-space-unit) * 10);
+    border-color: var(--wk-color-primary);
+    background: var(--wk-color-primary);
+  }
+
+  /* ---- Profile choice ---- */
+
+  .wk-choose {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wk-space-section);
+    box-sizing: border-box;
+    min-height: 100dvh;
+    padding: var(--wk-space-screen-edge);
+    background: var(--wk-color-page);
+  }
+
+  .wk-choose-head {
+    display: flex;
+    align-items: center;
+    gap: var(--wk-space-container);
+  }
+
+  .wk-choose-heading {
+    margin: 0;
+    font-size: var(--wk-text-display);
+  }
+
+  .wk-choose-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--wk-space-container);
+    max-width: 1400px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .wk-choose-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--wk-space-item);
+    min-width: calc(var(--wk-target-large) * 1.5);
+    padding: var(--wk-space-container);
+    border: var(--wk-border-width) solid var(--wk-color-border);
+    border-radius: var(--wk-radius-card);
+    background: var(--wk-color-surface);
+    color: var(--wk-color-text);
+    box-shadow: var(--wk-shadow-raised);
+    font: inherit;
+    font-weight: var(--wk-font-weight-bold);
+    cursor: pointer;
+    transition: transform var(--wk-duration-base) var(--wk-ease-out);
+  }
+
+  .wk-choose-profile:hover {
+    transform: translateY(calc(-4px * var(--wk-motion-scale)));
+  }
+
+  .wk-choose-profile:active {
+    transform: translateY(calc(1px * var(--wk-motion-scale)));
+  }
+
+  .wk-choose-problem {
+    max-width: 40ch;
+    margin: 0;
+    font-size: var(--wk-text-title);
+    text-align: center;
+  }
+
+  .wk-choose-name {
+    display: flex;
+    align-items: center;
+    gap: var(--wk-space-item);
+    max-width: calc(var(--wk-target-large) * 2);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- Home map ---- */
+
+  .wk-home {
+    position: relative;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .wk-home-map-frame {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* The top bar floats over the sky of the meadow, in the same places as on every other screen. */
+  .wk-home-bar {
+    position: absolute;
+    z-index: 1;
+    inset: 0 0 auto;
+    pointer-events: none;
+  }
+
+  .wk-home-bar .wk-screen-slot > * {
+    pointer-events: auto;
+  }
+
+  .wk-home-bar .wk-avatar {
+    border: 0;
+  }
+
+  /*
+   * The grown-ups' control sits alone in the bottom right corner, away from every place on the
+   * map and from the child's top bar, so a small child is unlikely to press it by chance. The
+   * parent gate is behind it either way.
+   */
+  .wk-corner-control {
+    position: fixed;
+    right: var(--wk-space-screen-edge);
+    bottom: var(--wk-space-screen-edge);
+  }
+
+  /* ---- Closing screen ---- */
+
+  .wk-closing {
+    position: relative;
+  }
+
+  /* ---- Not found ---- */
+
+  .wk-not-found {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-height: 100dvh;
+    padding: var(--wk-space-screen-edge);
+    background: var(--wk-color-page);
+  }
+
+  .wk-not-found-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--wk-space-container);
+    text-align: center;
+  }
+
+  .wk-not-found-heading {
+    margin: 0;
+    font-size: var(--wk-text-display);
+  }
+}

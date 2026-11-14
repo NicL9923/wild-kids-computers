@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- a round seed head with a flat ridged crown, outlined so it stands out on any ground -->
+  <ellipse cx="100" cy="188" rx="54" ry="8" fill="#2f4a22" opacity="0.22"/>
+  <path d="M100 186c-4-8-4-14 0-20" fill="none" stroke="#3d5c25" stroke-width="10" stroke-linecap="round"/>
+  <path d="M100 52c42 0 66 30 66 64 0 36-28 58-66 58s-66-22-66-58c0-34 24-64 66-64z" fill="#9fcb6b" stroke="#3d5c25" stroke-width="7"/>
+  <path d="M150 74c12 14 18 30 16 46-4 30-28 50-60 54 30-12 48-36 48-64 0-14-2-26-4-36z" fill="#7fb04e"/>
+  <ellipse cx="72" cy="96" rx="14" ry="22" fill="#d6edb4" transform="rotate(-24 72 96)"/>
+  <path d="M100 58v112M72 64c-10 30-10 72 0 104M128 64c10 30 10 72 0 104" fill="none" stroke="#5f8a3a" stroke-width="4" stroke-linecap="round"/>
+  <!-- the crown: a little wheel of ridges on top -->
+  <ellipse cx="100" cy="50" rx="40" ry="14" fill="#c4dc92" stroke="#3d5c25" stroke-width="6"/>
+  <g stroke="#3d5c25" stroke-width="4" stroke-linecap="round">
+    <path d="M100 50v-12M100 50l-26-8M100 50l26-8M100 50l-30 6M100 50l30 6"/>
+  </g>
+  <circle cx="100" cy="50" r="7" fill="#3d5c25"/>
+</svg>

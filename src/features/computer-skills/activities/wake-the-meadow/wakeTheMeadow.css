@@ -1,0 +1,75 @@
+/*
+ * The meadow keeps its 5:3 shape and fits the stage. Buds and the pointer's light are sized in the
+ * meadow's width, so they grow with the window. Nothing here is a control: the pointer itself is
+ * the whole game.
+ */
+
+.meadow-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.meadow-board {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  overflow: hidden;
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-meadow-grass);
+  touch-action: none;
+}
+
+/* A soft light under the pointer, the size of its reach, so a child sees where flowers will wake. */
+.meadow-halo {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: var(--wk-radius-round);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--wk-color-surface) 55%, transparent) 0%,
+    color-mix(in srgb, var(--wk-color-surface) 25%, transparent) 55%,
+    transparent 72%
+  );
+  translate: -50% -50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--wk-duration-quick) var(--wk-ease-out);
+}
+
+.meadow-halo[data-shown='true'] {
+  opacity: 1;
+}
+
+.meadow-bud {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.meadow-bud-art,
+.meadow-flower {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A bud opens with a quick swell from small. Reduced motion shows the flower at once. */
+.meadow-bud[data-awake='true'] .meadow-flower {
+  animation: meadow-open var(--wk-duration-calm) var(--wk-ease-out);
+}
+
+@keyframes meadow-open {
+  from {
+    scale: calc(1 - 0.6 * var(--wk-motion-scale));
+  }
+
+  to {
+    scale: 1;
+  }
+}

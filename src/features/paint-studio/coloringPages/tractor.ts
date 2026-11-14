@@ -1,0 +1,43 @@
+import mask from '../../../../assets/coloring/tractor.png?no-inline';
+import thumbnail from '../../../../assets/coloring/src/tractor.svg?no-inline';
+import { defineColoringPage } from '../coloringPage.ts';
+import { strings } from './strings.ts';
+
+export default defineColoringPage({
+  id: 'tractor',
+  order: 240,
+  title: strings.tractor,
+  bands: ['band-9-12'],
+  mask,
+  thumbnail,
+  background: { x: 0, y: 0 },
+  regions: [
+    { x: 759, y: 89 },
+    { x: 294, y: 144 },
+    { x: 1429, y: 149 },
+    { x: 459, y: 209 },
+    { x: 1139, y: 239 },
+    { x: 1084, y: 309 },
+    { x: 552, y: 312 },
+    { x: 647, y: 312 },
+    { x: 892, y: 313 },
+    { x: 1055, y: 385 },
+    { x: 85, y: 468 },
+    { x: 650, y: 494 },
+    { x: 1202, y: 502 },
+    { x: 1516, y: 512 },
+    { x: 1202, y: 547 },
+    { x: 819, y: 569 },
+    { x: 473, y: 582 },
+    { x: 1202, y: 592 },
+    { x: 1202, y: 637 },
+    { x: 498, y: 650 },
+    { x: 1133, y: 715 },
+    { x: 519, y: 729 },
+    { x: 1147, y: 755 },
+    { x: 1159, y: 804 },
+    { x: 847, y: 814 },
+    { x: 1437, y: 865 },
+    { x: 170, y: 879 },
+  ],
+});

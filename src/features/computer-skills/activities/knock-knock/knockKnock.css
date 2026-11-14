@@ -1,0 +1,120 @@
+/*
+ * The street keeps its 5:3 shape and fits the stage. Each house stands on the ground line with
+ * its door at the bottom, and two knock dots under the door show one click and two.
+ */
+
+.knock-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.knock-street {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  overflow: hidden;
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: linear-gradient(var(--wk-color-meadow-sky) 0 86.7%, var(--wk-color-meadow-grass) 86.7% 100%);
+}
+
+.knock-house {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+}
+
+.knock-house-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.knock-door {
+  position: relative;
+  min-width: var(--wk-target-min);
+  padding: 0;
+  border: 0;
+  border-radius: 46% 46% 0 0 / 30% 30% 0 0;
+  background: var(--wk-color-text);
+  cursor: pointer;
+  perspective: calc(var(--wk-target-min) * 24);
+}
+
+.knock-inside {
+  position: absolute;
+  inset: 0 0 0 16%;
+  display: grid;
+  place-items: center;
+}
+
+.knock-guest {
+  width: 80%;
+  height: auto;
+}
+
+.knock-panel {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transition: transform var(--wk-duration-base) var(--wk-ease-out);
+}
+
+.knock-door-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A knock: a small shake of the door. Reduced motion keeps it still; the dot still fills. */
+.knock-door[data-knocked='true'] .knock-panel {
+  animation: knock-shake var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes knock-shake {
+  33% {
+    translate: calc(-3% * var(--wk-motion-scale)) 0;
+  }
+
+  66% {
+    translate: calc(3% * var(--wk-motion-scale)) 0;
+  }
+}
+
+/* An open door swings inward and shows who is home. Reduced motion just takes the door away. */
+.knock-door[data-open='true'] {
+  cursor: default;
+}
+
+.knock-door[data-open='true'] .knock-panel {
+  transform: rotateY(calc(76deg * var(--wk-motion-scale)));
+  opacity: var(--wk-motion-scale);
+}
+
+/* Two dots under the door: empty, one filled after a knock, both filled when it opens. */
+.knock-dots {
+  position: absolute;
+  top: calc(100% + 1.2cqw);
+  display: flex;
+  gap: 1.2cqw;
+}
+
+.knock-dot {
+  width: 2.6cqw;
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-text);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-surface);
+}
+
+.knock-dots[data-filled='1'] .knock-dot:first-child,
+.knock-dots[data-filled='2'] .knock-dot {
+  background: var(--wk-color-text);
+}

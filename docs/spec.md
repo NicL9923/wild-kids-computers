@@ -29,11 +29,11 @@ Add an automated check for each rule where a check is possible.
 
 The first launch asks for an age band. A parent can change it in the parent corner. Each kid profile has its own band.
 
-| Band | Ages | Smallest target | Look |
-| --- | --- | --- | --- |
-| `band-3-5` | 3 to 5 | 72 CSS px | Fewest choices on screen, largest art, no text needed |
-| `band-6-8` | 6 to 8 | 56 CSS px | Short text with speech, more tools |
-| `band-9-12` | 9 to 12 | 44 CSS px | Plainer look, full tools, text instructions with speech on request |
+| Band        | Ages    | Smallest target | Look                                                               |
+| ----------- | ------- | --------------- | ------------------------------------------------------------------ |
+| `band-3-5`  | 3 to 5  | 72 CSS px       | Fewest choices on screen, largest art, no text needed              |
+| `band-6-8`  | 6 to 8  | 56 CSS px       | Short text with speech, more tools                                 |
+| `band-9-12` | 9 to 12 | 44 CSS px       | Plainer look, full tools, text instructions with speech on request |
 
 The target sizes are starting estimates. No study gives a validated minimum for each age. Keep each size in one token so that testing with children can change it in one place.
 
@@ -71,28 +71,28 @@ A fixed-size canvas with a 16:10 shape, scaled to fit the window.
 
 About 20 activities. The pointer activities follow the order move, click, drag, double-click, right-click, scroll.
 
-| Activity | The child | Bands |
-| --- | --- | --- |
-| Wake the meadow | Moves the pointer and flowers bloom under it | 3-5 |
-| Follow the trail | Keeps the pointer on a winding path | 3-5, 6-8 |
-| Pop the seed pods | Clicks large still targets | 3-5 |
-| Catch the fireflies | Clicks moving targets | 3-5, 6-8 |
-| Pack the picnic | Drags items to places, or clicks to pick up and clicks to place | 3-5, 6-8 |
-| Knock knock | Double-clicks doors to open them | 6-8 |
-| Two buttons | Sorts things with left click and right click | 6-8, 9-12 |
-| Climb the tall tree | Scrolls a tall scene to find things | 6-8 |
-| Zoom explorer | Zooms in and out to find small things | 6-8, 9-12 |
-| Sliders and dials | Drags sliders to match a target | 6-8 |
-| Trackpad moves | Practices two-finger scroll and tap | 6-8, 9-12 |
-| Any key party | Presses any key and sees a result | 3-5 |
-| Find the key | Presses the letter that is shown and spoken | 3-5, 6-8 |
-| Arrow key maze | Steers a critter with the arrow keys | 3-5, 6-8 |
-| Space and Enter | Jumps with Space and confirms with Enter | 3-5, 6-8 |
-| Type the word | Types short words shown with a picture | 6-8 |
-| Big letters | Uses Shift for capitals and symbols | 6-8, 9-12 |
-| Fix the sentence | Uses Backspace, Delete, arrow keys, and text selection | 6-8, 9-12 |
-| Typing course | Learns touch typing from the home row, accuracy before speed | 9-12 |
-| Shortcut workshop | Uses copy, cut, paste, undo, select all, and save | 9-12 |
+| Activity            | The child                                                       | Bands     |
+| ------------------- | --------------------------------------------------------------- | --------- |
+| Wake the meadow     | Moves the pointer and flowers bloom under it                    | 3-5       |
+| Follow the trail    | Keeps the pointer on a winding path                             | 3-5, 6-8  |
+| Pop the seed pods   | Clicks large still targets                                      | 3-5       |
+| Catch the fireflies | Clicks moving targets                                           | 3-5, 6-8  |
+| Pack the picnic     | Drags items to places, or clicks to pick up and clicks to place | 3-5, 6-8  |
+| Knock knock         | Double-clicks doors to open them                                | 6-8       |
+| Two buttons         | Sorts things with left click and right click                    | 6-8, 9-12 |
+| Climb the tall tree | Scrolls a tall scene to find things                             | 6-8       |
+| Zoom explorer       | Zooms in and out to find small things                           | 6-8, 9-12 |
+| Sliders and dials   | Drags sliders to match a target                                 | 6-8       |
+| Trackpad moves      | Practices two-finger scroll and tap                             | 6-8, 9-12 |
+| Any key party       | Presses any key and sees a result                               | 3-5       |
+| Find the key        | Presses the letter that is shown and spoken                     | 3-5, 6-8  |
+| Arrow key maze      | Steers a critter with the arrow keys                            | 3-5, 6-8  |
+| Space and Enter     | Jumps with Space and confirms with Enter                        | 3-5, 6-8  |
+| Type the word       | Types short words shown with a picture                          | 6-8       |
+| Big letters         | Uses Shift for capitals and symbols                             | 6-8, 9-12 |
+| Fix the sentence    | Uses Backspace, Delete, arrow keys, and text selection          | 6-8, 9-12 |
+| Typing course       | Learns touch typing from the home row, accuracy before speed    | 9-12      |
+| Shortcut workshop   | Uses copy, cut, paste, undo, select all, and save               | 9-12      |
 
 Shortcut lessons show the modifier key of the current operating system.
 
@@ -100,22 +100,22 @@ Shortcut lessons show the modifier key of the current operating system.
 
 A pretend computer inside the app. It never touches real files. It has a free-play mode with small toy apps: a notepad, a picture viewer, a file explorer, a music box, and a calculator.
 
-| Lesson | The child | Bands |
-| --- | --- | --- |
-| Open and close | Opens and closes windows | 3-5, 6-8 |
-| Move and resize | Moves and resizes windows | 6-8, 9-12 |
-| Switch windows | Minimizes, maximizes, and switches between windows | 6-8, 9-12 |
-| Menus | Finds a command in a menu | 6-8, 9-12 |
-| Files and folders | Opens folders, moves a file, makes and renames a folder | 6-8, 9-12 |
-| Trash | Deletes a file and restores it | 6-8, 9-12 |
-| Save and open | Saves work with a name and finds it again | 6-8, 9-12 |
-| Copy and paste | Moves content between two toy apps | 6-8, 9-12 |
-| Undo and redo | Reverses and repeats a change | 6-8, 9-12 |
-| Controls | Uses a checkbox, radio button, dropdown, slider, text field, and scrollbar | 6-8, 9-12 |
-| Find it | Searches for a file by name | 9-12 |
-| Parts of a computer | Names the screen, keyboard, mouse, trackpad, speaker, and camera | 3-5, 6-8 |
-| Fix it | Solves simple problems such as muted sound or a hidden window | 6-8, 9-12 |
-| Secrets stay secret | Makes a strong toy password and sorts private from shareable facts | 6-8, 9-12 |
+| Lesson              | The child                                                                  | Bands     |
+| ------------------- | -------------------------------------------------------------------------- | --------- |
+| Open and close      | Opens and closes windows                                                   | 3-5, 6-8  |
+| Move and resize     | Moves and resizes windows                                                  | 6-8, 9-12 |
+| Switch windows      | Minimizes, maximizes, and switches between windows                         | 6-8, 9-12 |
+| Menus               | Finds a command in a menu                                                  | 6-8, 9-12 |
+| Files and folders   | Opens folders, moves a file, makes and renames a folder                    | 6-8, 9-12 |
+| Trash               | Deletes a file and restores it                                             | 6-8, 9-12 |
+| Save and open       | Saves work with a name and finds it again                                  | 6-8, 9-12 |
+| Copy and paste      | Moves content between two toy apps                                         | 6-8, 9-12 |
+| Undo and redo       | Reverses and repeats a change                                              | 6-8, 9-12 |
+| Controls            | Uses a checkbox, radio button, dropdown, slider, text field, and scrollbar | 6-8, 9-12 |
+| Find it             | Searches for a file by name                                                | 9-12      |
+| Parts of a computer | Names the screen, keyboard, mouse, trackpad, speaker, and camera           | 3-5, 6-8  |
+| Fix it              | Solves simple problems such as muted sound or a hidden window              | 6-8, 9-12 |
+| Secrets stay secret | Makes a strong toy password and sorts private from shareable facts         | 6-8, 9-12 |
 
 ### Early learning
 

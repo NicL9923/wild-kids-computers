@@ -1,0 +1,358 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "jsx-a11y", "unicorn", "oxc", "vitest", "promise"],
+  "jsPlugins": ["./tools/oxlintPlugin.ts"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "options": {
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "ignorePatterns": ["dist", "release", "coverage", "reports", ".stryker-tmp", "test-results", "playwright-report"],
+  "rules": {
+    "eqeqeq": ["error", "smart"],
+    "no-console": "off",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/consistent-type-imports": "error",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/react-in-jsx-scope": "off",
+    "import/no-cycle": "error",
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": ["**/*.css"]
+      }
+    ],
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": ["expect", "expectGolden", "expectNoPositionTell"]
+      }
+    ],
+    "vitest/valid-expect": [
+      "error",
+      {
+        "maxArgs": 2
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@tanstack/react-router",
+                "importNames": ["lazyRouteComponent"],
+                "message": "Load a screen with lazyScreen from src/app/lazyScreen.ts, so its load has a deadline and a try-again screen."
+              },
+              {
+                "name": "react",
+                "importNames": ["lazy"],
+                "message": "Load a screen with lazyScreen from src/app/lazyScreen.ts, so its load has a deadline and a try-again screen."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/app/lazyScreen.ts", "src/activityShell/ActivityRun.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/core/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "message": "src/core has no interface code. Keep React in src/ outside core."
+              },
+              {
+                "name": "react-dom",
+                "message": "src/core has no interface code. Keep React in src/ outside core."
+              },
+              {
+                "name": "electron",
+                "message": "src/core has no Electron. Reach the system through PlatformBridge."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["react/*", "react-dom/*", "electron/*"],
+                "message": "src/core imports nothing from React or Electron."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/**", "src/core/**"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "Randomness comes from the level seed. Use createRandom(seed) from the activity kit."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/core/paint/**"],
+      "rules": {
+        "wkc/no-exponent-operator": "error",
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "Randomness comes from a seed. Use createRandom from src/core/paint/random.ts."
+          },
+          {
+            "object": "Math",
+            "property": "sin",
+            "message": "The paint engine needs exact math. Use sin from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "cos",
+            "message": "The paint engine needs exact math. Use cos from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "tan",
+            "message": "The paint engine needs exact math. Use tan from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "asin",
+            "message": "The paint engine needs exact math. Use asin from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "acos",
+            "message": "The paint engine needs exact math. Use acos from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "atan",
+            "message": "The paint engine needs exact math. Use atan from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "atan2",
+            "message": "The paint engine needs exact math. Use atan2 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "sinh",
+            "message": "The paint engine needs exact math. Use sinh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "cosh",
+            "message": "The paint engine needs exact math. Use cosh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "tanh",
+            "message": "The paint engine needs exact math. Use tanh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "asinh",
+            "message": "The paint engine needs exact math. Use asinh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "acosh",
+            "message": "The paint engine needs exact math. Use acosh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "atanh",
+            "message": "The paint engine needs exact math. Use atanh from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "pow",
+            "message": "The paint engine needs exact math. Use pow from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "exp",
+            "message": "The paint engine needs exact math. Use exp from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "expm1",
+            "message": "The paint engine needs exact math. Use expm1 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log",
+            "message": "The paint engine needs exact math. Use log from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log1p",
+            "message": "The paint engine needs exact math. Use log1p from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log2",
+            "message": "The paint engine needs exact math. Use log2 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "log10",
+            "message": "The paint engine needs exact math. Use log10 from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "cbrt",
+            "message": "The paint engine needs exact math. Use cbrt from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          },
+          {
+            "object": "Math",
+            "property": "hypot",
+            "message": "The paint engine needs exact math. Use hypot from src/core/paint/math.ts, or add it there from exactly rounded operations."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/**"],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "setTimeout",
+            "message": "Use kit.scope.setTimeout so leaving the activity cancels it."
+          },
+          {
+            "name": "setInterval",
+            "message": "Use kit.scope.setInterval so leaving the activity cancels it."
+          },
+          {
+            "name": "requestAnimationFrame",
+            "message": "Use kit.scope.requestFrame so leaving the activity cancels it."
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "Randomness comes from the level seed. Use createRandom(seed) from the activity kit."
+          },
+          {
+            "object": "window",
+            "property": "setTimeout",
+            "message": "Use kit.scope.setTimeout."
+          },
+          {
+            "object": "window",
+            "property": "setInterval",
+            "message": "Use kit.scope.setInterval."
+          },
+          {
+            "object": "window",
+            "property": "requestAnimationFrame",
+            "message": "Use kit.scope.requestFrame."
+          },
+          {
+            "object": "globalThis",
+            "property": "setTimeout",
+            "message": "Use kit.scope.setTimeout."
+          },
+          {
+            "object": "globalThis",
+            "property": "setInterval",
+            "message": "Use kit.scope.setInterval."
+          },
+          {
+            "object": "globalThis",
+            "property": "requestAnimationFrame",
+            "message": "Use kit.scope.requestFrame."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/**"],
+      "rules": {
+        "wkc/no-native-drag": "error"
+      }
+    },
+    {
+      "files": ["src/**/*.tsx"],
+      "rules": {
+        "react/jsx-no-literals": [
+          "error",
+          {
+            "noStrings": true,
+            "ignoreProps": true
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "e2e/**"],
+      "rules": {
+        "react/jsx-no-literals": "off"
+      }
+    },
+    {
+      "files": ["electron/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "electron",
+                "importNames": ["autoUpdater", "crashReporter"],
+                "message": "Hard rule 1: the app has no auto-update and no crash reporting."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["tools/**", "electron/main/**", "e2e/**", "*.config.ts"],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["electron/preload/index.ts"],
+      "rules": {
+        "unicorn/no-empty-file": "off"
+      }
+    }
+  ]
+}

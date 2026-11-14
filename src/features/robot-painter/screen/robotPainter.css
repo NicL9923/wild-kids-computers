@@ -1,0 +1,557 @@
+/*
+ * The robot painter screen. The paper is the biggest thing on screen at every band; controls sit
+ * beside it for the youngest children and around it for older ones. Every value is a token.
+ */
+
+.rp-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: var(--wk-space-container);
+}
+
+/* ---- the youngest layouts: paper on the left, the big arrows on the right ---- */
+
+.rp-screen[data-layout='direct'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'stage controls';
+}
+
+.rp-screen[data-layout='plan'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'stage controls'
+    'plan controls';
+}
+
+/* ---- older bands: toolbox, program, then the paper with its controls under it ---- */
+
+.rp-screen[data-layout='editor'] {
+  grid-template-columns: auto minmax(13rem, 0.75fr) minmax(0, 2fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'toolbox program stage'
+    'toolbox program controls';
+}
+
+.rp-stage-area {
+  grid-area: stage;
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rp-paper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- the paper ---- */
+
+.rp-paper-sheet {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-divider);
+  stroke-width: 0.04;
+}
+
+.rp-dots circle {
+  fill: var(--wk-color-border);
+  opacity: 0.45;
+}
+
+.rp-paper line {
+  stroke-linecap: round;
+}
+
+.rp-target line {
+  opacity: 0.3;
+}
+
+.rp-shape-mark-back {
+  fill: var(--wk-color-surface);
+  stroke: currentColor;
+  stroke-width: 4;
+}
+
+.rp-shape-mark .rp-color-shape {
+  fill: currentColor;
+  stroke: none;
+}
+
+.rp-bump {
+  fill: none;
+  stroke: var(--wk-color-text-muted);
+  stroke-dasharray: 0.12 0.1;
+}
+
+.rp-pen {
+  fill: var(--wk-color-surface);
+}
+
+.rp-hint-cross {
+  fill: none;
+  stroke: var(--wk-color-text-muted);
+  stroke-linecap: round;
+}
+
+.rp-hint-goal {
+  fill: none;
+  stroke: var(--wk-color-focus);
+  stroke-dasharray: 0.3 0.2;
+}
+
+/* ---- pictures inside controls ---- */
+
+.rp-picture {
+  display: block;
+  flex: none;
+  width: var(--wk-icon-size);
+  height: var(--wk-icon-size);
+}
+
+.rp-color-shape {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-text);
+}
+
+/* ---- buttons ---- */
+
+.rp-control {
+  gap: calc(var(--wk-space-unit) * 2);
+  padding: 0 var(--wk-space-item);
+}
+
+.rp-control-label {
+  font-size: var(--wk-text-small);
+}
+
+.rp-controls {
+  grid-area: controls;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-item);
+  padding-bottom: var(--wk-press-depth);
+}
+
+.rp-screen:not([data-layout='editor']) .rp-controls {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: var(--wk-space-container);
+}
+
+.rp-go {
+  min-width: calc(var(--wk-target-min) * 2);
+}
+
+/* ---- the arrow pad: a cross with go in the middle ---- */
+
+.rp-pad {
+  /* Large arrows, never under 1.25 times the band's target, that give the paper more room in a
+     smaller window. At 1280 by 800 a cell is about 102 px; at 1920 by 1080 it is the full size. */
+  --rp-pad-cell: min(calc(var(--wk-target-min) * 1.75), max(calc(var(--wk-target-min) * 1.25), 8vw));
+
+  display: grid;
+  /* A puzzle that offers only some arrows leaves their tracks empty, and an empty track takes no
+     room, so the paper gets it. */
+  grid-template-columns: repeat(3, auto);
+  grid-template-rows: repeat(3, auto);
+  gap: var(--wk-space-item);
+}
+
+.rp-pad .rp-control,
+.rp-pad-center {
+  width: var(--rp-pad-cell);
+  height: var(--rp-pad-cell);
+}
+
+.rp-pad .rp-control {
+  padding: 0;
+}
+
+.rp-pad .rp-picture {
+  width: 64%;
+  height: 64%;
+}
+
+.rp-pad-up {
+  grid-area: 1 / 2;
+}
+
+.rp-pad-left {
+  grid-area: 2 / 1;
+}
+
+.rp-pad-right {
+  grid-area: 2 / 3;
+}
+
+.rp-pad-down {
+  grid-area: 3 / 2;
+}
+
+.rp-pad-center {
+  grid-area: 2 / 2;
+  display: grid;
+}
+
+.rp-pad-center .rp-go {
+  min-width: 0;
+}
+
+.rp-colors,
+.rp-free-actions {
+  display: flex;
+  gap: var(--wk-space-item);
+}
+
+.rp-color {
+  width: var(--wk-target-min);
+  padding: 0;
+}
+
+.rp-color .rp-picture {
+  width: 80%;
+  height: 80%;
+}
+
+/* ---- the youngest children's plan ---- */
+
+.rp-plan {
+  grid-area: plan;
+  display: flex;
+  justify-content: center;
+  gap: var(--wk-space-item);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-plan-place {
+  width: calc(var(--wk-target-min) * 1.25);
+  height: calc(var(--wk-target-min) * 1.25);
+}
+
+.rp-plan-empty {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: var(--wk-border-width) dashed var(--wk-color-border);
+  border-radius: var(--wk-radius-control);
+}
+
+.rp-plan-block {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.rp-plan-block .rp-picture {
+  width: 70%;
+  height: 70%;
+}
+
+/* The block the robot is running now: a thick accent edge, not only a color change. */
+[data-running='true'].rp-plan-block,
+[data-running='true'] > .rp-block-row > .rp-block-button,
+.rp-definition-head[data-running='true'] {
+  outline: calc(var(--wk-border-width) * 2) solid var(--wk-color-text);
+  outline-offset: 2px;
+  background: var(--wk-color-accent);
+}
+
+/* ---- the toolbox ---- */
+
+.rp-editor {
+  display: contents;
+}
+
+.rp-toolbox {
+  grid-area: toolbox;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wk-space-item);
+  min-height: 0;
+  overflow-y: auto;
+  padding: calc(var(--wk-space-unit) * 1) calc(var(--wk-space-unit) * 1) var(--wk-press-depth);
+}
+
+.rp-toolbox-list,
+.rp-names {
+  display: grid;
+  grid-template-columns: repeat(2, calc(var(--wk-target-min) * 1.25));
+  gap: var(--wk-space-item);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-tool,
+.rp-block-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: var(--wk-target-min);
+  min-height: var(--wk-target-min);
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-secondary-base);
+  color: var(--wk-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rp-tool {
+  width: calc(var(--wk-target-min) * 1.25);
+  height: calc(var(--wk-target-min) * 1.25);
+}
+
+.rp-tool:hover,
+.rp-block-button:hover {
+  background: var(--wk-color-surface-sunken);
+}
+
+.rp-tool[aria-expanded='true'] {
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+}
+
+.rp-tool[data-carried='true'],
+.rp-block-button[data-carried='true'] {
+  z-index: 2;
+  border-color: var(--wk-color-primary);
+  box-shadow: var(--wk-shadow-overlay);
+}
+
+.rp-block-value {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-size: var(--wk-text-small);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1.1;
+}
+
+/* ---- the program ---- */
+
+.rp-program {
+  grid-area: program;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wk-space-item);
+  min-height: 0;
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+  padding: var(--wk-space-item);
+}
+
+.rp-program-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wk-space-item);
+  min-height: 0;
+  overflow-y: auto;
+  padding: calc(var(--wk-space-unit) * 1) calc(var(--wk-space-unit) * 1) var(--wk-space-item);
+}
+
+.rp-take-out,
+.rp-end-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--wk-target-min);
+  border: var(--wk-border-width) dashed var(--wk-color-border);
+  border-radius: var(--wk-radius-control);
+  background: transparent;
+  color: var(--wk-color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Ready to take a carried block: solid edge and a fill, not only a color. */
+.rp-take-out[data-ready='true'] {
+  border-style: solid;
+  border-color: var(--wk-color-text);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+}
+
+.rp-end-slot[data-selected='true'] {
+  border-style: solid;
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  color: var(--wk-color-primary-base);
+}
+
+[data-carry-over='true'].rp-take-out,
+[data-carry-over='true'].rp-end-slot,
+[data-carry-over='true'].rp-gap {
+  border-style: solid;
+  border-color: var(--wk-color-text);
+  background: var(--wk-color-accent);
+}
+
+.rp-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--wk-space-unit) * 1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-list .rp-list {
+  margin: calc(var(--wk-space-unit) * 1) 0 0 calc(var(--wk-target-min) * 0.4);
+  padding-left: var(--wk-space-item);
+  border-left: calc(var(--wk-border-width) * 2) solid var(--wk-color-border);
+}
+
+[data-running-within='true'] > .rp-list {
+  border-left-color: var(--wk-color-text);
+}
+
+.rp-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--wk-space-unit) * 1);
+}
+
+.rp-gap {
+  box-sizing: border-box;
+  min-height: calc(var(--wk-target-min) * 0.6);
+  border: var(--wk-border-width) dashed var(--wk-color-border);
+  border-radius: var(--wk-radius-small);
+}
+
+.rp-block-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--wk-space-unit) * 2);
+}
+
+.rp-block-button {
+  padding: 0 calc(var(--wk-space-unit) * 1);
+}
+
+[data-flagged='true'] > .rp-block-row > .rp-block-button {
+  outline: calc(var(--wk-border-width) * 2) dashed var(--wk-color-focus);
+  outline-offset: 2px;
+}
+
+.rp-stepper {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--wk-space-unit) * 1);
+}
+
+/* The number a block carries, big enough to read at a glance between minus and plus. */
+.rp-stepper-value {
+  min-width: calc(var(--wk-target-min) * 0.75);
+  font-size: var(--wk-text-title);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  text-align: center;
+}
+
+.rp-small-button {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--wk-target-min);
+  height: var(--wk-target-min);
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  cursor: pointer;
+}
+
+.rp-small-button .rp-picture {
+  width: 55%;
+  height: 55%;
+}
+
+.rp-small-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.rp-definition {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--wk-space-unit) * 1);
+  padding-top: var(--wk-space-item);
+  border-top: var(--wk-border-width) solid var(--wk-color-divider);
+}
+
+.rp-definition-head {
+  display: flex;
+  align-items: center;
+  gap: var(--wk-space-item);
+  border-radius: var(--wk-radius-small);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.rp-definition-picture {
+  width: var(--wk-target-min);
+  height: var(--wk-target-min);
+}
+
+.rp-definition-head .rp-small-button {
+  margin-left: auto;
+}
+
+/* ---- after a puzzle: two equal choices on the paper ---- */
+
+.rp-choices {
+  position: absolute;
+  inset: auto 0 var(--wk-space-container);
+  display: flex;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  outline: none;
+}
+
+.rp-choice {
+  min-width: var(--wk-target-large);
+  min-height: calc(var(--wk-target-min) * 1.4);
+  box-shadow:
+    0 var(--wk-press-depth) 0 var(--wk-color-secondary-base),
+    var(--wk-shadow-raised);
+}
+
+.rp-choice .rp-control-label {
+  font-size: var(--wk-text-body);
+}
+
+/* Groups of controls are fieldsets for their names; they draw no frame of their own. */
+.rp-controls,
+.rp-pad,
+.rp-colors {
+  min-inline-size: 0;
+  margin: 0;
+  border: 0;
+  padding-inline: 0;
+  padding-block-start: 0;
+}
+
+.rp-stage-area {
+  margin: 0;
+}
+
+.rp-choice .rp-picture,
+.rp-choice .wk-icon {
+  width: calc(var(--wk-icon-size) * 1.3);
+  height: calc(var(--wk-icon-size) * 1.3);
+}

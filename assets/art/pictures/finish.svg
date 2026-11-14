@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe7f2"/><stop offset="1" stop-color="#f3f1df"/></linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#s)"/>
+  <circle cx="620" cy="130" r="56" fill="#f8dc84"/>
+  <path d="M0 330c140-60 300-70 420-40s260 20 380-20v230H0z" fill="#b9dc9c"/>
+  <path d="M0 400c180-40 360-40 520-10s220 10 280 0v110H0z" fill="#93c879"/>
+  <!-- one big flower with a butterfly resting on it -->
+  <path d="M300 500c0-90 6-170 20-240" fill="none" stroke="#4f9147" stroke-width="12" stroke-linecap="round"/>
+  <path d="M312 380c-40-30-80-30-100-10 30 26 70 30 100 10zm6-60c34-34 74-40 96-24-28 30-66 38-96 24z" fill="#5aa04f"/>
+  <g transform="translate(322 220)">
+    <g fill="#e8664a">
+      <ellipse cx="0" cy="-48" rx="24" ry="34"/><ellipse cx="0" cy="48" rx="24" ry="34"/>
+      <ellipse cx="-48" cy="0" rx="34" ry="24"/><ellipse cx="48" cy="0" rx="34" ry="24"/>
+    </g>
+    <g fill="#ef8a6f">
+      <ellipse cx="-34" cy="-34" rx="22" ry="30" transform="rotate(-45 -34 -34)"/><ellipse cx="34" cy="34" rx="22" ry="30" transform="rotate(-45 34 34)"/>
+      <ellipse cx="34" cy="-34" rx="22" ry="30" transform="rotate(45 34 -34)"/><ellipse cx="-34" cy="34" rx="22" ry="30" transform="rotate(45 -34 34)"/>
+    </g>
+    <circle r="28" fill="#f5c542"/>
+    <g transform="translate(6 -26) rotate(-8)">
+      <path d="M0 0c-30-34-62-30-62-6s30 30 62 6zM0 0c-22 10-38 30-30 44s26 0 30-44z" fill="#6a8fd8"/>
+      <path d="M0 0c30-34 62-30 62-6S32 24 0 0zm0 0c22 10 38 30 30 44S4 44 0 0z" fill="#8aa7e2"/>
+      <rect x="-4" y="-18" width="8" height="40" rx="4" fill="#2e4034"/>
+      <path d="M-2-18c-4-10-10-16-16-18M2-18c4-10 10-16 16-18" fill="none" stroke="#2e4034" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </g>
+  <g fill="#ffffff"><circle cx="120" cy="420" r="9"/><circle cx="560" cy="440" r="9"/><circle cx="700" cy="400" r="8"/><circle cx="460" cy="470" r="8"/></g>
+  <g fill="#f5c542"><circle cx="120" cy="420" r="4"/><circle cx="560" cy="440" r="4"/><circle cx="700" cy="400" r="3.5"/><circle cx="460" cy="470" r="3.5"/></g>
+  <g fill="#c99ad0"><circle cx="200" cy="460" r="8"/><circle cx="640" cy="470" r="8"/></g>
+</svg>

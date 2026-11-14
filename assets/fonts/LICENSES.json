@@ -1,0 +1,14 @@
+[
+  {
+    "files": "Andika-*.woff2",
+    "source": "https://software.sil.org/downloads/r/andika/Andika-7.000.zip (web/ folder, unmodified, zip sha256 88ba6ea41ef4a8e5214b090df8fa2983be1babe4843efaa99cdb6078b0e2c070)",
+    "author": "SIL Global",
+    "license": "OFL-1.1"
+  },
+  {
+    "files": "OFL.txt",
+    "source": "https://software.sil.org/downloads/r/andika/Andika-7.000.zip (OFL.txt, the license and copyright notice that must travel with the font)",
+    "author": "SIL Global",
+    "license": "OFL-1.1"
+  }
+]

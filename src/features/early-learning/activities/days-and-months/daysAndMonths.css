@@ -1,0 +1,16 @@
+/*
+ * Day and month names are long words, so their boxes are wide and their text sized for a word.
+ * Five names fit in one row at 1280 by 800. The rest of the look comes from the shared reading
+ * styles; these selectors are stronger than theirs on purpose.
+ */
+
+.dm-stage {
+  --rd-size: max(var(--wk-target-large), min(14vh, 8vw));
+}
+
+.dm-stage .dm-name:is(.rd-slot, .rd-tile, .rd-shown, .rd-tile-home) {
+  box-sizing: border-box;
+  min-width: calc(var(--rd-size) * 1.9);
+  padding: 0 var(--wk-space-item);
+  font-size: calc(var(--rd-size) * 0.26);
+}

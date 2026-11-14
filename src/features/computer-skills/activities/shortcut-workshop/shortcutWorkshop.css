@@ -1,0 +1,171 @@
+/*
+ * A small note editor on the left and the shortcuts for this step on the right. The editor is a
+ * plain window: a title bar with the note's name and whether it is saved, then the note. The
+ * shortcuts are key caps, with the modifier key of the child's own computer.
+ */
+
+.sw-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-section);
+  padding: var(--wk-space-container) var(--wk-space-section);
+  container-type: size;
+  /* Text and key caps grow with the window, never below the band's own sizes. */
+  --sw-text: clamp(var(--wk-text-body), 2.4cqh, 30px);
+  --sw-note-text: clamp(calc(var(--wk-text-title) * 1.1), 4.2cqh, 46px);
+  --sw-cap: clamp(calc(var(--wk-target-min) * 1.3), 9cqh, 104px);
+}
+
+.sw-window {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 0;
+  max-width: 1240px;
+  height: min(100%, 860px);
+  overflow: hidden;
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: var(--wk-shadow-raised);
+}
+
+/* The note's own ring would be clipped by the window, so the window shows it. */
+.sw-window:focus-within {
+  outline: var(--wk-focus-width) solid var(--wk-color-focus);
+  outline-offset: var(--wk-focus-offset);
+}
+
+.sw-note:focus {
+  outline: none;
+}
+
+.sw-stage[data-done='true'] .sw-window {
+  border-color: var(--wk-color-success);
+}
+
+.sw-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-item) var(--wk-space-container);
+  border-bottom: var(--wk-border-width) solid var(--wk-color-divider);
+  background: var(--wk-color-surface-sunken);
+  color: var(--wk-color-text);
+  font-size: var(--sw-text);
+}
+
+.sw-title {
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.sw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wk-space-unit);
+  color: var(--wk-color-text-muted);
+}
+
+.sw-status[data-saved='true'] {
+  color: var(--wk-color-success);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.sw-status-icon {
+  width: 1.2em;
+  height: 1.2em;
+  fill: currentcolor;
+  stroke: currentcolor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sw-status[data-saved='true'] .sw-status-icon {
+  fill: none;
+}
+
+.sw-note {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: var(--wk-space-container);
+  box-sizing: border-box;
+  border: none;
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  font-family: var(--wk-font-family);
+  font-size: var(--sw-note-text);
+  line-height: var(--wk-line-height);
+  letter-spacing: var(--wk-letter-spacing);
+  word-spacing: var(--wk-word-spacing);
+  resize: none;
+}
+
+.sw-note::selection {
+  background: var(--wk-color-selected);
+  color: var(--wk-color-text);
+}
+
+.sw-panel {
+  display: grid;
+  gap: var(--wk-space-section);
+  justify-items: start;
+  flex: none;
+}
+
+.sw-shortcuts {
+  display: grid;
+  gap: var(--wk-space-container);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-shortcut {
+  display: grid;
+  gap: var(--wk-space-unit);
+}
+
+.sw-shortcut-name {
+  color: var(--wk-color-text);
+  font-size: var(--sw-text);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.sw-caps {
+  display: flex;
+  align-items: center;
+  gap: var(--wk-space-item);
+}
+
+.sw-cap {
+  display: grid;
+  place-items: center;
+  min-width: var(--sw-cap);
+  min-height: var(--sw-cap);
+  padding: 0 var(--wk-space-item);
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 1.5) solid var(--wk-color-text);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-accent);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-text);
+  color: var(--wk-color-on-accent);
+  font-family: var(--wk-font-family);
+  font-size: calc(var(--sw-cap) * 0.42);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.sw-cap[data-cap='modifier'] {
+  min-width: calc(var(--sw-cap) * 1.85);
+  font-size: calc(var(--sw-cap) * 0.3);
+}
+
+.sw-plus {
+  color: var(--wk-color-text);
+  font-size: calc(var(--sw-cap) * 0.42);
+  font-weight: var(--wk-font-weight-bold);
+}

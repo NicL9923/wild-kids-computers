@@ -1,0 +1,38 @@
+import { defineStampCategory } from '../stampCategory.ts';
+import { strings } from './strings.ts';
+
+export default defineStampCategory({
+  id: 'vehicles',
+  order: 60,
+  title: strings.vehicles,
+  icon: 'car',
+  stamps: [
+    'car',
+    'taxi',
+    'bus',
+    'van',
+    'race-car',
+    'police-car',
+    'ambulance',
+    'fire-truck',
+    'truck',
+    'tractor',
+    'motorcycle',
+    'scooter',
+    'bike',
+    'roller-skate',
+    'skateboard',
+    'steam-train',
+    'fast-train',
+    'airplane',
+    'helicopter',
+    'rocket',
+    'sailboat',
+    'canoe',
+    'ship',
+    'parachute',
+    'wheel',
+    'traffic-light',
+    'anchor',
+  ],
+});

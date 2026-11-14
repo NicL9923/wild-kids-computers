@@ -1,0 +1,98 @@
+/*
+ * The scene keeps its 5:3 shape and fits the stage: food on the grass to the left, the basket or
+ * blanket to the right. Sizes follow the scene's width.
+ */
+
+.picnic-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.picnic-scene {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-meadow-grass);
+}
+
+.picnic-blanket {
+  position: absolute;
+}
+
+.picnic-piece,
+.picnic-place {
+  position: absolute;
+  aspect-ratio: 1;
+}
+
+.picnic-place {
+  translate: -50% -50%;
+}
+
+.picnic-piece {
+  min-width: var(--wk-target-min);
+  padding: 0;
+  border: var(--wk-border-width) solid transparent;
+  border-radius: var(--wk-radius-card);
+  background: color-mix(in srgb, var(--wk-color-surface) 35%, transparent);
+}
+
+/* The carried piece moves with its own translate from useCarry, on top of the centering one. */
+.picnic-piece[data-carried='true'] {
+  z-index: 2;
+}
+
+.picnic-picture {
+  display: block;
+  width: 86%;
+  height: 86%;
+  margin: auto;
+}
+
+/* A place on the blanket: a dashed ring with the food's dark shadow inside. */
+.picnic-place[data-kind='spot'] {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-text-muted);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-surface);
+}
+
+.picnic-shadow {
+  filter: grayscale(1) brightness(0.25);
+  opacity: 0.45;
+}
+
+.picnic-place[data-kind='basket'] {
+  display: grid;
+  place-items: center;
+  border-radius: var(--wk-radius-card);
+}
+
+/* Food already in the basket peeks out of its top. */
+.picnic-basket-load {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  display: flex;
+  translate: -50% 0;
+}
+
+.picnic-load {
+  width: 8cqw;
+  margin: 0 -1.5cqw;
+}
+
+/* After a couple of tries, the right place lights up with a thick solid ring. */
+.picnic-place[data-hint='true'] {
+  border-style: solid;
+  border-color: var(--wk-color-focus);
+  box-shadow: 0 0 0 calc(var(--wk-border-width) * 3) var(--wk-color-accent);
+}

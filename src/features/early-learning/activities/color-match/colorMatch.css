@@ -1,0 +1,146 @@
+/*
+ * Toys in a row on top, boxes in a row below, and the pattern switch alone in the bottom right
+ * corner, far from the shell's controls. Toys and boxes grow with the window, never below the
+ * band's large target.
+ */
+
+.cm-stage {
+  --cm-toy: max(var(--wk-target-large), min(24vh, 14vw));
+  --cm-box: max(calc(var(--wk-target-large) * 1.2), min(30vh, 17vw));
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: center;
+  justify-items: center;
+  padding-bottom: var(--wk-space-container);
+}
+
+.cm-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.cm-toys,
+.cm-boxes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-container);
+  max-width: 100%;
+}
+
+.cm-boxes {
+  align-items: end;
+  gap: calc(var(--wk-space-container) * 1.5);
+}
+
+.cm-toy,
+.cm-toy-home {
+  display: block;
+  width: var(--cm-toy);
+  height: var(--cm-toy);
+}
+
+.cm-toy {
+  padding: calc(var(--cm-toy) * 0.06);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+}
+
+.cm-toy:hover {
+  background: var(--wk-color-selected);
+}
+
+/* A toy that went into its box leaves an outline, so the row does not jump. */
+.cm-toy-home {
+  box-sizing: border-box;
+  border: var(--wk-border-width) dashed var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+}
+
+.cm-toy-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cm-box {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  width: var(--cm-box);
+  padding: var(--wk-space-item) var(--wk-space-item) 0;
+  box-sizing: border-box;
+  border-radius: var(--wk-radius-card);
+}
+
+/* The toys already in the box sit in its opening. */
+.cm-box-inside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(var(--cm-box) * 0.36);
+  margin-bottom: calc(var(--cm-box) * -0.12);
+}
+
+.cm-box-toy {
+  width: calc(var(--cm-box) * 0.32);
+  height: calc(var(--cm-box) * 0.32);
+}
+
+.cm-box-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: calc(var(--cm-box) * 0.62);
+}
+
+/* After two misses, the toy and its box stand out with a thick edge and a slow, small grow. */
+.cm-toy[data-hint='true'],
+.cm-box[data-hint='true'] {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+  outline-offset: var(--wk-focus-offset);
+  animation: cm-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes cm-hint {
+  to {
+    scale: calc(1 + 0.06 * var(--wk-motion-scale));
+  }
+}
+
+.cm-pattern-switch {
+  position: absolute;
+  right: 0;
+  bottom: var(--wk-space-container);
+  display: grid;
+  place-items: center;
+  width: var(--wk-target-min);
+  height: var(--wk-target-min);
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+}
+
+.cm-pattern-switch[aria-pressed='true'] {
+  border-width: calc(var(--wk-border-width) * 2);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+}
+
+.cm-pattern-icon {
+  width: 60%;
+  height: 60%;
+}

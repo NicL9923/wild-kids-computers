@@ -1,0 +1,180 @@
+/*
+ * The clock on the left, as big as the stage allows, and the choices or the turning buttons on
+ * the right. Numbers on the face use the app face, which young readers know.
+ */
+
+.tt-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: center;
+  gap: var(--wk-space-section);
+  padding: 0 var(--wk-space-section) var(--wk-space-container);
+  container-type: size;
+}
+
+.tt-clock {
+  display: block;
+  width: min(100%, calc(100cqh - var(--wk-space-container)));
+  max-height: 100%;
+}
+
+.tt-number {
+  fill: var(--wk-color-text);
+  font-size: 19px;
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.tt-hand {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+}
+
+.tt-ghost line {
+  stroke: var(--wk-color-primary);
+  stroke-dasharray: 4 4;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.tt-choices {
+  display: grid;
+  gap: var(--wk-space-container);
+  margin: 0;
+  padding: 0 0 var(--wk-press-depth);
+  border: 0;
+}
+
+.tt-stage {
+  /* Times and buttons grow with tall windows, never below the band's sizes. */
+  --tt-time: max(var(--wk-text-display), 6.5vh);
+  --tt-label: max(var(--wk-text-body), 2.6vh);
+}
+
+.tt-choice,
+.tt-target {
+  min-width: calc(var(--tt-time) * 4);
+  min-height: max(calc(var(--wk-target-min) * 1.4), calc(var(--tt-time) * 1.9));
+  font: inherit;
+  font-size: var(--tt-time);
+  font-weight: var(--wk-font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.tt-choice {
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.tt-choice:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+/* A time already tried steps back: dashed edge and lighter text, so it is not color alone. */
+.tt-choice[data-tried='true'] {
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--wk-color-text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tt-choice[data-answer='true'] {
+  border-width: calc(var(--wk-border-width) * 2);
+  background: var(--wk-color-selected);
+}
+
+.tt-choice:disabled:not([data-tried='true'], [data-answer='true']) {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tt-choice[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  animation: tt-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes tt-hint {
+  to {
+    scale: calc(1 + 0.06 * var(--wk-motion-scale));
+  }
+}
+
+.tt-controls {
+  display: grid;
+  justify-items: center;
+  gap: var(--wk-space-container);
+}
+
+/* The time to set, written as a digital clock writes it. Flat: it is read, not pressed. */
+.tt-target {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0 var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+  color: var(--wk-color-text);
+}
+
+.tt-turns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--wk-space-item);
+}
+
+.tt-turn,
+.tt-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-item);
+  min-height: max(var(--wk-target-min), calc(var(--tt-label) * 2.6));
+  padding: var(--wk-space-item) var(--wk-space-container);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  font: inherit;
+  font-size: var(--tt-label);
+  font-weight: var(--wk-font-weight-bold);
+  cursor: pointer;
+}
+
+.tt-turn:hover:not(:disabled),
+.tt-check:hover {
+  background: var(--wk-color-selected);
+}
+
+.tt-turn-icon {
+  flex: none;
+  width: max(var(--wk-icon-size), calc(var(--tt-label) * 1.4));
+  height: max(var(--wk-icon-size), calc(var(--tt-label) * 1.4));
+}
+
+/* Forward turns clockwise: the back arrow, mirrored. */
+.tt-turn-icon[data-back='false'] {
+  scale: -1 1;
+}
+
+.tt-check {
+  min-width: 100%;
+  border-color: var(--wk-color-primary-base);
+  background: var(--wk-color-primary);
+  color: var(--wk-color-on-primary);
+}
+
+.tt-check:hover {
+  background: var(--wk-color-primary-hover);
+}

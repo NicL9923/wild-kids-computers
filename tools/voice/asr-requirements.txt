@@ -1,0 +1,7 @@
+# The round-trip check's Python environment. Install once per machine:
+#   python3 -m venv ~/.cache/wkc/venv-asr
+#   ~/.cache/wkc/venv-asr/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0
+#   ~/.cache/wkc/venv-asr/bin/pip install -r tools/voice/asr-requirements.txt
+torch==2.15.0
+transformers==5.23.0
+numpy==2.5.4

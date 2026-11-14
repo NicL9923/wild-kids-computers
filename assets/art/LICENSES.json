@@ -1,0 +1,44 @@
+[
+  {
+    "files": "home/*.svg",
+    "source": "Original SVG drawn for this repository: the home map meadow and its five places",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "avatars/*.svg",
+    "source": "Original SVG drawn for this repository: twelve animal avatars",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "interface/*.svg",
+    "source": "Original SVG drawn for this repository: interface icons for young children",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "pictures/*.svg",
+    "source": "Original SVG drawn for this repository: the finish and closing screen pictures",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "activities/pop-the-seed-pods/*.svg",
+    "source": "Original SVG drawn for this repository: the seed pod and the popped seed pod for Pop the seed pods",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "activities/robot-painter/*.svg",
+    "source": "Original SVG drawn for this repository: the robot painter's robot and the pictures of its four activities",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  },
+  {
+    "files": "activities/catch-the-fireflies/*.svg",
+    "source": "Original SVG drawn for this repository: the firefly for Catch the fireflies",
+    "author": "Wild Flowers Tech",
+    "license": "MIT"
+  }
+]

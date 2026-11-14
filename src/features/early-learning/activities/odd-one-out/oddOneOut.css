@@ -1,0 +1,23 @@
+/* The pictures fill the stage in one row, as big as the window allows. Every value is a token. */
+
+.oo-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: var(--wk-space-container);
+}
+
+.oo-stage .lg-choices {
+  --lg-choice: max(
+    var(--wk-target-large),
+    min(
+      44vh,
+      calc(
+        (100vw - 2 * var(--wk-space-screen-edge) - (var(--lg-count) - 1) * var(--wk-space-container)) / var(--lg-count)
+      ),
+      380px
+    )
+  );
+  flex-wrap: nowrap;
+}

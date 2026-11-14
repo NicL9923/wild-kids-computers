@@ -1,0 +1,162 @@
+/* The settings panel shows only the settings the round asks for. */
+.ctl-lesson:not([data-uses~='showNames']) [data-setting='showNames'],
+.ctl-lesson:not([data-uses~='wallpaper']) [data-setting='wallpaper'],
+.ctl-lesson:not([data-uses~='iconSize']) [data-setting='iconSize'],
+.ctl-lesson:not([data-uses~='brightness']) [data-setting='brightness'],
+.ctl-lesson:not([data-uses~='computerName']) [data-setting='computerName'],
+.ctl-lesson:not([data-uses~='alertSound']) [data-setting='alertSound'] {
+  display: none;
+}
+
+/*
+ * The card of settings to match. It stands on the desktop beside the settings window, under any
+ * window, and scales with the desktop. The row to do now has a thick edge; a matched row shows a
+ * check and fades a little, so color is never the only sign.
+ */
+
+.ctl-card {
+  position: absolute;
+  z-index: 0;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: var(--wk-space-item);
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: var(--wk-shadow-raised);
+}
+
+.ctl-card-title {
+  margin: 0 0 var(--wk-space-item);
+  font-size: var(--wk-text-body);
+}
+
+.ctl-list {
+  display: grid;
+  gap: var(--wk-space-item);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ctl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--wk-space-item);
+  padding: var(--wk-space-unit) var(--wk-space-item);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-control);
+}
+
+.ctl-row[aria-current='step'] {
+  border: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+}
+
+.ctl-row[data-matched='true'] {
+  background: var(--wk-color-selected);
+}
+
+.ctl-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.ctl-label {
+  font-size: var(--wk-text-small);
+  color: var(--wk-color-text-muted);
+}
+
+.ctl-value {
+  font-size: var(--wk-text-body);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ctl-typed {
+  font-size: var(--wk-text-title);
+}
+
+.ctl-status {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(var(--wk-target-min) * 0.5);
+  height: calc(var(--wk-target-min) * 0.5);
+}
+
+.ctl-check {
+  width: 100%;
+  height: 100%;
+  stroke: var(--wk-color-primary);
+  stroke-width: 3;
+}
+
+.ctl-picture,
+.ctl-box,
+.ctl-size,
+.ctl-slider {
+  flex: none;
+}
+
+.ctl-box {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: calc(var(--wk-target-min) * 0.5);
+  height: calc(var(--wk-target-min) * 0.5);
+  border: calc(var(--wk-border-width) * 2) solid var(--wk-color-text);
+  border-radius: calc(var(--wk-radius-small) / 3);
+  background: var(--wk-color-surface);
+}
+
+.ctl-box .td-glyph {
+  width: 90%;
+  height: 90%;
+}
+
+/* A square, small or large, for the icon size. */
+.ctl-size {
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) solid var(--wk-color-text);
+  border-radius: calc(var(--wk-radius-small) / 3);
+  background: var(--wk-color-selected);
+}
+
+.ctl-size[data-size='small'] {
+  width: calc(var(--wk-target-min) * 0.3);
+  height: calc(var(--wk-target-min) * 0.3);
+}
+
+.ctl-size[data-size='large'] {
+  width: calc(var(--wk-target-min) * 0.6);
+  height: calc(var(--wk-target-min) * 0.6);
+}
+
+/* A small slider track with its knob where the slider should end. */
+.ctl-slider {
+  position: relative;
+  width: calc(var(--wk-target-min) * 0.9);
+  height: calc(var(--wk-target-min) * 0.15);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-divider);
+}
+
+.ctl-knob {
+  position: absolute;
+  top: 50%;
+  width: calc(var(--wk-target-min) * 0.3);
+  height: calc(var(--wk-target-min) * 0.3);
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-primary);
+  translate: -50% -50%;
+}
+
+.ctl-slider[data-at='lowest'] .ctl-knob {
+  left: 0;
+}
+
+.ctl-slider[data-at='middle'] .ctl-knob {
+  left: 50%;
+}

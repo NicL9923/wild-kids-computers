@@ -1,0 +1,90 @@
+/*
+ * Shapes in a row on top and a wooden lid with the holes below. One unit, the size of a square,
+ * sets every shape and hole, so a shape and its hole are always the same size.
+ */
+
+.ss-stage {
+  --ss-unit: max(calc(var(--wk-target-min) * 1.4), min(18vh, 9vw));
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  padding-bottom: var(--wk-space-container);
+}
+
+.ss-pieces,
+.ss-lid {
+  margin: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--ss-unit) * 0.3);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ss-pieces {
+  padding: 0;
+}
+
+.ss-slot {
+  position: relative;
+}
+
+.ss-piece {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wk-radius-small);
+  background: transparent;
+}
+
+.ss-piece svg,
+.ss-hole svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ss-piece:hover svg {
+  scale: calc(1 + 0.04 * var(--wk-motion-scale));
+}
+
+/* The lid: a wooden board with a dark edge, so the holes read as cut into it. */
+.ss-lid {
+  padding: calc(var(--ss-unit) * 0.3) calc(var(--ss-unit) * 0.35);
+  border: calc(var(--wk-border-width) * 2) solid #6b4a2b;
+  border-radius: var(--wk-radius-card);
+  background: #d9b47e;
+  box-shadow: 0 var(--wk-press-depth) 0 #6b4a2b;
+}
+
+.ss-hole {
+  position: relative;
+  border-radius: var(--wk-radius-small);
+}
+
+.ss-dropped {
+  position: absolute;
+  inset: 0;
+}
+
+/* After two misses, the shape and its hole stand out with a thick edge and a slow, small grow. */
+.ss-piece[data-hint='true'],
+.ss-hole[data-hint='true'] {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+  outline-offset: var(--wk-focus-offset);
+  animation: ss-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes ss-hint {
+  to {
+    scale: calc(1 + 0.06 * var(--wk-motion-scale));
+  }
+}

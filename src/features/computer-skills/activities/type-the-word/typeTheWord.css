@@ -1,0 +1,88 @@
+/*
+ * The picture and its word side by side on top, the keyboard picture below. The word shows every
+ * letter: typed letters dark and solid, the next one framed in the primary color, the rest pale
+ * with a dashed edge, so the child always sees what comes next.
+ */
+
+.ttw-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+  gap: var(--wk-space-container);
+  padding: var(--wk-space-container);
+  container-type: size;
+}
+
+.ttw-scene {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wk-space-section);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.ttw-picture {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: min(78cqh, 30cqw);
+  aspect-ratio: 1;
+  padding: var(--wk-space-container);
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  cursor: pointer;
+}
+
+.ttw-picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ttw-slots {
+  display: flex;
+  gap: var(--wk-space-item);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttw-slot {
+  display: grid;
+  place-items: center;
+  width: min(46cqh, 12cqw);
+  aspect-ratio: 4 / 5;
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-border);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  color: var(--wk-color-text-muted);
+  font-size: min(36cqh, 9cqw);
+  font-weight: var(--wk-font-weight-regular);
+  line-height: 1;
+}
+
+.ttw-slot[data-state='next'] {
+  border: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+  background: var(--wk-color-selected);
+}
+
+.ttw-slot[data-state='typed'] {
+  border-style: solid;
+  border-color: var(--wk-color-primary-base);
+  color: var(--wk-color-text);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.ttw-keyboard {
+  /* At most about two fifths of the stage's height, so the picture and the word stay large. */
+  width: min(100%, 140cqh);
+}

@@ -1,0 +1,163 @@
+/*
+ * Picture sudoku: the grid fills the space on the left and the animals stand in a column on the
+ * right, each as big as a square. On the 4 by 4 grid, thicker lines mark the boxes of four.
+ * Every value is a token.
+ */
+
+.ps-stage {
+  --ps-gap: calc(var(--wk-space-unit) * 2);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--wk-space-section);
+  padding: 0 var(--wk-space-section) var(--wk-space-container);
+  container-type: size;
+}
+
+.ps-board-area {
+  display: grid;
+  place-items: center end;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  container-type: size;
+}
+
+.ps-grid {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  /* The grid is square and as big as its area allows. */
+  --ps-board: min(100cqh, 100cqw);
+  --ps-cell: calc((var(--ps-board) - (var(--ps-size) + 1) * var(--ps-gap)) / var(--ps-size));
+  display: grid;
+  grid-template-columns: repeat(var(--ps-size), var(--ps-cell));
+  grid-auto-rows: var(--ps-cell);
+  gap: var(--ps-gap);
+  padding: var(--ps-gap);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-primary-base);
+}
+
+/* The 4 by 4 grid is four boxes of four, with a wider line between boxes. */
+.ps-grid[data-boxes='true'] {
+  --ps-box-gap: calc(var(--ps-gap) * 3);
+  --ps-cell: calc((var(--ps-board) - 2 * var(--ps-box-gap) - 3 * var(--ps-gap)) / 4);
+  grid-template-columns: repeat(2, auto);
+  grid-auto-rows: auto;
+  gap: var(--ps-box-gap);
+  padding: var(--ps-box-gap);
+}
+
+.ps-box {
+  display: grid;
+  grid-template-columns: repeat(2, var(--ps-cell));
+  grid-auto-rows: var(--ps-cell);
+  gap: var(--ps-gap);
+}
+
+.ps-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: var(--wk-border-width) solid transparent;
+  border-radius: var(--wk-radius-small);
+  background: var(--wk-color-surface);
+}
+
+.ps-cell > img {
+  width: 76%;
+  height: 76%;
+}
+
+/* An empty square: sunken with a dashed edge, until an animal fills it. */
+.ps-blank {
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-border);
+  background: var(--wk-color-surface-sunken);
+  cursor: pointer;
+}
+
+.ps-blank[data-filled='true'] {
+  border-style: solid;
+  border-color: var(--wk-color-success);
+  background: var(--wk-color-surface);
+  cursor: default;
+}
+
+/* The square the next animal goes in: a thick solid edge and a light fill. */
+.ps-blank[data-active='true'] {
+  border: calc(var(--wk-border-width) * 3) solid var(--wk-color-primary);
+  background: var(--wk-color-selected);
+}
+
+/* A square that already holds the animal the child picked: a thick accent ring and a small lift. */
+.ps-cell[data-conflict='true'] {
+  outline: calc(var(--wk-border-width) * 3) solid var(--wk-color-accent);
+  outline-offset: calc(var(--wk-border-width) * -3);
+  animation: ps-lift var(--wk-duration-base) var(--wk-ease-out);
+}
+
+@keyframes ps-lift {
+  50% {
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+}
+
+.ps-palette {
+  --ps-animal: min(
+    calc((100cqh - var(--wk-space-container) - (var(--ps-size) - 1) * var(--wk-space-item)) / var(--ps-size)),
+    200px
+  );
+  display: grid;
+  gap: var(--wk-space-item);
+  margin: 0;
+  padding: 0 0 var(--wk-press-depth);
+  border: 0;
+}
+
+.ps-animal {
+  display: grid;
+  place-items: center;
+  width: var(--ps-animal);
+  height: var(--ps-animal);
+  padding: 0;
+  border: var(--wk-border-width) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-primary-base);
+  cursor: pointer;
+}
+
+.ps-animal > img {
+  width: 76%;
+  height: 76%;
+}
+
+.ps-animal:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+.ps-animal:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* After two tries the animal for the square stands out with a thick edge and a slow grow. */
+.ps-animal[data-hint='true'] {
+  border-width: calc(var(--wk-border-width) * 3);
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  animation: ps-hint calc(var(--wk-duration-calm) * 3) var(--wk-ease-in-out) infinite alternate;
+}
+
+@keyframes ps-hint {
+  to {
+    scale: calc(1 + 0.08 * var(--wk-motion-scale));
+  }
+}

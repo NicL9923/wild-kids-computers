@@ -1,0 +1,114 @@
+/*
+ * One card of things, or two with a plus between them. Each thing is a square cell sized so the
+ * cards fill the board: --cols cells across per card, up to five, and --rows rows. A cell is never
+ * larger than a big button, so one or two things do not swell to fill the screen. A thing taken away fades
+ * and is struck through, so it is not color alone.
+ */
+
+.add-board {
+  --add-cell: min(
+    100cqw / (var(--cards) * (var(--cols) + 0.8) + (var(--cards) - 1) * 1.4),
+    (100cqh - var(--reserve) * var(--wk-target-min) * 2) / (var(--rows) + 0.8),
+    var(--wk-target-large) * 1.2
+  );
+  grid-auto-flow: row;
+  align-content: center;
+  gap: var(--wk-space-container);
+}
+
+.add-board[data-show='sentence'] .add-sentence {
+  font-size: calc(var(--wk-target-min) * 1.4);
+}
+
+.add-cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-card-slot {
+  display: flex;
+  align-items: center;
+}
+
+.add-sign {
+  width: calc(var(--add-cell) * 1.4);
+  color: var(--wk-color-text);
+  font-size: calc(var(--add-cell) * 0.9);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+  text-align: center;
+}
+
+.add-card {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--add-cell));
+  grid-template-rows: repeat(var(--rows), var(--add-cell));
+  padding: calc(var(--add-cell) * 0.4);
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+}
+
+.add-thing {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: var(--wk-target-min);
+  min-height: var(--wk-target-min);
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: var(--wk-border-width) solid transparent;
+  border-radius: var(--wk-radius-round);
+  background: transparent;
+  box-sizing: border-box;
+}
+
+button.add-thing {
+  cursor: pointer;
+}
+
+.add-thing[aria-pressed='true'] {
+  border-color: var(--wk-color-primary);
+  background: var(--wk-color-surface);
+}
+
+.add-picture {
+  display: block;
+  width: 82%;
+  height: 82%;
+}
+
+.add-thing[data-gone] .add-picture {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.add-thing[data-gone]::after {
+  position: absolute;
+  top: 50%;
+  right: 6%;
+  left: 6%;
+  border-top: calc(var(--wk-border-width) * 2.5) solid var(--wk-color-text);
+  rotate: -45deg;
+  content: '';
+}
+
+.add-badge {
+  position: absolute;
+  right: -6%;
+  bottom: -6%;
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--wk-target-min) * 0.55);
+  height: calc(var(--wk-target-min) * 0.55);
+  padding: 0 calc(var(--wk-space-unit) * 2);
+  box-sizing: border-box;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-primary);
+  color: var(--wk-color-on-primary);
+  font-size: var(--wk-text-body);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}

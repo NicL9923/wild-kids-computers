@@ -1,0 +1,153 @@
+/*
+ * One column in the middle of the stage: the sentence as it should be, the text field with the
+ * sentence to fix, and a row of key caps that help. The mark is drawn on a copy of the text that
+ * sits exactly behind the field's own text, with the same font, padding, and border.
+ */
+
+.fix-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--wk-space-container);
+  container-type: size;
+}
+
+.fix-column {
+  display: grid;
+  gap: var(--wk-space-section);
+  justify-items: center;
+  width: min(100%, 1400px);
+  --fix-text-size: clamp(var(--wk-text-title), 3.6cqw, calc(var(--wk-text-display) * 1.5));
+}
+
+.fix-target {
+  display: grid;
+  gap: var(--wk-space-item);
+  justify-items: start;
+  width: 100%;
+  padding: var(--wk-space-container);
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface-sunken);
+  color: var(--wk-color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.fix-target-label {
+  color: var(--wk-color-text-muted);
+  font-size: var(--wk-text-body);
+}
+
+.fix-target-text {
+  font-size: var(--fix-text-size);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: var(--wk-line-height-tight);
+}
+
+.fix-field {
+  position: relative;
+  width: 100%;
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+}
+
+.fix-backdrop,
+.fix-input {
+  margin: 0;
+  padding: var(--wk-space-container);
+  box-sizing: border-box;
+  border: calc(var(--wk-border-width) * 2) solid transparent;
+  border-radius: var(--wk-radius-control);
+  font-family: var(--wk-font-family);
+  font-size: var(--fix-text-size);
+  font-weight: var(--wk-font-weight-regular);
+  line-height: var(--wk-line-height-tight);
+  letter-spacing: var(--wk-letter-spacing);
+  word-spacing: var(--wk-word-spacing);
+  white-space: pre;
+}
+
+.fix-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+}
+
+.fix-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-color: var(--wk-color-border);
+  background: transparent;
+  color: var(--wk-color-text);
+  caret-color: var(--wk-color-text);
+}
+
+.fix-stage[data-fixed='true'] .fix-input {
+  border-color: var(--wk-color-success);
+}
+
+.fix-mark {
+  border-radius: 6px;
+  background: var(--wk-color-accent);
+  color: transparent;
+  box-shadow: 0 calc(var(--wk-border-width) * 2) 0 var(--wk-color-text);
+}
+
+/* A missing letter: a wedge under the gap where it belongs. */
+.fix-mark[data-gap='true'] {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  vertical-align: text-bottom;
+  box-shadow: none;
+}
+
+.fix-mark[data-gap='true']::after {
+  content: '';
+  position: absolute;
+  left: -0.3em;
+  bottom: -0.45em;
+  border-right: 0.3em solid transparent;
+  border-bottom: 0.4em solid var(--wk-color-text);
+  border-left: 0.3em solid transparent;
+}
+
+.fix-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--wk-space-item);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fix-cap {
+  display: grid;
+  place-items: center;
+  min-width: var(--wk-target-min);
+  min-height: var(--wk-target-min);
+  padding: 0 var(--wk-space-container);
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-surface);
+  box-shadow: 0 var(--wk-press-depth) 0 var(--wk-color-border);
+  color: var(--wk-color-text);
+  font-size: var(--wk-text-title);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.fix-cap[data-pressed='true'] {
+  background: var(--wk-color-primary);
+  color: var(--wk-color-on-primary);
+  box-shadow: none;
+  translate: 0 calc(var(--wk-press-depth) * var(--wk-motion-scale));
+}

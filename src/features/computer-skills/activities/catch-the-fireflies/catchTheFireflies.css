@@ -1,0 +1,69 @@
+/*
+ * The sky keeps its 5:3 shape and fits the stage. Fireflies are sized in the sky's width, so they
+ * grow with the window. Their place changes every frame from script, never by CSS animation.
+ */
+
+.fireflies-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.fireflies-sky {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 5 / 3));
+  aspect-ratio: 5 / 3;
+  overflow: hidden;
+  container-type: inline-size;
+  border: var(--wk-border-width) solid var(--wk-color-divider);
+  border-radius: var(--wk-radius-card);
+  touch-action: none;
+}
+
+.fireflies-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.fireflies-firefly {
+  position: absolute;
+  min-width: var(--wk-target-min);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wk-radius-round);
+  background: transparent;
+  cursor: pointer;
+  translate: -50% -50%;
+}
+
+.fireflies-firefly img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A caught firefly stops and shines brighter inside a warm ring, so it differs in more than color. */
+.fireflies-firefly[data-caught='true'] {
+  background: radial-gradient(circle, color-mix(in srgb, var(--wk-color-accent) 70%, transparent) 0%, transparent 68%);
+  box-shadow: inset 0 0 0 calc(var(--wk-border-width) * 2) var(--wk-color-accent);
+  cursor: default;
+}
+
+.fireflies-firefly[data-caught='true'] img {
+  animation: fireflies-glow var(--wk-duration-calm) var(--wk-ease-out);
+}
+
+@keyframes fireflies-glow {
+  from {
+    scale: calc(1 + 0.25 * var(--wk-motion-scale));
+  }
+
+  to {
+    scale: 1;
+  }
+}

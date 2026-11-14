@@ -1,0 +1,58 @@
+/*
+ * The count is a row of round stones, evenly spaced, each as wide as the board allows. When hops
+ * show, a small "+2" sits over the gap before each stone.
+ */
+
+.skip-row {
+  --skip-stone: min(100cqw / (var(--stones) * 1.3), 100cqh * 0.5, var(--wk-target-large) * 1.4);
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--skip-stone) * 0.3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skip-slot {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+.skip-stone {
+  display: grid;
+  place-items: center;
+  width: var(--skip-stone);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-surface);
+  box-shadow: var(--wk-shadow-raised);
+  color: var(--wk-color-text);
+  font-size: calc(var(--skip-stone) * 0.36);
+  font-weight: var(--wk-font-weight-bold);
+  line-height: 1;
+}
+
+.skip-stone.math-blank {
+  border: calc(var(--wk-border-width) * 2) dashed var(--wk-color-primary);
+  color: var(--wk-color-primary);
+}
+
+.skip-stone.math-blank[data-filled='true'] {
+  border-style: solid;
+  color: var(--wk-color-text);
+}
+
+/* The hop label sits above the gap to the left of its stone. */
+.skip-hop {
+  position: absolute;
+  bottom: calc(100% + var(--wk-space-item));
+  left: calc(var(--skip-stone) * -0.15);
+  translate: -50% 0;
+  color: var(--wk-color-text-muted);
+  font-size: var(--wk-text-body);
+  font-weight: var(--wk-font-weight-bold);
+  white-space: nowrap;
+}

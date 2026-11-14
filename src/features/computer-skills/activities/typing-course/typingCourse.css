@@ -1,0 +1,218 @@
+/*
+ * The line to type on top, the hands in the middle, and the keyboard picture at the bottom. Each
+ * finger has a soft tint, and its keys on the keyboard share the tint, so a child can see which
+ * finger owns which keys. The finger for the next key is drawn in the accent color with a thick
+ * outline, and its name is written under the hands, so color is never the only sign.
+ */
+
+.tc-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+  gap: var(--wk-space-item);
+  padding: var(--wk-space-container);
+  container-type: size;
+  --tc-little: color-mix(in srgb, var(--wk-profile-marigold) 38%, var(--wk-color-surface));
+  --tc-ring: color-mix(in srgb, var(--wk-profile-clover) 38%, var(--wk-color-surface));
+  --tc-middle: color-mix(in srgb, var(--wk-profile-sky) 38%, var(--wk-color-surface));
+  --tc-pointer: color-mix(in srgb, var(--wk-profile-fern) 30%, var(--wk-color-surface));
+  --tc-thumb: var(--wk-color-surface-sunken);
+}
+
+.tc-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+  padding: var(--wk-space-item) var(--wk-space-container);
+  box-sizing: border-box;
+  border: var(--wk-border-width) solid var(--wk-color-border);
+  border-radius: var(--wk-radius-card);
+  background: var(--wk-color-surface);
+  font-size: clamp(var(--wk-text-title), 3.1cqw, 60px);
+  line-height: 1.5;
+}
+
+.tc-char {
+  display: inline-grid;
+  place-items: center;
+  min-width: 0.6em;
+  padding: 0 0.04em;
+  border-bottom: 0.1em solid transparent;
+  border-radius: 0.12em;
+  color: var(--wk-color-text-muted);
+  white-space: pre;
+}
+
+.tc-char[data-space='true']::before {
+  content: '·';
+  grid-area: 1 / 1;
+  color: var(--wk-color-text-muted);
+}
+
+.tc-char[data-state='typed'] {
+  color: var(--wk-color-text);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.tc-char[data-state='next'] {
+  border-bottom-color: var(--wk-color-primary);
+  background: var(--wk-color-selected);
+  color: var(--wk-color-text);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+/* A key that was not the next one: the line waits, and the next character is ringed. */
+.tc-line[data-waiting='true'] .tc-char[data-state='next'] {
+  outline: calc(var(--wk-border-width) * 1.5) dashed var(--wk-color-text-muted);
+  outline-offset: 0.06em;
+}
+
+.tc-hands-figure {
+  display: grid;
+  justify-items: center;
+  gap: var(--wk-space-unit);
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.tc-hands {
+  height: 100%;
+  min-height: 0;
+  max-width: 100%;
+}
+
+.tc-palm {
+  fill: var(--wk-color-surface);
+  stroke: var(--wk-color-border);
+  stroke-width: 3;
+}
+
+.tc-finger {
+  stroke: var(--wk-color-border);
+  stroke-width: 3;
+}
+
+.tc-finger[data-finger$='little'] {
+  fill: var(--tc-little);
+}
+
+.tc-finger[data-finger$='ring'] {
+  fill: var(--tc-ring);
+}
+
+.tc-finger[data-finger$='middle'] {
+  fill: var(--tc-middle);
+}
+
+.tc-finger[data-finger$='pointer'] {
+  fill: var(--tc-pointer);
+}
+
+.tc-finger[data-finger='thumb'] {
+  fill: var(--tc-thumb);
+}
+
+.tc-finger[data-active='true'] {
+  fill: var(--wk-color-accent);
+  stroke: var(--wk-color-text);
+  stroke-width: 8;
+}
+
+.tc-finger-name {
+  min-height: 1.45em;
+  color: var(--wk-color-text);
+  font-size: clamp(var(--wk-text-body), 2.6cqh, 30px);
+  font-weight: var(--wk-font-weight-bold);
+}
+
+.tc-keyboard {
+  /* About two fifths of the stage's height, so the hands and the line keep their room. */
+  width: min(100%, 125cqh);
+}
+
+/* Each finger's keys share its tint. The key to press keeps the shared accent mark. */
+.tc-keyboard
+  .keypic-key[data-mark='none']:is(
+    [data-key='Backquote'],
+    [data-key='Digit1'],
+    [data-key='KeyQ'],
+    [data-key='KeyA'],
+    [data-key='KeyZ']
+  )
+  .keypic-cap {
+  fill: var(--tc-little);
+}
+
+.tc-keyboard
+  .keypic-key[data-mark='none']:is([data-key='Digit2'], [data-key='KeyW'], [data-key='KeyS'], [data-key='KeyX'])
+  .keypic-cap {
+  fill: var(--tc-ring);
+}
+
+.tc-keyboard
+  .keypic-key[data-mark='none']:is([data-key='Digit3'], [data-key='KeyE'], [data-key='KeyD'], [data-key='KeyC'])
+  .keypic-cap {
+  fill: var(--tc-middle);
+}
+
+.tc-keyboard
+  .keypic-key[data-mark='none']:is(
+    [data-key='Digit4'],
+    [data-key='Digit5'],
+    [data-key='KeyR'],
+    [data-key='KeyT'],
+    [data-key='KeyF'],
+    [data-key='KeyG'],
+    [data-key='KeyV'],
+    [data-key='KeyB'],
+    [data-key='Digit6'],
+    [data-key='Digit7'],
+    [data-key='KeyY'],
+    [data-key='KeyU'],
+    [data-key='KeyH'],
+    [data-key='KeyJ'],
+    [data-key='KeyN'],
+    [data-key='KeyM']
+  )
+  .keypic-cap {
+  fill: var(--tc-pointer);
+}
+
+.tc-keyboard
+  .keypic-key[data-mark='none']:is([data-key='Digit8'], [data-key='KeyI'], [data-key='KeyK'], [data-key='Comma'])
+  .keypic-cap {
+  fill: var(--tc-middle);
+}
+
+.tc-keyboard
+  .keypic-key[data-mark='none']:is([data-key='Digit9'], [data-key='KeyO'], [data-key='KeyL'], [data-key='Period'])
+  .keypic-cap {
+  fill: var(--tc-ring);
+}
+
+.tc-keyboard
+  .keypic-key[data-mark='none']:is(
+    [data-key='Digit0'],
+    [data-key='Minus'],
+    [data-key='Equal'],
+    [data-key='KeyP'],
+    [data-key='BracketLeft'],
+    [data-key='BracketRight'],
+    [data-key='Semicolon'],
+    [data-key='Quote'],
+    [data-key='Slash']
+  )
+  .keypic-cap {
+  fill: var(--tc-little);
+}
+
+/* The home keys F and J have a bump on a real keyboard; here they get a thicker edge. */
+.tc-keyboard .keypic-key[data-mark='none']:is([data-key='KeyF'], [data-key='KeyJ']) .keypic-cap {
+  stroke: var(--wk-color-text);
+  stroke-width: 6;
+}
