@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { Band } from '../../../../core/bands.ts';
+import type { Random } from '../../../../core/activityKit/random.ts';
 import {
   BED,
   FLOWERS,
   flowerSize,
   generateLevel,
   MAX_FLOWER_DIFFICULTY,
-  scatterSpacing,
+  placeFlowers,
+  rowsLayout,
+  scatterLayout,
   TIERS,
   tierFor,
+  type Flower,
   type FlowersLevel,
 } from './level.ts';
 
@@ -20,7 +24,9 @@ function problems(level: FlowersLevel): string[] {
   if (level.flowers.length !== level.count)
     found.push(`${String(level.flowers.length)} flowers for ${String(level.count)}`);
   const r = level.size / 2;
-  const apart = level.arrangement === 'scatter' ? scatterSpacing(level.size) : level.size;
+  // Scattered flowers keep a tenth of their size apart; rows keep more.
+  const apart = level.size * 1.1;
+  if (new Set(level.flowers.map((flower) => flower.id)).size !== level.count) found.push('flower ids repeat');
   level.flowers.forEach((flower, index) => {
     if (flower.x - r < 0 || flower.x + r > BED.width || flower.y - r < 0 || flower.y + r > BED.height) {
       found.push(`${flower.id} leaves the bed`);
@@ -76,6 +82,27 @@ describe('generateLevel', () => {
       }),
     );
     expect([...positions].toSorted((a, b) => a - b)).toEqual([0, 1, 2]);
+  });
+
+  it('sometimes offers 1 when the answer is 2', () => {
+    const twos = SEEDS.map((seed) => generateLevel(seed, 1, 'band-3-5')).filter((level) => level.count === 2);
+    expect(twos.some((level) => level.choices.includes(1))).toBe(true);
+  });
+
+  it.each([
+    [1, 'row'],
+    [2, 'row'],
+    [3, 'rows'],
+    [4, 'rows'],
+    [5, 'scatter'],
+    [6, 'rows'],
+    [7, 'scatter'],
+    [8, 'scatter'],
+    [9, 'scatter'],
+    [10, 'scatter'],
+  ] as const)('at difficulty %i arranges the flowers as %s', (difficulty, arrangement) => {
+    const arrangements = SEEDS.slice(0, 60).map((seed) => generateLevel(seed, difficulty, 'band-6-8').arrangement);
+    expect(arrangements.filter((each) => each === arrangement).length).toBeGreaterThan(54);
   });
 
   it('offers no number below 1 when the answer is 1', () => {
@@ -137,5 +164,101 @@ describe('flowerSize', () => {
     [20, 82],
   ])('gives %i flowers a size of %i', (count, size) => {
     expect(flowerSize(count)).toBe(size);
+  });
+});
+
+/** The flowers grouped into rows by height, top row first. */
+function rowsOf(flowers: readonly Flower[]): Flower[][] {
+  const rows = new Map<number, Flower[]>();
+  for (const flower of flowers) rows.set(flower.y, [...(rows.get(flower.y) ?? []), flower]);
+  return [...rows.entries()].toSorted(([a], [b]) => a - b).map(([, row]) => row);
+}
+
+const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+describe('rowsLayout', () => {
+  it.each(Array.from({ length: 20 }, (_, index) => index + 1))('lays %i flowers in even, centered rows', (count) => {
+    const size = flowerSize(count);
+    const flowers = rowsLayout(count, size);
+    const rows = rowsOf(flowers);
+    const lengths = rows.map((row) => row.length);
+    expect(lengths.reduce((a, b) => a + b, 0)).toBe(count);
+    expect(rows).toHaveLength(Math.ceil(count / 5));
+    // As even as can be: rows differ by at most one, the longer rows first, none over five.
+    expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(1);
+    expect(lengths).toEqual(lengths.toSorted((a, b) => b - a));
+    expect(Math.max(...lengths)).toBeLessThanOrEqual(5);
+    for (const row of rows)
+      expect(Math.abs(mean(row.map((flower) => flower.x)) - BED.width / 2)).toBeLessThanOrEqual(1);
+    expect(Math.abs(mean(rows.map((row) => row[0]?.y ?? 0)) - BED.height / 2)).toBeLessThanOrEqual(1);
+    // Every flower stays in the bed with room around it.
+    for (const flower of flowers) {
+      expect(flower.x - size / 2).toBeGreaterThanOrEqual(0);
+      expect(flower.x + size / 2).toBeLessThanOrEqual(BED.width);
+      expect(flower.y - size / 2).toBeGreaterThanOrEqual(0);
+      expect(flower.y + size / 2).toBeLessThanOrEqual(BED.height);
+    }
+  });
+
+  it('spaces neighbors evenly, apart but close enough to read as a group', () => {
+    for (const count of [3, 5, 8, 10, 20]) {
+      const size = flowerSize(count);
+      const rows = rowsOf(rowsLayout(count, size));
+      for (const row of rows) {
+        for (let index = 1; index < row.length; index += 1) {
+          const step = (row[index]?.x ?? 0) - (row[index - 1]?.x ?? 0);
+          expect(step).toBeGreaterThanOrEqual(size * 1.2);
+          expect(step).toBeLessThanOrEqual(size * 1.5 + 1);
+        }
+      }
+      for (let index = 1; index < rows.length; index += 1) {
+        const step = (rows[index]?.[0]?.y ?? 0) - (rows[index - 1]?.[0]?.y ?? 0);
+        expect(step).toBeGreaterThanOrEqual(size * 1.1);
+        expect(step).toBeLessThanOrEqual(size * 1.25 + 1);
+      }
+    }
+  });
+
+  it('lists flowers in reading order, so Tab moves left to right, top to bottom', () => {
+    const flowers = rowsLayout(8, flowerSize(8));
+    for (let index = 1; index < flowers.length; index += 1) {
+      const before = flowers[index - 1];
+      const after = flowers[index];
+      if (before === undefined || after === undefined) continue;
+      expect(after.y > before.y || (after.y === before.y && after.x > before.x)).toBe(true);
+    }
+    expect(flowers.map((flower) => flower.id)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `flower-${String(index)}`),
+    );
+  });
+});
+
+/** A generator that always picks the same spot, so only one flower ever fits. */
+const stuck: Random = {
+  next: () => 0.5,
+  int: (min, max) => Math.round((min + max) / 2),
+  pick: (items) => {
+    for (const item of items) return item;
+    throw new RangeError('empty');
+  },
+  shuffle: (items) => [...items],
+  sample: (items, count) => items.slice(0, count),
+};
+
+describe('scatterLayout and placeFlowers', () => {
+  it('finds no room when the flowers cannot all fit', () => {
+    expect(scatterLayout(stuck, 2, 100)).toBeNull();
+  });
+
+  it('places one flower at the spot it is given', () => {
+    expect(scatterLayout(stuck, 1, 100)).toEqual([{ id: 'flower-0', x: 500, y: 220 }]);
+  });
+
+  it('falls back to rows rather than overlapping flowers', () => {
+    expect(placeFlowers(stuck, 6, 130, 'scatter')).toEqual({ flowers: rowsLayout(6, 130), arrangement: 'rows' });
+  });
+
+  it('keeps rows and a single row as asked', () => {
+    expect(placeFlowers(stuck, 3, 170, 'row')).toEqual({ flowers: rowsLayout(3, 170), arrangement: 'row' });
   });
 });

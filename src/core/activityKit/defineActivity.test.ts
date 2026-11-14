@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineStrings } from '../strings/defineStrings.ts';
-import { defineActivity, isArea, type RoundsActivityInput } from './defineActivity.ts';
+import { defineActivity, isArea, type RoundsActivityInput, type SequenceActivityInput } from './defineActivity.ts';
 
 const strings = defineStrings('kit-fixture', {
   title: { text: 'Fixture' },
@@ -41,14 +41,19 @@ function shared() {
   return rest;
 }
 
-function sequence(steps: readonly { id: string }[], stepsDirectory: string | null = null) {
-  return {
+/** A sequence fixture. Steps and directory are loose, because tests pass bad ones on purpose. */
+function sequence(
+  steps: readonly { id: unknown }[],
+  stepsDirectory: unknown = null,
+): SequenceActivityInput<number, never, { id: string }> {
+  const input = {
     ...shared(),
-    kind: 'sequence' as const,
+    kind: 'sequence',
     steps,
     stepsDirectory,
-    generateLevel: (_seed: number, step: number) => step,
+    generateLevel: (_s: number, step: number) => step,
   };
+  return Reflect.apply(Object.assign, undefined, [{}, input]);
 }
 
 describe('defineActivity', () => {
@@ -93,6 +98,13 @@ describe('defineActivity', () => {
     ['no inputs', { inputs: [] }, /inputs needs at least one entry/],
     ['an unknown input', { inputs: ['tap'] }, /inputs has an unknown entry "tap"/],
     ['no goal', { goal: undefined }, /goal must be a string handle/],
+    ['a null goal', { goal: null }, /goal must be a string handle/],
+    ['bands out of order after the first', { bands: ['band-3-5', 'band-9-12', 'band-6-8'] }, /youngest first/],
+    ['an icon that is text', { icon: 'flower' }, /icon must be/],
+    ['a null icon', { icon: null }, /icon must be/],
+    ['an empty emoji icon', { icon: { emoji: '' } }, /icon must be/],
+    ['an emoji icon that is not text', { icon: { emoji: 5 } }, /icon must be/],
+    ['an art icon that is not text', { icon: { art: 5 } }, /icon must be/],
     ['a silent title', { title: strings.quiet }, /title must be a spoken string handle/],
     ['nothing spoken', { spoken: [] }, /spoken needs at least one entry/],
     ['a silent string in spoken', { spoken: [strings.instruction, strings.quiet] }, /spoken has an unknown entry/],
@@ -129,6 +141,14 @@ describe('defineActivity', () => {
     expect(() => defineActivity(rounds(change))).toThrow(reason);
   });
 
+  it('accepts order 0 and an art icon', () => {
+    expect(() => defineActivity(rounds({ order: 0, icon: { art: 'kit-fixture/picture' } }))).not.toThrow();
+  });
+
+  it('names a non-text id as it was given', () => {
+    expect(() => defineActivity(rounds({ id: 42 }))).toThrow(/^Activity 42: the id must be kebab-case/);
+  });
+
   it('accepts the edges of rounds per session', () => {
     expect(() => defineActivity(rounds({ roundsPerSession: 1 }))).not.toThrow();
     expect(() => defineActivity(rounds({ roundsPerSession: 20 }))).not.toThrow();
@@ -143,6 +163,9 @@ describe('defineActivity', () => {
       ['no steps', [], null, /at least one step/],
       ['a step without an id', [{ id: '' }], null, /every step needs an id/],
       ['a repeated step id', [{ id: 'a' }, { id: 'b' }, { id: 'a' }], null, /step id "a" appears twice/],
+      ['a blank step id', [{ id: '  ' }], null, /every step needs an id/],
+      ['a step id that is not text', [{ id: 3 }], null, /every step needs an id/],
+      ['a steps directory that is not text', [{ id: 'a' }], 5, /stepsDirectory must be a path, or null/],
       ['an empty steps directory', [{ id: 'a' }], '', /stepsDirectory must be a path, or null/],
     ])('rejects %s', (_label, steps, directory, reason) => {
       expect(() => defineActivity(sequence(steps, directory))).toThrow(reason);

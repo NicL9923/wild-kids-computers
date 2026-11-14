@@ -123,7 +123,7 @@ export type ActivityDefinition<
 export const MAX_ROUNDS_PER_SESSION = 20;
 
 function fail(id: unknown, message: string): never {
-  throw new Error(`Activity ${typeof id === 'string' ? id : JSON.stringify(id)}: ${message}`);
+  throw new Error(`Activity ${String(id)}: ${message}`);
 }
 
 function isHandle(value: unknown): value is StringHandle {
@@ -132,6 +132,12 @@ function isHandle(value: unknown): value is StringHandle {
 
 function isSpoken(value: unknown): value is SpokenHandle {
   return isHandle(value) && value.kind === 'spoken';
+}
+
+function isIcon(icon: unknown): boolean {
+  if (typeof icon !== 'object' || icon === null) return false;
+  const reference: unknown = 'emoji' in icon ? icon.emoji : 'art' in icon ? icon.art : undefined;
+  return typeof reference === 'string' && reference !== '';
 }
 
 function checkList(id: string, field: string, values: readonly unknown[], valid: (value: unknown) => boolean) {
@@ -192,13 +198,7 @@ export function defineActivity<L, S = never, P extends ActivityStep = ActivitySt
   if (!isHandle(input.goal)) fail(id, 'goal must be a string handle from strings.ts.');
   if (!isSpoken(input.title)) fail(id, 'title must be a spoken string handle, because a young child cannot read it.');
   checkList(id, 'spoken', input.spoken, isSpoken);
-  const icon: unknown = input.icon;
-  const iconOk =
-    typeof icon === 'object' &&
-    icon !== null &&
-    (('emoji' in icon && typeof icon.emoji === 'string' && icon.emoji !== '') ||
-      ('art' in icon && typeof icon.art === 'string' && icon.art !== ''));
-  if (!iconOk) fail(id, 'icon must be { emoji } or { art }.');
+  if (!isIcon(input.icon)) fail(id, 'icon must be { emoji } or { art }.');
   if (typeof input.load !== 'function') fail(id, 'load must be () => import("./<Name>Activity.tsx").');
   if (typeof input.generateLevel !== 'function') fail(id, 'generateLevel must be a function.');
 

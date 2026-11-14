@@ -138,6 +138,10 @@ describe('assertDifficultyRange', () => {
     expect(() => assertDifficultyRange(range, 'band-3-5')).toThrow(reason);
   });
 
+  it('calls it a difficulty range when the caller does not say where it came from', () => {
+    expect(() => assertDifficultyRange({ min: 3, max: 2 })).toThrow(/^A difficulty range has min above max/);
+  });
+
   it('names where the bad range came from', () => {
     expect(() => assertDifficultyRange({ min: 3, max: 2 }, 'pop-the-seed-pods band-3-5')).toThrow(
       /^pop-the-seed-pods band-3-5 has min above max/,

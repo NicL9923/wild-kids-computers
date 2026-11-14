@@ -8,6 +8,9 @@ function draw(seed: number): number[] {
 
 const byValue = (a: number, b: number) => a - b;
 
+/** The order createRandom(1) gives five items. Levels in tests depend on it. */
+const SHUFFLE_OF_SEED_1 = [4, 1, 3, 5, 2];
+
 describe('createRandom', () => {
   it('repeats the same sequence for the same seed and differs for another seed', () => {
     expect(draw(42)).toEqual(draw(42));
@@ -80,6 +83,10 @@ describe('createRandom', () => {
       const shuffled = createRandom(5).shuffle(input);
       expect(shuffled.toSorted((a, b) => a - b)).toEqual(input);
       expect(input).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    });
+
+    it('pins the order of a known seed, so a level never changes under a saved seed', () => {
+      expect(createRandom(1).shuffle([1, 2, 3, 4, 5])).toEqual(SHUFFLE_OF_SEED_1);
     });
 
     it('produces more than one order over many seeds, including moving the first item', () => {

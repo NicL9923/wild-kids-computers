@@ -30,6 +30,11 @@ export interface Scope {
 export interface OwnedScope extends Scope {
   /** Cancels everything. Safe to call more than once. */
   dispose(): void;
+  /**
+   * How many timers, frames, listeners, and cleanups it still owns. A timeout or frame that ran
+   * no longer counts, so a long round does not pile up dead entries.
+   */
+  pending(): number;
 }
 
 const NOTHING: Cancel = () => undefined;
@@ -96,11 +101,12 @@ export function createScope(scheduler: Scheduler): OwnedScope {
       }
       return track(cleanup);
     },
+    pending: () => cleanups.size,
     dispose() {
-      if (disposed) return;
       disposed = true;
       const errors: unknown[] = [];
-      // A cleanup removes itself from the set as it runs, which a Set allows during iteration.
+      // Each cleanup removes itself from the set as it runs, which a Set allows during iteration,
+      // so the set is empty afterwards and a second dispose does nothing.
       for (const cleanup of cleanups) {
         try {
           cleanup();
@@ -108,7 +114,6 @@ export function createScope(scheduler: Scheduler): OwnedScope {
           errors.push(error);
         }
       }
-      cleanups.clear();
       // Every cleanup ran. Report the first failure so a broken one is not silent.
       if (errors.length > 0) throw errors[0];
     },

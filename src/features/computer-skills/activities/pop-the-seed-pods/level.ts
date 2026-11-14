@@ -38,47 +38,30 @@ export interface PodsLevel {
   readonly gap: number;
 }
 
-interface Step {
-  readonly count: number;
-  readonly size: number;
-  readonly gap: number;
-}
-
-/** One entry per difficulty, 1 first: more pods, a little smaller, a little closer. */
-export const STEPS: readonly Step[] = [
-  { count: 1, size: 260, gap: 160 },
-  { count: 2, size: 240, gap: 140 },
-  { count: 3, size: 220, gap: 120 },
-  { count: 3, size: 200, gap: 100 },
-  { count: 4, size: 180, gap: 80 },
-  { count: 5, size: 160, gap: 60 },
-];
-
-/** The highest difficulty this activity defines. */
-export const MAX_POD_DIFFICULTY = STEPS.length;
+type Spot = readonly [x: number, y: number];
 
 /**
- * Spread-out layouts that fit every difficulty, used when random placement does not find room.
- * The level test checks them against the same rules as random layouts.
+ * Spread-out layouts, used when random placement does not find room. The level test checks them
+ * against the same rules as random layouts, at every difficulty that uses them.
  */
-export const FALLBACK_LAYOUTS: Readonly<Record<number, readonly (readonly [number, number])[]>> = {
-  1: [[600, 330]],
-  2: [
+const SPREAD: Readonly<Record<'one' | 'two' | 'three' | 'four' | 'five', readonly Spot[]>> = {
+  one: [[600, 330]],
+  two: [
     [330, 420],
     [740, 300],
   ],
-  3: [
+  three: [
     [200, 440],
     [500, 260],
     [800, 440],
   ],
-  4: [
+  four: [
     [200, 450],
     [450, 280],
     [690, 460],
     [860, 200],
   ],
-  5: [
+  five: [
     [150, 470],
     [390, 330],
     [610, 480],
@@ -86,6 +69,32 @@ export const FALLBACK_LAYOUTS: Readonly<Record<number, readonly (readonly [numbe
     [870, 460],
   ],
 };
+
+export interface Step {
+  /** How many pods: the length of `fallback`. */
+  readonly count: number;
+  readonly size: number;
+  readonly gap: number;
+  /** Where the pods go when random placement finds no room. */
+  readonly fallback: readonly Spot[];
+}
+
+function makeStep(size: number, gap: number, fallback: readonly Spot[]): Step {
+  return { count: fallback.length, size, gap, fallback };
+}
+
+/** One entry per difficulty, 1 first: more pods, a little smaller, a little closer. */
+export const STEPS: readonly Step[] = [
+  makeStep(260, 160, SPREAD.one),
+  makeStep(240, 140, SPREAD.two),
+  makeStep(220, 120, SPREAD.three),
+  makeStep(200, 100, SPREAD.three),
+  makeStep(180, 80, SPREAD.four),
+  makeStep(160, 60, SPREAD.five),
+];
+
+/** The highest difficulty this activity defines. */
+export const MAX_POD_DIFFICULTY = STEPS.length;
 
 function distanceToKeepOut(x: number, y: number): number {
   const dx = Math.max(EXIT_KEEP_OUT.left - x, 0, x - EXIT_KEEP_OUT.right);
@@ -139,17 +148,20 @@ export function stepFor(difficulty: number): Step {
   return step;
 }
 
+/**
+ * Pods placed at random where they fit, or the spread-out fallback layout when a few tries find
+ * no room. Exported so its test can hand it a generator that never finds room.
+ */
+export function placePods(random: Random, step: Step): Pod[] {
+  for (let attempt = 0; attempt < LAYOUT_TRIES; attempt += 1) {
+    const pods = randomLayout(random, step);
+    if (pods !== null) return pods;
+  }
+  return step.fallback.map(([x, y], index) => ({ id: `pod-${String(index)}`, x, y, size: step.size }));
+}
+
 /** Pure: the same seed and difficulty give the same pods. The band does not change the layout. */
 export function generateLevel(seed: number, difficulty: number, _band: Band): PodsLevel {
   const step = stepFor(difficulty);
-  const random = createRandom(seed);
-  for (let attempt = 0; attempt < LAYOUT_TRIES; attempt += 1) {
-    const pods = randomLayout(random, step);
-    if (pods !== null) return { pods, gap: step.gap };
-  }
-  const layout = FALLBACK_LAYOUTS[step.count] ?? [];
-  return {
-    pods: layout.map(([x, y], index) => ({ id: `pod-${String(index)}`, x, y, size: step.size })),
-    gap: step.gap,
-  };
+  return { pods: placePods(createRandom(seed), step), gap: step.gap };
 }

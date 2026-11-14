@@ -61,7 +61,6 @@ export interface ManualScheduler extends Scheduler {
 }
 
 interface Timer {
-  readonly id: number;
   due: number;
   readonly every: number | null;
   readonly callback: () => void;
@@ -75,14 +74,13 @@ interface Timer {
 export function createManualScheduler(start: { wall: number; monotonic?: number }): ManualScheduler {
   const origin = start.monotonic ?? 0;
   let elapsed = 0;
-  let nextId = 1;
   let framesRun = 0;
+  // In the order they were set, so among timers due at the same time the oldest runs first.
   const timers: Timer[] = [];
-  let frames = new Map<number, (time: number) => void>();
+  let frames = new Set<{ readonly callback: (time: number) => void }>();
 
   const add = (callback: () => void, ms: number, every: number | null): Cancel => {
-    const timer: Timer = { id: nextId, due: elapsed + ms, every, callback };
-    nextId += 1;
+    const timer: Timer = { due: elapsed + ms, every, callback };
     timers.push(timer);
     return () => {
       const index = timers.indexOf(timer);
@@ -90,17 +88,17 @@ export function createManualScheduler(start: { wall: number; monotonic?: number 
     };
   };
 
-  /** The timer that is due first, oldest first among equals. */
+  /** The timer that is due first. A later one replaces it only when strictly earlier. */
   const earliest = (): Timer | undefined =>
-    timers.reduce<Timer | undefined>((best, timer) => {
-      if (best === undefined) return timer;
-      return timer.due < best.due || (timer.due === best.due && timer.id < best.id) ? timer : best;
-    }, undefined);
+    timers.reduce<Timer | undefined>(
+      (best, timer) => (best === undefined || timer.due < best.due ? timer : best),
+      undefined,
+    );
 
   const runFrame = (): void => {
     const due = frames;
-    frames = new Map();
-    for (const callback of due.values()) callback(origin + elapsed);
+    frames = new Set();
+    for (const entry of due) entry.callback(origin + elapsed);
   };
 
   const scheduler: ManualScheduler = {
@@ -116,11 +114,10 @@ export function createManualScheduler(start: { wall: number; monotonic?: number 
       return add(callback, every, every);
     },
     requestFrame(callback) {
-      const id = nextId;
-      nextId += 1;
-      frames.set(id, callback);
+      const entry = { callback };
+      frames.add(entry);
       return () => {
-        frames.delete(id);
+        frames.delete(entry);
       };
     },
     advance(ms) {
@@ -140,14 +137,15 @@ export function createManualScheduler(start: { wall: number; monotonic?: number 
     for (;;) {
       const timer = earliest();
       const nextFrame = (framesRun + 1) * FRAME_MS;
-      const timerDue = timer === undefined ? Number.POSITIVE_INFINITY : timer.due;
-      if (Math.min(timerDue, nextFrame) > target) break;
-      if (timer !== undefined && timerDue <= nextFrame) {
+      // A timer due on the frame's own time runs before the frame.
+      if (timer !== undefined && timer.due <= nextFrame) {
+        if (timer.due > target) break;
         elapsed = timer.due;
         if (timer.every === null) timers.splice(timers.indexOf(timer), 1);
         else timer.due += timer.every;
         timer.callback();
       } else {
+        if (nextFrame > target) break;
         elapsed = nextFrame;
         framesRun += 1;
         runFrame();

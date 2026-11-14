@@ -79,57 +79,85 @@ export function tierFor(difficulty: number): Tier {
   return tier;
 }
 
-/** Neat rows of up to PER_ROW, each row centered, the rows centered in the bed. */
-function rowsLayout(count: number, size: number): Flower[] {
-  const perRow = count <= PER_ROW ? count : Math.min(PER_ROW, Math.ceil(count / Math.ceil(count / PER_ROW)));
-  const rows = Math.ceil(count / perRow);
-  const stepX = Math.min(size * 1.5, BED.width / perRow);
-  const stepY = Math.min(size * 1.25, BED.height / rows);
+/**
+ * Neat rows of up to PER_ROW, as even as they can be, each row centered and the rows centered in
+ * the bed. Flowers come in reading order, so Tab moves left to right and top to bottom.
+ */
+export function rowsLayout(count: number, size: number): Flower[] {
+  const rows = Math.ceil(count / PER_ROW);
+  // The first `longer` rows take one more flower, so rows differ by at most one.
+  const shortRow = Math.floor(count / rows);
+  const longer = count % rows;
+  const lengths = Array.from({ length: rows }, (_, row) => shortRow + (row < longer ? 1 : 0));
+  // flowerSize keeps five across and four down inside the bed; the level test checks it.
+  const stepX = size * 1.5;
+  const stepY = size * 1.25;
   const flowers: Flower[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const row = Math.floor(index / perRow);
-    const inRow = Math.min(perRow, count - row * perRow);
-    const column = index % perRow;
-    flowers.push({
-      id: `flower-${String(index)}`,
-      x: Math.round(BED.width / 2 + (column - (inRow - 1) / 2) * stepX),
-      y: Math.round(BED.height / 2 + (row - (rows - 1) / 2) * stepY),
-    });
-  }
-  return flowers;
-}
-
-/** The smallest distance between two scattered flower centers, so none overlap. */
-export function scatterSpacing(size: number): number {
-  return size * 1.1;
-}
-
-function scatterLayout(random: Random, count: number, size: number): Flower[] | null {
-  const radius = size / 2;
-  const spacing = scatterSpacing(size);
-  const flowers: Flower[] = [];
-  for (let index = 0; index < count; index += 1) {
-    let placed: Flower | null = null;
-    for (let attempt = 0; attempt < 80 && placed === null; attempt += 1) {
-      const candidate = {
-        id: `flower-${String(index)}`,
-        x: random.int(Math.ceil(radius), Math.floor(BED.width - radius)),
-        y: random.int(Math.ceil(radius), Math.floor(BED.height - radius)),
-      };
-      if (flowers.every((other) => Math.hypot(candidate.x - other.x, candidate.y - other.y) >= spacing))
-        placed = candidate;
+  lengths.forEach((inRow, row) => {
+    for (let column = 0; column < inRow; column += 1) {
+      flowers.push({
+        id: `flower-${String(flowers.length)}`,
+        x: Math.round(BED.width / 2 + (column - (inRow - 1) / 2) * stepX),
+        y: Math.round(BED.height / 2 + (row - (rows - 1) / 2) * stepY),
+      });
     }
-    if (placed === null) return null;
-    flowers.push(placed);
+  });
+  return flowers;
+}
+
+/** Scattered flowers keep a tenth of their size between them, so none touch. */
+const SCATTER_SPACING = 1.1;
+
+/** Flowers at random places that do not touch, or null when there is no room for them all. */
+export function scatterLayout(random: Random, count: number, size: number): Flower[] | null {
+  const flowers: Flower[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const spot = findSpot(random, flowers, size);
+    if (spot === null) return null;
+    flowers.push({ id: `flower-${String(index)}`, ...spot });
   }
   return flowers;
 }
 
-/** The answer and nearby numbers, smallest first. Distractors are within two of the answer and at least 1. */
+const SPOT_ATTEMPTS = 80;
+
+/** The first random spot in the bed that keeps the spacing from every flower placed so far. */
+function findSpot(random: Random, placed: readonly Flower[], size: number): { x: number; y: number } | null {
+  const radius = size / 2;
+  for (let attempt = 0; attempt < SPOT_ATTEMPTS; attempt += 1) {
+    const x = random.int(Math.ceil(radius), Math.floor(BED.width - radius));
+    const y = random.int(Math.ceil(radius), Math.floor(BED.height - radius));
+    if (placed.every((other) => Math.hypot(x - other.x, y - other.y) >= size * SCATTER_SPACING)) return { x, y };
+  }
+  return null;
+}
+
+/**
+ * The answer and nearby numbers, smallest first. Distractors are within two of the answer and at
+ * least 1. Every tier leaves enough of them: an answer of 1 still has 2 and 3.
+ */
 function choicesFor(random: Random, count: number, total: number): number[] {
   const near = [count - 2, count - 1, count + 1, count + 2].filter((value) => value >= 1);
-  const extra = near.length >= total - 1 ? near : [...near, count + 3];
-  return [count, ...random.sample(extra, total - 1)].toSorted((a, b) => a - b);
+  return [count, ...random.sample(near, total - 1)].toSorted((a, b) => a - b);
+}
+
+const SCATTER_TRIES = 8;
+
+/** Flowers in the tier's arrangement. A crowded scatter falls back to rows rather than overlap. */
+export function placeFlowers(
+  random: Random,
+  count: number,
+  size: number,
+  arrangement: Arrangement,
+): { flowers: Flower[]; arrangement: Arrangement } {
+  if (arrangement === 'scatter') {
+    for (let attempt = 0; attempt < SCATTER_TRIES; attempt += 1) {
+      const flowers = scatterLayout(random, count, size);
+      if (flowers !== null) return { flowers, arrangement };
+    }
+    return { flowers: rowsLayout(count, size), arrangement: 'rows' };
+  }
+  return { flowers: rowsLayout(count, size), arrangement };
 }
 
 /** Pure: the same seed, difficulty, and band give the same flowers and choices. */
@@ -139,13 +167,6 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Fl
   const count = random.int(tier.min, tier.max);
   const kind = random.pick(FLOWERS);
   const size = flowerSize(count);
-  let flowers: Flower[] | null = null;
-  let arrangement = tier.arrangement;
-  if (arrangement === 'scatter') {
-    for (let attempt = 0; attempt < 8 && flowers === null; attempt += 1) flowers = scatterLayout(random, count, size);
-    // Rows always fit; a crowded patch falls back to them rather than overlapping.
-    if (flowers === null) arrangement = 'rows';
-  }
-  flowers ??= rowsLayout(count, size);
+  const { flowers, arrangement } = placeFlowers(random, count, size, tier.arrangement);
   return { count, kind, arrangement, size, flowers, choices: choicesFor(random, count, tier.choices) };
 }

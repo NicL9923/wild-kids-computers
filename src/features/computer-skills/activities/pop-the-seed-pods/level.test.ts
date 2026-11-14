@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { Random } from '../../../../core/activityKit/random.ts';
 import {
   BOARD,
   EDGE_MARGIN,
   EXIT_KEEP_OUT,
-  FALLBACK_LAYOUTS,
   fits,
   generateLevel,
   KEEP_OUT_GAP,
+  placePods,
   MAX_POD_DIFFICULTY,
   STEPS,
   stepFor,
@@ -20,6 +21,7 @@ const DIFFICULTIES = Array.from({ length: MAX_POD_DIFFICULTY }, (_, index) => in
 function problems(pods: readonly Pod[], gap: number): string[] {
   const found: string[] = [];
   pods.forEach((pod, index) => {
+    if (![pod.x, pod.y, pod.size].every(Number.isFinite)) found.push(`${pod.id} has no place`);
     const r = pod.size / 2;
     if (pod.x - r < EDGE_MARGIN || pod.x + r > BOARD.width - EDGE_MARGIN)
       found.push(`${pod.id} leaves the board sideways`);
@@ -44,6 +46,12 @@ describe('generateLevel', () => {
       expect(new Set(level.pods.map((pod) => pod.id)).size).toBe(step.count);
       expect(problems(level.pods, level.gap), `seed ${String(seed)}`).toEqual([]);
     }
+  });
+
+  it('grows from one pod to five as the difficulty rises', () => {
+    expect(DIFFICULTIES.map((difficulty) => generateLevel(3, difficulty, 'band-3-5').pods.length)).toEqual([
+      1, 2, 3, 3, 4, 5,
+    ]);
   });
 
   it('repeats the same layout for the same seed and moves pods for another seed', () => {
@@ -88,12 +96,38 @@ describe('generateLevel', () => {
   });
 });
 
+/** A generator that always picks the same spot, so only one pod ever fits. */
+const stuck: Random = {
+  next: () => 0.5,
+  int: (min, max) => Math.round((min + max) / 2),
+  pick: (items) => {
+    for (const item of items) return item;
+    throw new RangeError('empty');
+  },
+  shuffle: (items) => [...items],
+  sample: (items, count) => items.slice(0, count),
+};
+
+describe('placePods', () => {
+  it('uses the spread-out layout when random places find no room', () => {
+    const step = stepFor(4);
+    expect(placePods(stuck, step).map((pod) => [pod.x, pod.y])).toEqual([
+      [200, 440],
+      [500, 260],
+      [800, 440],
+    ]);
+  });
+
+  it('keeps a random place when one pod fits', () => {
+    expect(placePods(stuck, stepFor(1))).toEqual([{ id: 'pod-0', x: 500, y: 300, size: 260 }]);
+  });
+});
+
 describe('the fallback layouts', () => {
   it.each(DIFFICULTIES)('fit the rules at difficulty %i', (difficulty) => {
     const step = stepFor(difficulty);
-    const layout = FALLBACK_LAYOUTS[step.count] ?? [];
-    expect(layout).toHaveLength(step.count);
-    const pods = layout.map(([x, y], index) => ({ id: `pod-${String(index)}`, x, y, size: step.size }));
+    expect(step.fallback).toHaveLength(step.count);
+    const pods = step.fallback.map(([x, y], index) => ({ id: `pod-${String(index)}`, x, y, size: step.size }));
     expect(problems(pods, step.gap)).toEqual([]);
   });
 });
@@ -110,6 +144,19 @@ describe('fits', () => {
     ['just clear of the exit', { x: 391, y: 200, size: 100 }, [], true],
     ['touching another pod', pod, [{ x: 830, y: 300, size: 200 }], false],
     ['one gap from another pod', pod, [{ x: 860, y: 340, size: 40 }], true],
+    // Both sides of every boundary, for a pod of size 200 and a gap of 40.
+    ['exactly at the left margin', { ...pod, x: 120, y: 400 }, [], true],
+    ['one unit past the left margin', { ...pod, x: 119, y: 400 }, [], false],
+    ['exactly at the right margin', { ...pod, x: 880 }, [], true],
+    ['one unit past the right margin', { ...pod, x: 881 }, [], false],
+    ['exactly at the top margin', { ...pod, y: 120 }, [], true],
+    ['one unit past the top margin', { ...pod, y: 119 }, [], false],
+    ['exactly at the bottom margin', { ...pod, y: 480 }, [], true],
+    ['one unit past the bottom margin', { ...pod, y: 481 }, [], false],
+    ['exactly clear of the exit', { x: 390, y: 150, size: 100 }, [], true],
+    ['one unit too near the exit', { x: 389, y: 150, size: 100 }, [], false],
+    ['exactly one gap from another pod', pod, [{ x: 840, y: 300, size: 200 }], true],
+    ['one unit closer than a gap', pod, [{ x: 839, y: 300, size: 200 }], false],
   ])('a pod %s fits: %s', (_label, candidate, others, expected) => {
     expect(fits(candidate, others, 40)).toBe(expected);
   });

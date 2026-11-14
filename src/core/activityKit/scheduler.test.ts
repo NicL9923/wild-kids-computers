@@ -61,6 +61,52 @@ describe('createManualScheduler', () => {
     expect(count).toBe(5);
   });
 
+  it('cancelling twice leaves other timers alone', () => {
+    const scheduler = createManualScheduler({ wall: 0 });
+    const ran: string[] = [];
+    const cancel = scheduler.setTimeout(() => ran.push('cancelled'), 10);
+    scheduler.setTimeout(() => ran.push('kept'), 10);
+    cancel();
+    cancel();
+    scheduler.advance(10);
+    expect(ran).toEqual(['kept']);
+  });
+
+  it('counts waiting timers and frames together', () => {
+    const scheduler = createManualScheduler({ wall: 0 });
+    scheduler.setTimeout(() => undefined, 10);
+    scheduler.requestFrame(() => undefined);
+    scheduler.requestFrame(() => undefined);
+    expect(scheduler.pending()).toBe(3);
+    scheduler.stepFrames(1);
+    expect(scheduler.pending()).toBe(0);
+  });
+
+  it('runs every frame callback requested, even the same function twice, between timers', () => {
+    const scheduler = createManualScheduler({ wall: 0 });
+    const ran: string[] = [];
+    const frame = () => ran.push('frame');
+    scheduler.setTimeout(() => undefined, 100);
+    scheduler.requestFrame(frame);
+    scheduler.setTimeout(() => undefined, 100);
+    scheduler.requestFrame(frame);
+    scheduler.stepFrames(1);
+    expect(ran).toEqual(['frame', 'frame']);
+  });
+
+  it('runs frames when no timer is waiting', () => {
+    const scheduler = createManualScheduler({ wall: 0 });
+    let frames = 0;
+    const loop = () => {
+      frames += 1;
+      scheduler.requestFrame(loop);
+    };
+    scheduler.requestFrame(loop);
+    // Sixty frames end a hair after one second, because a frame is 1000 / 60 ms.
+    scheduler.advance(1001);
+    expect(frames).toBe(60);
+  });
+
   it('cancels a timeout before it runs', () => {
     const scheduler = createManualScheduler({ wall: 0 });
     const ran: string[] = [];
@@ -187,6 +233,12 @@ describe('systemScheduler', () => {
     cancel();
     expect(times).toEqual([16]);
     expect(cancelled).toEqual([1]);
+  });
+
+  it('reads the monotonic clock of the page', () => {
+    const first = systemScheduler().monotonic();
+    expect(typeof first).toBe('number');
+    expect(systemScheduler().monotonic()).toBeGreaterThanOrEqual(first);
   });
 
   it('rejects a negative delay', () => {

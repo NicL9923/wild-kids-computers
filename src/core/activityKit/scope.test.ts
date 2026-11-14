@@ -77,6 +77,8 @@ describe('createScope', () => {
       scope.listen(target, 'click', () => ran.push('click')),
     ];
     scope.own(() => ran.push('late cleanup'));
+    // It ran at once, not on some later dispose.
+    expect(ran).toEqual(['late cleanup']);
     scheduler.advance(50);
     target.fire('click', {});
     for (const cancel of cancels) cancel();
@@ -123,6 +125,30 @@ describe('createScope', () => {
     tracked.dispose();
     expect(cancelledAfterRun).toBe(0);
     scope.dispose();
+  });
+
+  it('forgets timeouts and frames that ran, so a long round does not pile them up', () => {
+    const { scheduler, scope } = setup();
+    for (let i = 0; i < 50; i += 1) {
+      scope.setTimeout(() => undefined, i);
+      scope.requestFrame(() => undefined);
+    }
+    scope.setInterval(() => undefined, 10);
+    expect(scope.pending()).toBe(101);
+    scheduler.advance(100);
+    // Only the interval is still owned.
+    expect(scope.pending()).toBe(1);
+    scope.dispose();
+    expect(scope.pending()).toBe(0);
+  });
+
+  it('forgets an item cancelled early', () => {
+    const { scope } = setup();
+    const cancel = scope.setTimeout(() => undefined, 10);
+    const stop = scope.own(() => undefined);
+    cancel();
+    stop();
+    expect(scope.pending()).toBe(0);
   });
 
   it('passes listener options to both add and remove', () => {
