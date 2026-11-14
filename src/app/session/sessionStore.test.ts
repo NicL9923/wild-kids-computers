@@ -91,7 +91,8 @@ const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
  * the I/O edge, so the store's own code runs for real around them.
  */
 function holdReads(fake: FakeBridge, matches: (name: DocumentName) => boolean) {
-  const read = fake.bridge.documents.read;
+  const documents = fake.bridge.documents;
+  const read = documents.read.bind(documents);
   const parked: Array<() => void> = [];
   let releasing = false;
   fake.bridge.documents.read = async (name) => {
@@ -451,13 +452,14 @@ describe('writes', () => {
       const reads = holdReads(fake, (read) => read.startsWith('profile/'));
       // What each profile's settings must end as: every update applied in the order it was made.
       const expected = new Map(profiles.map((profile) => [profile.id, { voiceVolume: 0.5, effectsVolume: 0.6 }]));
-      let activeId: string | null = null;
+      let activeId = random.pick(profiles).id;
+      store.chooseProfile(activeId);
       for (let step = 0; step < 80; step++) {
         const roll = random.next();
         if (roll < 0.25) {
           activeId = random.pick(profiles).id;
           store.chooseProfile(activeId);
-        } else if (roll < 0.6 && activeId !== null) {
+        } else if (roll < 0.6) {
           const update = { [random.pick(fields)]: random.int(0, 10) / 10 };
           store.updateSettings(update);
           const before = expected.get(activeId) ?? { voiceVolume: 0.5, effectsVolume: 0.6 };
@@ -474,9 +476,7 @@ describe('writes', () => {
         const disk = saved(fake, documentNames.settings(profile.id), settingsDocument);
         expect(disk, `seed ${seed}, ${profile.id} on disk`).toMatchObject(expected.get(profile.id) ?? {});
       }
-      if (activeId !== null) {
-        expect(store.getSnapshot().settings, `seed ${seed}, in memory`).toMatchObject(expected.get(activeId) ?? {});
-      }
+      expect(store.getSnapshot().settings, `seed ${seed}, in memory`).toMatchObject(expected.get(activeId) ?? {});
     }
   });
 
