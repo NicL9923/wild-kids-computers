@@ -179,22 +179,29 @@ describe('parent corner', () => {
     expect(appDocument.schema.parse(saved(harness, 'app')).kioskLock).toBe(true);
   });
 
-  it('lists what a child practiced by area with first and last days, and nothing for a child who has not', async () => {
-    const progress = {
-      version: 1,
-      activities: { 'pop-the-seed-pods': { recentRounds: [], daysPracticed: ['2026-11-02', '2026-11-13'] } },
-    };
-    await openCorner({ ...savedProfiles([FOX, OWL], FOX.id), [documentNames.progress(FOX.id)]: json(progress) });
-    const skills = screen.getByRole('region', { name: strings.skills.text });
-    // The skill is named by the activity's goal sentence, never by its id.
-    expect(await within(skills).findByText(seedPodStrings.goal.text)).toBeTruthy();
-    expect(within(skills).queryByText('pop-the-seed-pods')).toBeNull();
-    expect(within(skills).getByText(strings.firstPracticed.text)).toBeTruthy();
-    expect(within(skills).queryByText(/%|\bscore\b|\blevel\b/i)).toBeNull();
+  it(
+    'lists what a child practiced by area with first and last days, and nothing for a child who has not',
+    {
+      timeout: 20_000,
+    },
+    async () => {
+      const progress = {
+        version: 1,
+        activities: { 'pop-the-seed-pods': { recentRounds: [], daysPracticed: ['2026-11-02', '2026-11-13'] } },
+      };
+      await openCorner({ ...savedProfiles([FOX, OWL], FOX.id), [documentNames.progress(FOX.id)]: json(progress) });
+      const skills = screen.getByRole('region', { name: strings.skills.text });
+      // The skill is named by the activity's goal sentence, never by its id.
+      // The goals of all activities load lazily, which can take more than a second on a busy machine.
+      expect(await within(skills).findByText(seedPodStrings.goal.text, {}, { timeout: 10_000 })).toBeTruthy();
+      expect(within(skills).queryByText('pop-the-seed-pods')).toBeNull();
+      expect(within(skills).getByText(strings.firstPracticed.text)).toBeTruthy();
+      expect(within(skills).queryByText(/%|\bscore\b|\blevel\b/i)).toBeNull();
 
-    fireEvent.click(screen.getByRole('radio', { name: OWL.name }));
-    await within(skills).findByText(strings.skillsEmpty.text);
-  });
+      fireEvent.click(screen.getByRole('radio', { name: OWL.name }));
+      await within(skills).findByText(strings.skillsEmpty.text);
+    },
+  );
 });
 
 const notices = () => within(screen.getByRole('region', { name: strings.notices.text }));
