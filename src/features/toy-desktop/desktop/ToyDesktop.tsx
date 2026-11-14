@@ -164,8 +164,12 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
         if (events.length > 0) setNotice((current) => (current === null ? current : null));
         // A window that came forward any way but a click inside it gets keyboard focus.
         const focused = events.findLast((event) => event.type === 'window-focused');
+        // A save or open dialog that closed hands the keyboard back to its window.
+        const closedDialog = events.find((event) => event.type === 'dialog-closed');
         if (focused !== undefined && action.type !== 'focus-window' && focused.type === 'window-focused') {
           setFocusRequest((current) => ({ windowId: focused.windowId, serial: (current?.serial ?? 0) + 1 }));
+        } else if (closedDialog !== undefined && closedDialog.type === 'dialog-closed') {
+          setFocusRequest((current) => ({ windowId: closedDialog.windowId, serial: (current?.serial ?? 0) + 1 }));
         } else if (transition.state.windows.length === 0 && events.some((event) => event.type === 'window-closed')) {
           setFocusRequest((current) => ({ windowId: null, serial: (current?.serial ?? 0) + 1 }));
         }
@@ -185,11 +189,16 @@ export function ToyDesktop({ desktop, kit, band, parts: partsIn, highlight = nul
       root.querySelector<HTMLElement>('.td-icon')?.focus();
       return;
     }
-    const element = root.querySelector<HTMLElement>(`[data-window="${focusRequest.windowId}"]`);
+    // A window with a save or open dialog up is answering it, so the keyboard goes to the dialog.
+    const dialog = root.querySelector<HTMLElement>(`[data-dialog-window="${focusRequest.windowId}"]`);
+    const element = dialog ?? root.querySelector<HTMLElement>(`[data-window="${focusRequest.windowId}"]`);
     if (element === null || element.contains(document.activeElement)) return;
-    // Focus goes to the text of a notepad, ready to type, and otherwise to the window itself, so
-    // opening a window never makes one of its buttons say its name.
-    const target = element.querySelector<HTMLElement>('textarea') ?? element;
+    // Focus goes to the name in a dialog or the text of a notepad, ready to type, and otherwise to
+    // the window itself, so opening a window never makes one of its buttons say its name.
+    const target =
+      dialog === null
+        ? (element.querySelector<HTMLElement>('textarea') ?? element)
+        : (dialog.querySelector<HTMLElement>('input, [data-dialog-item], [data-dialog-action]') ?? dialog);
     target.focus();
   }, [focusRequest]);
 

@@ -1,33 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createManualScheduler } from '../../../core/activityKit/scheduler.ts';
-import { createScope } from '../../../core/activityKit/scope.ts';
 import { buildDesktop, note, picture } from '../model/build.ts';
-import { LessonDesktop, type LessonKit } from '../lessons/harness/LessonDesktop.tsx';
+import { fakeLessonKit } from '../lessons/harness/fakeLessonKit.ts';
+import { LessonDesktop } from '../lessons/harness/LessonDesktop.tsx';
 import type { DesktopParts } from './parts.ts';
-
-/** The kit is the desktop's edge to the shell. Speech is recorded so a test can hear a refusal. */
-function fakeKit(): { kit: LessonKit; spoken: string[] } {
-  const spoken: string[] = [];
-  const kit: LessonKit = {
-    scope: createScope(createManualScheduler({ wall: Date.UTC(2026, 10, 14) })),
-    play: () => undefined,
-    speak: (handle) => {
-      spoken.push(handle.id);
-      return Promise.resolve();
-    },
-    pictures: {
-      list: () => Promise.reject(new Error('no pictures to list')),
-      read: () => Promise.reject(new Error('no pictures to read')),
-    },
-    setInstruction: () => undefined,
-    feedback: { correct: () => undefined, wrong: () => undefined },
-    hint: () => undefined,
-    roundComplete: () => undefined,
-  };
-  return { kit, spoken };
-}
 
 /** A file explorer showing the trash, which holds a picture and a note. */
 const desktop = buildDesktop({
@@ -37,7 +14,7 @@ const desktop = buildDesktop({
 });
 
 function show(parts: DesktopParts) {
-  const fake = fakeKit();
+  const fake = fakeLessonKit();
   const view = render(
     <LessonDesktop level={{ desktop, parts }} band='band-9-12' kit={fake.kit} steps={[{ done: () => false }]} />,
   );
