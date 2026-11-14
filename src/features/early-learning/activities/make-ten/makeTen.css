@@ -1,0 +1,67 @@
+/*
+ * The frame is a row of five big square spaces, two rows for ten, like a classroom ten frame.
+ * Counters already there are solid discs; counters the child adds are open rings with a dot, so
+ * the two kinds differ by shape as well as color.
+ */
+
+.ten-board {
+  grid-auto-flow: row;
+  align-content: center;
+  gap: var(--wk-space-container);
+}
+
+.ten-frame {
+  --ten-rows: 2;
+  min-width: 0;
+  margin: 0;
+  --ten-space: min(100cqw / 5.6, (100cqh - var(--wk-target-min) * 1.8) / var(--ten-rows) * 0.85);
+  display: grid;
+  grid-template-columns: repeat(5, var(--ten-space));
+  grid-auto-rows: var(--ten-space);
+  padding: var(--wk-space-item);
+  border: calc(var(--wk-border-width) * 2) solid var(--wk-color-primary-base);
+  border-radius: var(--wk-radius-control);
+  background: var(--wk-color-primary-base);
+  gap: var(--wk-border-width);
+}
+
+.ten-frame[data-whole='5'] {
+  --ten-rows: 1;
+}
+
+.ten-space {
+  display: grid;
+  place-items: center;
+  min-width: var(--wk-target-min);
+  min-height: var(--wk-target-min);
+  padding: 0;
+  border: 0;
+  background: var(--wk-color-surface);
+  font: inherit;
+}
+
+button.ten-space {
+  cursor: pointer;
+}
+
+button.ten-space:hover:not(:disabled) {
+  background: var(--wk-color-selected);
+}
+
+.ten-counter {
+  display: block;
+  width: 72%;
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border-radius: var(--wk-radius-round);
+  background: var(--wk-color-primary);
+}
+
+.ten-space[data-counter='added'] .ten-counter {
+  border: calc(var(--wk-target-min) * 0.12) solid var(--wk-color-text);
+  background: var(--wk-color-accent);
+}
+
+.ten-sentence {
+  justify-self: center;
+}
