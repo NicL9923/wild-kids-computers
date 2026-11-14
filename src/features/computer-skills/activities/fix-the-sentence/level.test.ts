@@ -4,6 +4,7 @@ import { applyTextOp, createEditor } from '../../../toy-desktop/model/textEditor
 import activity from './activity.ts';
 import {
   changedWord,
+  DENIED_SLIP_WORDS,
   differingRange,
   editDistance,
   generateLevel,
@@ -93,6 +94,19 @@ describe('generateLevel', () => {
         expect(wordsOf(level.start).length - wordsOf(level.target).length, level.start).toBe(
           level.kind === 'extra-word' ? 1 : 0,
         );
+      }
+    }
+  });
+
+  it('drops a letter only from inside a word of four letters or more, so the word still looks like itself', () => {
+    for (const sentence of SENTENCES) {
+      const target = wordsOf(sentence.text).map((word) => word.text);
+      for (const candidate of slipCandidates('missing-letter', sentence)) {
+        const slipped = wordsOf(candidate).map((word) => word.text);
+        const at = slipped.findIndex((word, index) => word !== target[index]);
+        const [whole = '', short = ''] = [target[at], slipped[at]];
+        expect(whole.length, candidate).toBeGreaterThanOrEqual(4);
+        expect([short.at(0), short.at(-1)], candidate).toEqual([whole.at(0), whole.at(-1)]);
       }
     }
   });
@@ -319,6 +333,13 @@ describe('slips never make a denied word', () => {
       expect(candidates.length, sentence.id).toBeGreaterThan(0);
       expect(candidates.filter(hasDeniedWord), sentence.id).toEqual([]);
     }
+  });
+
+  it('lists only words the check can catch, so no entry is a silent gap', () => {
+    // The check compares whole words of letters in lower case. An entry with a capital, a space,
+    // or no letters at all would never match anything.
+    const missed = [...DENIED_SLIP_WORDS].filter((word) => !hasDeniedWord(`The ${word.toUpperCase()} is here.`));
+    expect(missed).toEqual([]);
   });
 
   it('drops "rude", which a changed vowel makes from "ride"', () => {

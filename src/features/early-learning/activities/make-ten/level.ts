@@ -1,5 +1,5 @@
 import type { Band } from '../../../../core/bands.ts';
-import { createRandom } from '../../../../core/activityKit/random.ts';
+import { createRandom, type Random } from '../../../../core/activityKit/random.ts';
 import { nearby, pickChoices } from '../../math/choices.ts';
 
 /**
@@ -56,6 +56,14 @@ export function tierFor(difficulty: number): Tier {
   return tier;
 }
 
+type Fill = (random: Random, indexes: readonly number[], filled: number) => number[];
+
+/** How each order picks the spaces the counters fill. Each order has its own entry, so none passes for another. */
+const FILL: Readonly<Record<Tier['order'], Fill>> = {
+  'in-order': (_random, indexes, filled) => indexes.slice(0, filled),
+  any: (random, indexes, filled) => random.sample(indexes, filled),
+};
+
 /** Pure: the same seed, difficulty, and band give the same round. */
 export function generateLevel(seed: number, difficulty: number, _band: Band): TenLevel {
   const tier = tierFor(difficulty);
@@ -63,7 +71,7 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Te
   const filled = random.int(tier.min, tier.max);
   const answer = tier.whole - filled;
   const indexes = Array.from({ length: tier.whole }, (_, index) => index);
-  const taken = new Set(tier.order === 'any' ? random.sample(indexes, filled) : indexes.slice(0, filled));
+  const taken = new Set(FILL[tier.order](random, indexes, filled));
   const spaces = indexes.map((index) => taken.has(index));
   // The mistake children make most is the number already there; then numbers near the answer.
   const choices = pickChoices(
