@@ -26,6 +26,8 @@ test('system clipboard text cannot be pasted in, and copied text does not leave'
   // Other workers on this display share the clipboard, so it is held until the last check.
   await withSystemClipboard(async () => {
     const { page } = launched;
+    // The first launch screen moves focus when it mounts, so the probe goes in only after it has.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await writeSystemClipboard(launched, 'adult password');
     await page.evaluate(() => {
       const field = document.createElement('textarea');
@@ -43,6 +45,8 @@ test('system clipboard text cannot be pasted in, and copied text does not leave'
     await expect(field).toHaveValue('');
 
     await page.keyboard.type('a picture of a fox');
+    // Every later step depends on the text being there; an empty field would pass the cut check.
+    await expect(field).toHaveValue('a picture of a fox');
     await page.keyboard.press(`${primary}+A`);
     await page.keyboard.press(`${primary}+C`);
     expect(await readSystemClipboard()).toBe('adult password');
