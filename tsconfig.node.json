@@ -6,5 +6,8 @@
     "moduleResolution": "NodeNext",
     "types": ["node"]
   },
-  "include": ["electron/main", "tools", "vite.config.ts"]
+  // Tools share the string and clip-naming code with the app. Vitest tasks import the registries,
+  // which need Vite's types, so tsconfig.test.json checks them instead.
+  "include": ["electron/main", "tools", "src/core/strings", "vite.config.ts"],
+  "exclude": ["tools/tasks/*.task.ts"]
 }

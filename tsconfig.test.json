@@ -8,5 +8,12 @@
   },
   // Unit tests, end-to-end tests, and the source they import. tsconfig.app.json checks the
   // same source again without Node types, which keeps Node out of the renderer.
-  "include": ["src", "e2e", "playwright.config.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "playwright.config.ts",
+    "tools/tasks/*.task.ts",
+    "tools/voiceCheck.ts",
+    "tools/voice/spokenList.ts"
+  ]
 }
