@@ -31,19 +31,23 @@ test.afterEach(async () => {
  */
 async function holdStylesheets(page: Page, fragment: string): Promise<{ release: () => Promise<void> }> {
   await page.evaluate((held) => {
+    const head = document.head;
     const waiting: Node[] = [];
-    const append = HTMLHeadElement.prototype.appendChild;
+    const appendNow = head.appendChild.bind(head);
     Reflect.set(window, 'wkcReleaseStylesheets', () => {
-      HTMLHeadElement.prototype.appendChild = append;
-      for (const node of waiting.splice(0)) append.call(document.head, node);
+      Reflect.deleteProperty(head, 'appendChild');
+      for (const node of waiting.splice(0)) appendNow(node);
     });
-    HTMLHeadElement.prototype.appendChild = function <T extends Node>(this: HTMLHeadElement, node: T): T {
-      if (node instanceof HTMLLinkElement && node.href.includes(held)) {
-        waiting.push(node);
-        return node;
-      }
-      return append.call(this, node) as T;
-    };
+    Object.defineProperty(head, 'appendChild', {
+      configurable: true,
+      value: (node: Node): Node => {
+        if (node instanceof HTMLLinkElement && node.href.includes(held)) {
+          waiting.push(node);
+          return node;
+        }
+        return appendNow(node);
+      },
+    });
   }, fragment);
   return {
     release: () =>
@@ -135,8 +139,9 @@ for (const band of BANDS) {
   });
 }
 
+const profilesFile = (dataDir: string) => path.join(dataDir, 'profiles.json');
+
 test('when the saved profiles cannot be read, the app says so calmly, keeps them, and opens them on try again', async () => {
-  const profilesFile = (dataDir: string) => path.join(dataDir, 'profiles.json');
   launched = await launchApp(
     { band: 'band-9-12' },
     {
