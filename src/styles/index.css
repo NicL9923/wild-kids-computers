@@ -1,2 +1,133 @@
 @import 'tailwindcss';
 @import './tokens.css';
+@import './fonts.css';
+@import '../components/ui/ui.css';
+
+/*
+ * Tailwind's own palette, type scale, radii, and shadows are removed, so a utility such as
+ * bg-red-500 or text-xl does not exist and cannot slip in. Every utility below reads a token.
+ */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+}
+
+@theme inline {
+  --color-page: var(--wk-color-page);
+  --color-surface: var(--wk-color-surface);
+  --color-surface-sunken: var(--wk-color-surface-sunken);
+  --color-divider: var(--wk-color-divider);
+  --color-scrim: var(--wk-color-scrim);
+  --color-text: var(--wk-color-text);
+  --color-text-muted: var(--wk-color-text-muted);
+  --color-border: var(--wk-color-border);
+  --color-primary: var(--wk-color-primary);
+  --color-primary-hover: var(--wk-color-primary-hover);
+  --color-on-primary: var(--wk-color-on-primary);
+  --color-selected: var(--wk-color-selected);
+  --color-accent: var(--wk-color-accent);
+  --color-on-accent: var(--wk-color-on-accent);
+  --color-danger: var(--wk-color-danger);
+  --color-on-danger: var(--wk-color-on-danger);
+  --color-success: var(--wk-color-success);
+  --color-on-success: var(--wk-color-on-success);
+  --color-focus: var(--wk-color-focus);
+  --color-meadow-sky: var(--wk-color-meadow-sky);
+  --color-meadow-grass: var(--wk-color-meadow-grass);
+
+  --font-sans: var(--wk-font-family);
+  --font-weight-regular: var(--wk-font-weight-regular);
+  --font-weight-bold: var(--wk-font-weight-bold);
+
+  --text-small: var(--wk-text-small);
+  --text-small--line-height: var(--wk-line-height);
+  --text-body: var(--wk-text-body);
+  --text-body--line-height: var(--wk-line-height);
+  --text-title: var(--wk-text-title);
+  --text-title--line-height: var(--wk-line-height-tight);
+  --text-display: var(--wk-text-display);
+  --text-display--line-height: var(--wk-line-height-tight);
+
+  --spacing: var(--wk-space-unit);
+  --spacing-item: var(--wk-space-item);
+  --spacing-container: var(--wk-space-container);
+  --spacing-section: var(--wk-space-section);
+  --spacing-edge: var(--wk-space-screen-edge);
+  --spacing-target: var(--wk-target-min);
+  --spacing-target-large: var(--wk-target-large);
+  --spacing-icon: var(--wk-icon-size);
+
+  --radius-small: var(--wk-radius-small);
+  --radius-control: var(--wk-radius-control);
+  --radius-card: var(--wk-radius-card);
+  --radius-round: var(--wk-radius-round);
+
+  --shadow-raised: var(--wk-shadow-raised);
+  --shadow-overlay: var(--wk-shadow-overlay);
+
+  --ease-out: var(--wk-ease-out);
+  --ease-in-out: var(--wk-ease-in-out);
+}
+
+@layer base {
+  html {
+    font-family: var(--wk-font-family);
+    font-size: var(--wk-text-body);
+    line-height: var(--wk-line-height);
+    letter-spacing: var(--wk-letter-spacing);
+    word-spacing: var(--wk-word-spacing);
+    color: var(--wk-color-text);
+    background: var(--wk-color-page);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  /* One focus ring for every focusable element. Components never remove it. */
+  :focus-visible {
+    outline: var(--wk-focus-width) solid var(--wk-color-focus);
+    outline-offset: var(--wk-focus-offset);
+  }
+
+  img,
+  svg {
+    -webkit-user-drag: none;
+  }
+}
+
+@layer components {
+  /* Hidden on screen, still read by assistive technology. */
+  .wk-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /*
+   * Text that helps a reader but must not be needed. The youngest band does not see it; a
+   * screen reader still reads it, so the control keeps its name.
+   */
+  [data-band='band-3-5'] .wk-reading-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

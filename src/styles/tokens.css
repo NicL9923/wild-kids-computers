@@ -1,8 +1,122 @@
 /*
- * Design tokens. Every size, color, radius, and duration lives here as a custom property.
- * A band theme is a data-band attribute on the app root. :root carries the youngest band's
- * values so that anything rendered before a profile loads uses the largest targets.
+ * Design tokens. Every size, color, radius, shadow, and duration lives here as a custom property.
+ *
+ * The app root (<html>) carries the theme as attributes, set by src/app/theme/:
+ * - data-band: band-3-5, band-6-8, or band-9-12. :root carries the youngest band's values, so
+ *   anything rendered before a profile loads uses the largest targets and text.
+ * - data-text-size: large or larger. Absent means standard.
+ * - data-letter-spacing: wide or wider. Absent means standard.
+ * - data-motion: reduce or full. Absent means follow the operating system.
+ *
+ * Color pairings that carry text or icons are declared in colorPairings.ts. A unit test checks
+ * each one against WCAG 2.2 AA, so change a color here and the test tells you what it broke.
+ * Color values are six-digit hex so the test can read them.
  */
+
+:root {
+  /* ---- color: surfaces ---- */
+  --wk-color-page: #eef5e6;
+  --wk-color-surface: #ffffff;
+  --wk-color-surface-sunken: #dfebd3;
+  --wk-color-divider: #c9d9c0;
+  --wk-color-scrim: rgb(29 49 36 / 0.55);
+
+  /* ---- color: text and lines ---- */
+  --wk-color-text: #1d3124;
+  --wk-color-text-muted: #4a5d4f;
+  /* A boundary that identifies a control. Needs 3:1 against what it sits on. */
+  --wk-color-border: #6f8873;
+
+  /* ---- color: actions ---- */
+  --wk-color-primary: #2c5fae;
+  --wk-color-primary-hover: #234d8f;
+  --wk-color-primary-base: #1a3a6e;
+  --wk-color-on-primary: #ffffff;
+  --wk-color-secondary-base: #a9bba6;
+  --wk-color-selected: #dce8f8;
+  --wk-color-accent: #f5c542;
+  --wk-color-on-accent: #1d3124;
+  --wk-color-danger: #b3322a;
+  --wk-color-danger-hover: #952820;
+  --wk-color-danger-base: #6e1c16;
+  --wk-color-on-danger: #ffffff;
+  --wk-color-success: #2f7a45;
+  --wk-color-on-success: #ffffff;
+  --wk-color-focus: #6b2d8f;
+
+  /* ---- color: the meadow behind the home map, matched to assets/art/home/meadow.svg ---- */
+  --wk-color-meadow-sky: #bfe0ef;
+  --wk-color-meadow-grass: #8cc372;
+
+  /* ---- color: profile colors (Okabe-Ito), each with a mark color for its shape ---- */
+  --wk-profile-sun: #f0e442;
+  --wk-profile-sun-mark: #1d3124;
+  --wk-profile-marigold: #e69f00;
+  --wk-profile-marigold-mark: #1d3124;
+  --wk-profile-poppy: #d55e00;
+  --wk-profile-poppy-mark: #ffffff;
+  --wk-profile-sky: #56b4e9;
+  --wk-profile-sky-mark: #1d3124;
+  --wk-profile-lake: #0072b2;
+  --wk-profile-lake-mark: #ffffff;
+  --wk-profile-fern: #009e73;
+  --wk-profile-fern-mark: #1d3124;
+  --wk-profile-clover: #cc79a7;
+  --wk-profile-clover-mark: #1d3124;
+  --wk-profile-night: #3b4252;
+  --wk-profile-night-mark: #ffffff;
+
+  /* ---- type ---- */
+  --wk-font-family: 'Andika', system-ui, sans-serif;
+  --wk-font-weight-regular: 400;
+  --wk-font-weight-bold: 700;
+  --wk-line-height: 1.45;
+  --wk-line-height-tight: 1.2;
+  /* A parent changes these two in the parent corner. */
+  --wk-text-scale: 1;
+  --wk-letter-spacing: 0em;
+  --wk-word-spacing: 0em;
+  /* Base sizes per band. Components use the scaled --wk-text-* values below, never these. */
+  --wk-font-small: 20px;
+  --wk-font-body: 24px;
+  --wk-font-title: 32px;
+  --wk-font-display: 44px;
+
+  /* ---- spacing: a 4 px unit, and three steps that grow with grouping ---- */
+  --wk-space-unit: 4px;
+  --wk-space-item: 12px;
+  --wk-space-container: 24px;
+  --wk-space-section: 48px;
+  --wk-space-screen-edge: 24px;
+
+  /* ---- targets ---- */
+  --wk-target-min: 72px;
+
+  /* ---- shape ---- */
+  --wk-radius-small: 10px;
+  --wk-radius-control: 18px;
+  --wk-radius-card: 28px;
+  --wk-radius-round: 9999px;
+  --wk-border-width: 2px;
+  /* Buttons stand on a darker base, like a key, and press down into it. */
+  --wk-press-depth: 4px;
+  --wk-shadow-raised: 0 2px 0 rgb(29 49 36 / 0.1), 0 8px 20px rgb(29 49 36 / 0.1);
+  --wk-shadow-overlay: 0 24px 64px rgb(29 49 36 / 0.28);
+
+  /* ---- focus ---- */
+  --wk-focus-width: 4px;
+  --wk-focus-offset: 3px;
+
+  /* ---- motion. Movement multiplies by --wk-motion-scale, which reduced motion sets to 0. ---- */
+  --wk-duration-quick: 140ms;
+  --wk-duration-base: 220ms;
+  --wk-duration-calm: 420ms;
+  --wk-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --wk-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --wk-motion-scale: 1;
+}
+
+/* ---- bands ---- */
 
 :root,
 [data-band='band-3-5'] {
@@ -11,8 +125,70 @@
 
 [data-band='band-6-8'] {
   --wk-target-min: 56px;
+  --wk-font-small: 18px;
+  --wk-font-body: 21px;
+  --wk-font-title: 28px;
+  --wk-font-display: 38px;
 }
 
 [data-band='band-9-12'] {
   --wk-target-min: 44px;
+  --wk-font-small: 15px;
+  --wk-font-body: 17px;
+  --wk-font-title: 24px;
+  --wk-font-display: 32px;
+  --wk-space-screen-edge: 20px;
+  --wk-radius-control: 14px;
+  --wk-radius-card: 22px;
+  --wk-press-depth: 3px;
+}
+
+/*
+ * Derived tokens. A custom property that uses var() resolves on the element that declares it,
+ * so these are declared again on every element that can change an input. That lets a band or
+ * text size apply to a nested element, such as one band preview inside the component gallery.
+ */
+:root,
+[data-band],
+[data-text-size],
+[data-letter-spacing] {
+  --wk-text-small: calc(var(--wk-font-small) * var(--wk-text-scale));
+  --wk-text-body: calc(var(--wk-font-body) * var(--wk-text-scale));
+  --wk-text-title: calc(var(--wk-font-title) * var(--wk-text-scale));
+  --wk-text-display: calc(var(--wk-font-display) * var(--wk-text-scale));
+  /* Picture choices such as tiles and home map places are at least twice the minimum. */
+  --wk-target-large: calc(var(--wk-target-min) * 2);
+  --wk-icon-size: calc(var(--wk-target-min) * 0.62);
+}
+
+/* ---- parent settings ---- */
+
+[data-text-size='large'] {
+  --wk-text-scale: 1.25;
+}
+
+[data-text-size='larger'] {
+  --wk-text-scale: 1.5;
+}
+
+[data-letter-spacing='wide'] {
+  --wk-letter-spacing: 0.06em;
+  --wk-word-spacing: 0.12em;
+}
+
+[data-letter-spacing='wider'] {
+  --wk-letter-spacing: 0.12em;
+  --wk-word-spacing: 0.24em;
+}
+
+/* ---- reduced motion: follow the system unless a parent forced it ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) {
+    --wk-motion-scale: 0;
+  }
+}
+
+:root[data-motion='reduce'] {
+  --wk-motion-scale: 0;
 }

@@ -18,7 +18,15 @@ declare global {
  * page could not already do: the page can call window.wkBridge or its own IndexedDB directly.
  */
 export async function installTestHook(bridge: PlatformBridge, location: Location): Promise<void> {
+  if (await isTestRun(bridge, location)) window.wkcTest = { bridge };
+}
+
+/**
+ * Whether this page runs under an end-to-end test: the Electron app with WKC_TEST=1, or the
+ * browser build with a `wkc-test` query parameter. Dev-only screens such as the component gallery
+ * also open in a test run.
+ */
+export async function isTestRun(bridge: PlatformBridge, location: Location): Promise<boolean> {
   const info = await bridge.info();
-  const enabled = info.isElectron ? info.test !== undefined : new URLSearchParams(location.search).has('wkc-test');
-  if (enabled) window.wkcTest = { bridge };
+  return info.isElectron ? info.test !== undefined : new URLSearchParams(location.search).has('wkc-test');
 }
