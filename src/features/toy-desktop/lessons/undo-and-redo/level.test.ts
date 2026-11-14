@@ -8,7 +8,8 @@ import { findWindow, type DesktopState } from '../../model/state.ts';
 import { LESSON_DESKTOP_SIZE } from '../harness/lesson.ts';
 import { playSteps } from '../harness/playSteps.ts';
 import activity from './activity.ts';
-import { DOT_STEPS, generateLevel, type UndoRedoLevel } from './level.ts';
+import { TUNE_NOTES } from '../../model/apps/tune.ts';
+import { DOT_ROWS, DOT_STEPS, generateLevel, type UndoRedoLevel } from './level.ts';
 import { undoRedoSay, undoRedoSteps } from './steps.ts';
 import { strings } from './strings.ts';
 
@@ -49,6 +50,8 @@ function problems(level: UndoRedoLevel): string[] {
       if (dotOn(desktop, level) !== true) found.push('the music box does not show the dot');
       if (window.app.undo.length !== 1) found.push('the music box has more than the dot to undo');
       if ((level.dot?.step ?? DOT_STEPS) >= DOT_STEPS) found.push('the dot is past the steps every screen shows');
+      // Rows go from the highest note at the top; only the top rows show on every screen.
+      if ((level.dot?.note ?? 0) < TUNE_NOTES - DOT_ROWS) found.push('the dot is below the rows every screen shows');
     }
     if (window !== undefined) {
       const { x, y, width, height } = window.rect;

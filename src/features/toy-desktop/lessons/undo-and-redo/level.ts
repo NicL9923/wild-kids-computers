@@ -31,10 +31,11 @@ export const SENTENCES: readonly (readonly [string, string])[] = [
 ];
 
 /**
- * Steps of the music box the added dot can be on. The first steps show without scrolling on every
- * screen, so the child sees the dot go and come back.
+ * Where the added dot can be: the first steps and the top rows, the highest notes, which show
+ * without scrolling on every screen, so the child sees the dot go and come back.
  */
 export const DOT_STEPS = 4;
+export const DOT_ROWS = 3;
 
 export interface UndoRedoLevel extends LessonLevel {
   /** The apps to undo and redo in, in order. */
@@ -93,9 +94,9 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Un
   const [before, word] = random.pick(SENTENCES);
   const song = random.pick(LESSON_TUNES);
   const taken = new Set(song.on.map(([step, note]) => `${String(step)}:${String(note)}`));
-  const free = Array.from({ length: DOT_STEPS * TUNE_NOTES }, (_, index) => ({
-    step: Math.floor(index / TUNE_NOTES),
-    note: index % TUNE_NOTES,
+  const free = Array.from({ length: DOT_STEPS * DOT_ROWS }, (_, index) => ({
+    step: Math.floor(index / DOT_ROWS),
+    note: TUNE_NOTES - 1 - (index % DOT_ROWS),
   })).filter(({ step, note }) => !taken.has(`${String(step)}:${String(note)}`));
   const dot = random.pick(free);
 

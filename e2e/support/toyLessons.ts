@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import type { Band } from '../../src/core/bands.ts';
+import type { LaunchedApp } from './launchApp.ts';
 import { smallestTargets } from './toyDesktop.ts';
 
 /**
@@ -60,4 +61,34 @@ export async function expectHitArea(page: Page, band: Band, control: Locator): P
     );
     expect(hit, `a click at ${String(point.x)}, ${String(point.y)} reaches the control`).toBe(true);
   }
+}
+
+/** The modifier of a shortcut on the computer running the tests, as Electron's input events name it. */
+const NATIVE_PRIMARY = process.platform === 'darwin' ? 'meta' : 'control';
+
+/**
+ * Presses a shortcut, the primary modifier with a key and Shift when asked, through
+ * `webContents.sendInputEvent`: the path a real keyboard takes, which also reaches the
+ * application menu's edit shortcuts. Playwright's keyboard skips that path.
+ */
+export async function pressShortcut(app: LaunchedApp, keyCode: string, shift = false): Promise<void> {
+  const modifiers = shift ? [NATIVE_PRIMARY, 'shift'] : [NATIVE_PRIMARY];
+  await app.app.evaluate(
+    ({ BrowserWindow }, press) => {
+      const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+      if (contents === undefined) throw new Error('No window.');
+      contents.focus();
+      contents.sendInputEvent({ type: 'keyDown', keyCode: press.keyCode, modifiers: press.modifiers });
+      contents.sendInputEvent({ type: 'keyUp', keyCode: press.keyCode, modifiers: press.modifiers });
+    },
+    { keyCode, modifiers },
+  );
+}
+
+/** The app inside a window shows whole, with nothing to scroll to: no key or picture is cut off. */
+export async function expectWholeApp(window: Locator): Promise<void> {
+  const overflow = await window
+    .locator('.td-window-body')
+    .evaluate((body) => ({ x: body.scrollWidth - body.clientWidth, y: body.scrollHeight - body.clientHeight }));
+  expect(overflow).toEqual({ x: 0, y: 0 });
 }

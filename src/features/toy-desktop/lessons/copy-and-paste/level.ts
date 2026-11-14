@@ -87,13 +87,15 @@ export function generateLevel(seed: number, difficulty: number, _band: Band): Co
   const built = buildDesktop({
     size: LESSON_DESKTOP_SIZE,
     windows: [
+      // Side by side and clear of the icons. The calculator is tall enough that its
+      // display and keys fit at the band-6-8 target size on the smallest screen.
       {
         app: 'notepad',
         text: fromCalculator ? ANSWER_LEAD : number,
-        at: { x: 24, y: 32 },
-        size: { width: 380, height: 360 },
+        at: { x: 24, y: 24 },
+        size: { width: 340, height: 360 },
       },
-      { app: 'calculator', at: { x: 424, y: 24 }, size: { width: 280, height: 440 } },
+      { app: 'calculator', at: { x: 388, y: 24 }, size: { width: 316, height: 540 } },
     ],
     // The child starts where the number is.
     focus: fromCalculator ? 1 : 0,
