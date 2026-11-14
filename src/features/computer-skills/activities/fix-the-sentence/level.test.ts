@@ -7,11 +7,13 @@ import {
   differingRange,
   editDistance,
   generateLevel,
+  hasDeniedWord,
   MAX_FIX_DIFFICULTY,
   SENTENCES,
+  slipCandidates,
   STEPS,
-  wordsOf,
   type FixLevel,
+  wordsOf,
 } from './level.ts';
 import { strings } from './strings.ts';
 import { CAP_KEYS, capLabel, SENTENCE_SPEECH, tipFor } from './tips.ts';
@@ -300,5 +302,37 @@ describe('tips', () => {
       backspace: 'Backspace',
       delete: 'Delete',
     });
+  });
+});
+
+describe('slips never make a denied word', () => {
+  const KINDS = ['extra-letter', 'missing-letter', 'changed-letter', 'extra-word', 'changed-word'] as const;
+
+  it('starts from sentences with no denied word', () => {
+    expect(SENTENCES.filter((sentence) => hasDeniedWord(sentence.text)).map((sentence) => sentence.id)).toEqual([]);
+  });
+
+  // Every slip each rule can make for every sentence, so no seed can reach a word left out.
+  it.each(KINDS)('every %s slip of every sentence reads without a denied word, and one is always left', (kind) => {
+    for (const sentence of SENTENCES) {
+      const candidates = slipCandidates(kind, sentence);
+      expect(candidates.length, sentence.id).toBeGreaterThan(0);
+      expect(candidates.filter(hasDeniedWord), sentence.id).toEqual([]);
+    }
+  });
+
+  it('drops "rude", which a changed vowel makes from "ride"', () => {
+    const bus = SENTENCES.find((sentence) => sentence.id === 'busPark');
+    if (bus === undefined) throw new Error('The bus sentence is missing');
+    expect(slipCandidates('changed-letter', bus)).not.toContain('We rude the bus to the park.');
+    expect(slipCandidates('changed-letter', bus)).toContain('We rade the bus to the park.');
+  });
+
+  it.each([
+    ['a whole denied word', 'We ride the bus to the HELL.', true],
+    ['a denied word inside a longer one', 'The shell is here.', false],
+    ['no denied word', 'We ride the bus.', false],
+  ])('hasDeniedWord on %s', (_label, text, expected) => {
+    expect(hasDeniedWord(text)).toBe(expected);
   });
 });
