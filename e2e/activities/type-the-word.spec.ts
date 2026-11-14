@@ -45,7 +45,7 @@ forEachBand(activity.bands, (band) => {
     await expect(stage(page)).toHaveAttribute('data-word', first.id);
     // Replay says "Type the word" and the word itself.
     await expectInstructionSpoken(page, strings.type);
-    expect(await spokenIds(page)).toContain(emojiNames[first.id].id);
+    await expect.poll(async () => spokenIds(page)).toContain(emojiNames[first.id].id);
     // The youngest steps light the next key on the keyboard picture.
     await expect(page.locator(`[data-key="${letterCode(first.letters[0] ?? 'a')}"]`)).toHaveAttribute(
       'data-mark',

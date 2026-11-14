@@ -70,7 +70,7 @@ forEachBand(activity.bands, (band) => {
     await expect(field(page)).toHaveValue(level.start);
     // Replay says to make it say the sentence, and says the sentence.
     await expectInstructionSpoken(page, strings.itSays);
-    expect(await spokenIds(page)).toContain(SENTENCE_SPEECH[level.sentence].id);
+    await expect.poll(async () => spokenIds(page)).toContain(SENTENCE_SPEECH[level.sentence].id);
     // The slip is marked at the low steps.
     await expect(page.locator('.fix-mark')).toBeVisible();
     await saveBandScreenshot(page, band, activity.id);
