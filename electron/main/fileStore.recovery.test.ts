@@ -99,8 +99,19 @@ async function atEveryStep(
       () => 'done' as const,
       () => 'failed' as const,
     );
-    // A crash never settles. Give the store time to reach the stalled step.
-    const outcome = await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 200, 'stalled'))]);
+    // A crash never settles, so wait until the store has reached the stalled step. An error does
+    // settle, so wait for it. Neither waits on a fixed delay, which a busy machine can outlast.
+    let settled = false;
+    const reachedStall = new Promise<'stalled'>((resolve) => {
+      const look = (): void => {
+        if (settled) return;
+        if (fault.steps >= at) resolve('stalled');
+        else setTimeout(look, 2);
+      };
+      look();
+    });
+    const outcome = await (mode === 'crash' ? Promise.race([pending, reachedStall]) : pending);
+    settled = true;
     const stopped = fault.steps >= at;
     fault.at = 0;
     const stoppedOutcome = mode === 'crash' ? 'stalled' : 'failed';
