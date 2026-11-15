@@ -93,10 +93,11 @@ case $kind in
   pacman | deb | rpm)
     check_libraries "$install_dir"
     note sandbox_helper_mode "$(stat -c '%a %U' "$install_dir/chrome-sandbox")"
-    if [ "$ID" = ubuntu ]; then
+    if [ "$ID" = ubuntu ] && [ "${VERSION_ID%%.*}" -ge 24 ]; then
       # Ubuntu 24.04 and later need the AppArmor profile the deb installs to let the sandbox make
       # user namespaces. The container has no AppArmor to load it into, so this parses it the way
-      # the install script's own dry run does.
+      # the install script's own dry run does. Ubuntu 22.04 has no such restriction, and its
+      # AppArmor 3 cannot read the profile, so the install script skips it there.
       pm_install apparmor
       if apparmor_parser --skip-kernel-load --debug "$install_dir/resources/apparmor-profile" > "$out/apparmor.log" 2>&1; then
         note apparmor_profile_parses yes
