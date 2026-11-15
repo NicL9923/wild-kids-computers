@@ -6,8 +6,10 @@
 #
 #   session.sh <out-dir> <command...>
 #
-# The compositor is sway, or Hyprland when WKC_COMPOSITOR=hyprland. Results go to
-# <out-dir>/session.txt as key=value lines; run-check.sh reads them.
+# The compositor is sway on its headless backend with the pixman software renderer, a wlroots
+# compositor that runs without a GPU. Hyprland needs a DRM device and a seat, which a container
+# without a GPU lacks (see tools/packaging/README.md). Results go to <out-dir>/session.txt as
+# key=value lines; run-check.sh reads them.
 set -euo pipefail
 
 out=$1
@@ -18,7 +20,6 @@ result="$out/session.txt"
 note() { printf '%s=%s\n' "$1" "$2" >> "$result"; }
 
 app_id=wild-kids-computers
-compositor=${WKC_COMPOSITOR:-sway}
 here=$(dirname "$(readlink -f "$0")")
 
 XDG_RUNTIME_DIR=$(mktemp -d)
@@ -29,24 +30,12 @@ unset DISPLAY WAYLAND_DISPLAY
 # A Wayland login sets this. Electron 38 and later choose Wayland from it.
 export XDG_SESSION_TYPE=wayland
 
-case $compositor in
-  sway)
-    export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1
-    # The host's GPU driver can show through the container. sway draws with pixman here and never
-    # touches it, so its driver check does not apply.
-    sway --unsupported-gpu --config "$here/sway.conf" > "$out/compositor.log" 2>&1 &
-    ;;
-  hyprland)
-    export AQ_NO_KMS_REQUIREMENT=1 LIBGL_ALWAYS_SOFTWARE=1
-    Hyprland --config "$here/hyprland.conf" > "$out/compositor.log" 2>&1 &
-    ;;
-  *)
-    echo "Unknown compositor $compositor" >&2
-    exit 2
-    ;;
-esac
+export WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1
+# The host's GPU driver can show through the container. sway draws with pixman here and never
+# touches it, so its driver check does not apply.
+sway --unsupported-gpu --config "$here/sway.conf" > "$out/compositor.log" 2>&1 &
 compositor_pid=$!
-note compositor "$compositor"
+note compositor sway
 
 for _ in $(seq 1 100); do
   socket=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'wayland-*' ! -name '*.lock' -print -quit)
@@ -60,31 +49,19 @@ fi
 note compositor_started yes
 export WAYLAND_DISPLAY
 WAYLAND_DISPLAY=$(basename "$socket")
-if [ "$compositor" = sway ]; then
-  SWAYSOCK=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'sway-ipc.*' -print -quit)
-  export SWAYSOCK
-fi
+SWAYSOCK=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'sway-ipc.*' -print -quit)
+export SWAYSOCK
 
 # The window this app id names, as JSON with app_id, shell, and size, or nothing.
 find_window() {
-  if [ "$compositor" = sway ]; then
-    swaymsg -t get_tree 2> /dev/null |
-      jq -c --arg id "$app_id" '[.. | objects | select(.app_id? == $id)] | first // empty
-        | {app_id, shell, width: .rect.width, height: .rect.height, fullscreen: .fullscreen_mode}'
-  else
-    hyprctl clients -j 2> /dev/null |
-      jq -c --arg id "$app_id" '[.[] | select(.class == $id)] | first // empty
-        | {app_id: .class, shell: (if .xwayland then "xwayland" else "xdg_shell" end),
-           width: .size[0], height: .size[1], fullscreen: .fullscreen}'
-  fi
+  swaymsg -t get_tree 2> /dev/null |
+    jq -c --arg id "$app_id" '[.. | objects | select(.app_id? == $id)] | first // empty
+      | {app_id, shell, width: .rect.width, height: .rect.height, fullscreen: .fullscreen_mode}'
 }
 
+# The same xdg_toplevel close event Hyprland's killactive and Omarchy's Super+W send.
 close_window() {
-  if [ "$compositor" = sway ]; then
-    swaymsg "[app_id=\"$app_id\"] kill" > /dev/null
-  else
-    hyprctl dispatch closewindow "class:^($app_id)$" > /dev/null
-  fi
+  swaymsg "[app_id=\"$app_id\"] kill" > /dev/null
 }
 
 "$@" > "$out/app.log" 2>&1 &
@@ -99,7 +76,7 @@ for _ in $(seq 1 600); do
 done
 if [ -z "$window" ]; then
   note window_mapped no
-  if [ "$compositor" = sway ]; then swaymsg -t get_tree > "$out/tree.json" 2>&1 || true; fi
+  swaymsg -t get_tree > "$out/tree.json" 2>&1 || true
   kill "$app_pid" 2> /dev/null || true
   kill "$compositor_pid" 2> /dev/null || true
   exit 1

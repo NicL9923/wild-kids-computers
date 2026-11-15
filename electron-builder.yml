@@ -88,6 +88,8 @@ linux:
 # on a minimal Ubuntu 24.04, apt satisfied a bare libasound2 with liboss4-salsa-asound2, which
 # lacks ALSA symbols Electron needs, and the app could not start.
 pacman:
+  afterInstall: packaging/linux/after-install.tpl
+  afterRemove: packaging/linux/after-remove.tpl
   artifactName: ${name}-${version}-1-x86_64.pkg.tar.zst
   compression: zstd
   depends:
@@ -116,9 +118,13 @@ pacman:
     - pango
     - systemd-libs
   fpm:
+    - --after-upgrade
+    - packaging/linux/pacman-after-upgrade.sh
     - LICENSE=/usr/share/licenses/wild-kids-computers/LICENSE
 
 deb:
+  afterInstall: packaging/linux/after-install.tpl
+  afterRemove: packaging/linux/after-remove.tpl
   depends:
     - 'libasound2t64 | libasound2'
     - 'libatk-bridge2.0-0t64 | libatk-bridge2.0-0'
@@ -153,6 +159,8 @@ deb:
 # Library names rather than package names, as rpm's own dependency generator writes them, so one
 # list resolves on Fedora and openSUSE alike.
 rpm:
+  afterInstall: packaging/linux/after-install.tpl
+  afterRemove: packaging/linux/after-remove.tpl
   depends:
     - libasound.so.2()(64bit)
     - libatk-1.0.so.0()(64bit)

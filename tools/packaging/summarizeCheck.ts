@@ -70,6 +70,7 @@ export function checkProblems(result: Map<string, string>, session: Map<string, 
   if (PACKAGE_KINDS.has(kind)) {
     const icons = Number(result.get('desktop_icon') ?? '0');
     if (!(icons > 0)) problems.push('the package installed no icon under /usr/share/icons/hicolor');
+    expect(result, 'command_after_reinstall', 'yes', 'the command was gone after a reinstall, as after an upgrade');
     expect(result, 'removed_cleanly', 'yes', 'removing the package left files behind');
   }
   if (result.has('apparmor_profile_parses')) {

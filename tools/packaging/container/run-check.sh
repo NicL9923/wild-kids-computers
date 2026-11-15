@@ -105,6 +105,14 @@ case $kind in
       fi
     fi
     note command "$(readlink -f /usr/bin/$app || echo missing)"
+    # A reinstall runs the scripts an upgrade runs: the old package's remove script and the new
+    # one's install or upgrade script. The command link must survive it.
+    case $kind in
+      pacman) pacman -U --noconfirm "$artifact" > "$out/reinstall.log" 2>&1 ;;
+      deb) apt-get install -y --reinstall "$artifact" > "$out/reinstall.log" 2>&1 ;;
+      rpm) dnf reinstall -y "$artifact" > "$out/reinstall.log" 2>&1 ;;
+    esac
+    if [ -x "/usr/bin/$app" ]; then note command_after_reinstall yes; else note command_after_reinstall no; fi
     desktop=/usr/share/applications/$app.desktop
     [ -f "$desktop" ] || fail "no desktop entry at $desktop"
     cp "$desktop" "$out/"
@@ -121,12 +129,11 @@ case $ID in
   ubuntu | debian) pm_install sway grim jq tcpdump iproute2 procps fuse3 ca-certificates > /dev/null ;;
   fedora) pm_install sway grim jq tcpdump iproute procps-ng fuse3 util-linux shadow-utils > /dev/null ;;
 esac
-if [ "${WKC_COMPOSITOR:-sway}" = hyprland ]; then pm_install hyprland > /dev/null; fi
 # Some distributions give sway a file capability for realtime scheduling, which a container
 # cannot grant. A copy without it runs everywhere.
 install -m 0755 "$(command -v sway)" /usr/local/bin/sway
 # Xwayland must not be there to fall back to.
-if command -v Xwayland > /dev/null && [ "${WKC_COMPOSITOR:-sway}" = sway ]; then
+if command -v Xwayland > /dev/null; then
   note xwayland_installed yes
 else
   note xwayland_installed no
@@ -178,7 +185,7 @@ tcpdump -i any -n -U -w "$out/network.pcap" 'not icmp6' > "$out/tcpdump.log" 2>&
 tcpdump_pid=$!
 sleep 1
 status=0
-runuser -u kid -- env WKC_COMPOSITOR="${WKC_COMPOSITOR:-sway}" "$here/session.sh" "$out" "$@" || status=$?
+runuser -u kid -- "$here/session.sh" "$out" "$@" || status=$?
 sleep 1
 kill -INT "$tcpdump_pid"
 wait "$tcpdump_pid" || true

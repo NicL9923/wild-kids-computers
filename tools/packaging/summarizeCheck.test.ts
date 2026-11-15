@@ -11,6 +11,7 @@ desktop_icon=8
 network_packets=0
 session_status=0
 removed_cleanly=yes
+command_after_reinstall=yes
 `;
 
 const PASSING_SESSION = `compositor=sway
@@ -67,6 +68,7 @@ describe('checkProblems', () => {
     ],
     ['the package has no icon', { desktop_icon: '0' }, {}, 'no icon'],
     ['removal left files', { removed_cleanly: 'no: /opt/x' }, {}, 'left files behind'],
+    ['a reinstall lost the command', { command_after_reinstall: 'no' }, {}, 'gone after a reinstall'],
     ['the app sent a packet', { network_packets: '1' }, {}, 'sent network packets'],
     ['the AppArmor profile does not parse', { apparmor_profile_parses: 'no' }, {}, 'AppArmor profile'],
     ['the compositor did not start', {}, { compositor_started: 'no' }, 'compositor did not start'],
@@ -99,13 +101,22 @@ describe('checkProblems', () => {
     'does not ask an %s build for the library, icon, or removal steps it does not have',
     (kind) => {
       expect(
-        check({ kind, libraries_resolve: null, sandbox_helper_mode: null, desktop_icon: null, removed_cleanly: null }),
+        check({
+          kind,
+          libraries_resolve: null,
+          sandbox_helper_mode: null,
+          desktop_icon: null,
+          removed_cleanly: null,
+          command_after_reinstall: null,
+        }),
       ).toEqual([]);
     },
   );
 
   it('asks a tarball for its libraries and sandbox helper but not for removal', () => {
-    expect(check({ kind: 'tarball', desktop_icon: null, removed_cleanly: null })).toEqual([]);
+    expect(
+      check({ kind: 'tarball', desktop_icon: null, removed_cleanly: null, command_after_reinstall: null }),
+    ).toEqual([]);
     expect(check({ kind: 'tarball', libraries_resolve: 'no' })).toContainEqual(
       expect.stringContaining('library the app links is missing'),
     );

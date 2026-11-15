@@ -26,7 +26,7 @@ if [ ${#specs[@]} -eq 0 ]; then
 fi
 
 # The same user id as the person running this, so test output in the checkout stays theirs.
-podman run --rm \
+podman run --rm --interactive \
   --security-opt label=disable \
   --security-opt seccomp=unconfined \
   --cap-add SYS_ADMIN \
@@ -56,7 +56,9 @@ export XDG_RUNTIME_DIR XDG_SESSION_TYPE=wayland WLR_BACKENDS=headless WLR_RENDER
 unset DISPLAY
 sway --unsupported-gpu --config tools/packaging/container/sway.conf > "$out/compositor.log" 2>&1 &
 for _ in $(seq 1 100); do [ -S "$XDG_RUNTIME_DIR/wayland-1" ] && break; sleep 0.1; done
-export WAYLAND_DISPLAY=wayland-1
+export WAYLAND_DISPLAY=wayland-1 npm_config_update_notifier=false
+SWAYSOCK=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'sway-ipc.*' -print -quit)
+export SWAYSOCK
 {
   echo "image=$(. /etc/os-release && echo "$PRETTY_NAME")"
   echo "xwayland=$(command -v Xwayland || echo none)"
