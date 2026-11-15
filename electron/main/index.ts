@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { app, ipcMain, Menu, powerMonitor, protocol, session, type BrowserWindow } from 'electron';
+import { app, dialog, ipcMain, Menu, powerMonitor, protocol, session, type BrowserWindow } from 'electron';
 import {
   BRIDGE_METHODS,
   channelFor,
@@ -17,9 +17,21 @@ import { applyPageSwitches } from './pageSwitches.ts';
 import { exportPicture, printPicture } from './pictureOutput.ts';
 import { osFamily } from './platformInfo.ts';
 import { claimSingleInstance } from './singleInstance.ts';
+import { sandboxOffSwitch, sandboxRefusal } from './sandboxGuard.ts';
 import { resolveStartUrl } from './startUrl.ts';
 import { readTestMode, stripDebugSwitches } from './testMode.ts';
 import { createWindowControl } from './windowControl.ts';
+
+// Hard rule 8. A switch that turns the sandbox off makes the app explain and quit before it opens
+// a window or any saved data.
+const sandboxOff = sandboxOffSwitch(app.commandLine);
+if (sandboxOff !== null) {
+  void app.whenReady().then(() => {
+    const refusal = sandboxRefusal(sandboxOff);
+    dialog.showErrorBox(refusal.title, refusal.message);
+    return app.exit(1);
+  });
+}
 
 // Test hooks and debugging switches work only unpackaged. The packaged app ignores both.
 stripDebugSwitches(app.commandLine, app.isPackaged);
@@ -29,8 +41,8 @@ if (testMode.userDataDir !== undefined) app.setPath('userData', testMode.userDat
 // The lock is keyed on the user data directory, so it is taken after the path is final and
 // before anything opens storage. A second launch brings the first window forward and exits.
 let mainWindow: BrowserWindow | undefined;
-const isPrimaryInstance = claimSingleInstance(app, () => mainWindow);
-if (!isPrimaryInstance) app.exit(0);
+const isPrimaryInstance = sandboxOff === null && claimSingleInstance(app, () => mainWindow);
+if (!isPrimaryInstance && sandboxOff === null) app.exit(0);
 
 const os = osFamily(process.platform);
 const startUrl = resolveStartUrl({
@@ -59,6 +71,14 @@ protocol.registerSchemesAsPrivileged([
 const appRoot = app.getAppPath();
 const rendererRoot = path.join(appRoot, 'dist', 'renderer');
 const preloadPath = path.join(appRoot, 'dist', 'electron', 'preload.cjs');
+// Linux shows the window's own icon in some docks and task switchers. electron-builder copies the
+// drawn icon beside the program files; an unpackaged run reads it from build/.
+const windowIcon =
+  os !== 'linux'
+    ? undefined
+    : app.isPackaged
+      ? path.join(process.resourcesPath, 'icon.png')
+      : path.join(appRoot, 'build', 'icons', '256x256.png');
 
 app.on('web-contents-created', (_event, contents) => {
   guardContents(contents, { os, devRun: devServer !== undefined });
@@ -69,7 +89,7 @@ async function start(): Promise<void> {
   await app.whenReady();
   await hardenSession(sessionControls(session.defaultSession), networkPolicy);
   registerBundleProtocol(protocol, rendererRoot);
-  const window = createMainWindow({ startUrl, preloadPath });
+  const window = createMainWindow({ startUrl, preloadPath, os, icon: windowIcon });
   mainWindow = window;
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(

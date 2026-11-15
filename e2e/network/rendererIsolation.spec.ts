@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readlink } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { BRIDGE_METHODS } from '../../src/core/platform/ipc.ts';
 import { launchApp, type LaunchedApp } from '../support/launchApp.ts';
@@ -43,7 +43,7 @@ test('the renderer process runs inside the operating system sandbox', async () =
     const pid = contents.getOSProcessId();
     // Electron reports this on macOS and Windows only.
     const sandboxed = app.getAppMetrics().find((metric) => metric.pid === pid)?.sandboxed;
-    return { pid, sandboxed };
+    return { pid, sandboxed, mainPid: process.pid };
   });
 
   if (process.platform !== 'linux') {
@@ -56,6 +56,9 @@ test('the renderer process runs inside the operating system sandbox', async () =
   const status = await readFile(`/proc/${facts.pid}/status`, 'utf8');
   expect(status).toMatch(/^Seccomp:\s+2$/m);
   expect(status).toMatch(/^NoNewPrivs:\s+1$/m);
+  // The seccomp filter stays on even under --no-sandbox, which turns off the other layer: the
+  // namespace sandbox, which gives the renderer its own process namespace. Both must be on.
+  expect(await readlink(`/proc/${facts.pid}/ns/pid`)).not.toBe(await readlink(`/proc/${facts.mainPid}/ns/pid`));
 });
 
 // The page reaches the system only through the bridge, so no page code can open a system dialog.
