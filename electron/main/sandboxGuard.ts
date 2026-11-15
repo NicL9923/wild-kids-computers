@@ -1,11 +1,17 @@
 /**
- * Hard rule 8 says the sandbox stays on. Chromium turns it off for the whole app when it is
- * started with one of these switches, and the app cannot turn it back on once Chromium has
- * started. The AppImage's own launcher adds --no-sandbox by itself when the system blocks the
+ * Hard rule 8 says the sandbox stays on. Chromium turns it off for the whole app, or for the GPU
+ * process that draws the pages, when it is started with one of these switches, and the app
+ * cannot turn it back on once Chromium has started. The AppImage's own launcher adds --no-sandbox by itself when the system blocks the
  * user namespaces the sandbox needs, as Ubuntu 24.04 and later do for an AppImage. So the app
  * refuses to start instead, and tells the adult what to do.
  */
-const SANDBOX_OFF_SWITCHES = ['no-sandbox', 'disable-seccomp-filter-sandbox'] as const;
+const SANDBOX_OFF_SWITCHES = [
+  'no-sandbox',
+  'disable-seccomp-filter-sandbox',
+  // The GPU process without its sandbox, and GPU work moved into the unsandboxed browser process.
+  'disable-gpu-sandbox',
+  'in-process-gpu',
+] as const;
 
 /** The install section of the README. A unit test keeps it in step with package.json. */
 export const INSTALL_HELP_URL = 'https://github.com/NicL9923/wild-kids-computers#install';

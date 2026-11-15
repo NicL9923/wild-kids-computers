@@ -10,6 +10,10 @@ describe('sandboxOffSwitch', () => {
   it.each([
     ['--no-sandbox', ['no-sandbox'], 'no-sandbox'],
     ['--disable-seccomp-filter-sandbox', ['disable-seccomp-filter-sandbox'], 'disable-seccomp-filter-sandbox'],
+    // The GPU process handles pixels from the pages. Without its sandbox it keeps the right to
+    // gain privileges, and in-process it runs inside the browser process, which has no sandbox.
+    ['--disable-gpu-sandbox', ['disable-gpu-sandbox'], 'disable-gpu-sandbox'],
+    ['--in-process-gpu', ['in-process-gpu'], 'in-process-gpu'],
     ['both, naming the first', ['disable-seccomp-filter-sandbox', 'no-sandbox'], 'no-sandbox'],
   ])('refuses a start with %s', (_label, switches, expected) => {
     expect(sandboxOffSwitch(commandLine(...switches))).toBe(expected);

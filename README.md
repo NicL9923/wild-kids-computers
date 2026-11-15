@@ -62,7 +62,9 @@ tar -xzf wild-kids-computers-0.1.0-linux-x64.tar.gz
 ./wild-kids-computers-0.1.0-linux-x64/wild-kids-computers
 ```
 
-It needs the same libraries as any desktop browser, which a desktop system already has. On Ubuntu 24.04 or later, give the sandbox helper its setuid permission first: `sudo chown root:root chrome-sandbox && sudo chmod 4755 chrome-sandbox` in the extracted folder. Remove it by deleting the folder.
+It needs the same libraries as any desktop browser, which a desktop system already has. Remove it by deleting the folder.
+
+Do not use the tarball on Ubuntu 24.04 or later, for the same reason as the AppImage: Ubuntu blocks the sandbox for a program run from your home folder. Use the `.deb` instead, which installs the permission the sandbox needs.
 
 ### macOS
 
