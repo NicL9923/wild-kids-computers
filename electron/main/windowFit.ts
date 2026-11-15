@@ -2,7 +2,7 @@
  * The smallest page the app lays out for, in CSS pixels. Every screen is designed and tested
  * from this size up.
  */
-export const MIN_LAYOUT = { width: 1024, height: 640 } as const;
+const MIN_LAYOUT = { width: 1024, height: 640 } as const;
 
 /**
  * The page zoom that keeps the layout at least MIN_LAYOUT. A tiling compositor such as Hyprland
