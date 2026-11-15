@@ -6,6 +6,8 @@ export interface ContentsGuardOptions {
   os: OsFamily;
   /** True only for an unpackaged dev run, which keeps reload and DevTools shortcuts. */
   devRun: boolean;
+  /** The page zoom to keep, from electron/main/windowFit.ts. 1 when not given. */
+  zoomFactor?: () => number;
 }
 
 function deny(event: Cancellable): void {
@@ -71,7 +73,7 @@ export function guardContents(contents: GuardedContents, options: ContentsGuardO
     });
   });
   // Ctrl or Command plus the wheel, and any other page zoom the shortcut block misses.
-  contents.on('zoom-changed', () => contents.setZoomFactor(1));
+  contents.on('zoom-changed', () => contents.setZoomFactor(options.zoomFactor?.() ?? 1));
 
   if (options.devRun) return;
   contents.on('before-input-event', (event, input) => {

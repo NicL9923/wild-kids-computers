@@ -21,6 +21,7 @@ import { sandboxOffSwitch, sandboxRefusal } from './sandboxGuard.ts';
 import { resolveStartUrl } from './startUrl.ts';
 import { readTestMode, stripDebugSwitches } from './testMode.ts';
 import { createWindowControl } from './windowControl.ts';
+import { keepPageFitted } from './windowFit.ts';
 
 // Hard rule 8. A switch that turns the sandbox off makes the app explain and quit before it opens
 // a window or any saved data.
@@ -80,8 +81,10 @@ const windowIcon =
       ? path.join(process.resourcesPath, 'icon.png')
       : path.join(appRoot, 'build', 'icons', '256x256.png');
 
+// The page zoom that fits the main window, kept by keepPageFitted below.
+let pageZoom = 1;
 app.on('web-contents-created', (_event, contents) => {
-  guardContents(contents, { os, devRun: devServer !== undefined });
+  guardContents(contents, { os, devRun: devServer !== undefined, zoomFactor: () => pageZoom });
 });
 app.on('window-all-closed', () => app.quit());
 
@@ -91,6 +94,7 @@ async function start(): Promise<void> {
   registerBundleProtocol(protocol, rendererRoot);
   const window = createMainWindow({ startUrl, preloadPath, os, icon: windowIcon });
   mainWindow = window;
+  keepPageFitted(window, (factor) => (pageZoom = factor));
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       appMenuTemplate(os, app.getName(), (command) => window.webContents.send(MENU_COMMAND_CHANNEL, command)),
