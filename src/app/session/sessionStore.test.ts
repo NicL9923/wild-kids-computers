@@ -1265,172 +1265,177 @@ describe('documents that could not be read', () => {
 });
 
 describe('creating and removing profiles while the platform is slow', () => {
-  it("never deletes a listed profile's files or reports an outcome the disk contradicts, through random creations, removals, failed and slow list writes, and restarts", async () => {
-    const png = new Uint8Array([1]);
-    for (let seed = 1; seed <= 40; seed++) {
-      const random = createRandom(seed);
-      const fake = createFakeBridge({ documents: savedApp([FOX, OWL], FOX.id) });
-      const at = (step: number) => `seed ${seed}, step ${step}`;
-      let step = 0;
-      const listedOnDisk = () => saved(fake, 'profiles', profilesDocument).profiles.map((p) => p.id);
+  // Forty seeded runs in one test: far more work than the default five seconds allows on a busy machine.
+  it(
+    "never deletes a listed profile's files or reports an outcome the disk contradicts, through random creations, removals, failed and slow list writes, and restarts",
+    { timeout: 120_000 },
+    async () => {
+      const png = new Uint8Array([1]);
+      for (let seed = 1; seed <= 40; seed++) {
+        const random = createRandom(seed);
+        const fake = createFakeBridge({ documents: savedApp([FOX, OWL], FOX.id) });
+        const at = (step: number) => `seed ${seed}, step ${step}`;
+        let step = 0;
+        const listedOnDisk = () => saved(fake, 'profiles', profilesDocument).profiles.map((p) => p.id);
 
-      // The storage itself. Every deletion is checked at the moment it happens, and every file that
-      // reaches it is remembered, so each listed profile can be checked for all of its files at the end.
-      const { documents: disk, pictures: gallery } = fake.bridge;
-      const deletedListed: string[] = [];
-      const unlistedCreations: string[] = [];
-      const storedSettings = new Set<string>();
-      const storedPictures = new Map<string, string[]>();
-      const diskWrite = disk.write.bind(disk);
-      const diskRemove = disk.removeProfile.bind(disk);
-      const diskSave = gallery.save.bind(gallery);
-      const storage = {
-        write: async (name: DocumentName, text: string) => {
-          await diskWrite(name, text);
-          const [head, id, kind] = name.split('/');
-          if (head === 'profile' && kind === 'settings' && id !== undefined) storedSettings.add(id);
-        },
-        removeProfile: (profileId: string) => {
-          if (listedOnDisk().includes(profileId)) deletedListed.push(`${at(step)}: ${profileId}`);
-          return diskRemove(profileId);
-        },
-        save: async (profileId: string, input: SavePictureInput) => {
-          const summary = await diskSave(profileId, input);
-          storedPictures.set(profileId, [...(storedPictures.get(profileId) ?? []), summary.id]);
-          return summary;
-        },
-      };
-      for (const profile of [FOX, OWL]) {
-        await storage.save(profile.id, { id: `${profile.id}-art`, png, thumbnail: png });
-      }
+        // The storage itself. Every deletion is checked at the moment it happens, and every file that
+        // reaches it is remembered, so each listed profile can be checked for all of its files at the end.
+        const { documents: disk, pictures: gallery } = fake.bridge;
+        const deletedListed: string[] = [];
+        const unlistedCreations: string[] = [];
+        const storedSettings = new Set<string>();
+        const storedPictures = new Map<string, string[]>();
+        const diskWrite = disk.write.bind(disk);
+        const diskRemove = disk.removeProfile.bind(disk);
+        const diskSave = gallery.save.bind(gallery);
+        const storage = {
+          write: async (name: DocumentName, text: string) => {
+            await diskWrite(name, text);
+            const [head, id, kind] = name.split('/');
+            if (head === 'profile' && kind === 'settings' && id !== undefined) storedSettings.add(id);
+          },
+          removeProfile: (profileId: string) => {
+            if (listedOnDisk().includes(profileId)) deletedListed.push(`${at(step)}: ${profileId}`);
+            return diskRemove(profileId);
+          },
+          save: async (profileId: string, input: SavePictureInput) => {
+            const summary = await diskSave(profileId, input);
+            storedPictures.set(profileId, [...(storedPictures.get(profileId) ?? []), summary.id]);
+            return summary;
+          },
+        };
+        for (const profile of [FOX, OWL]) {
+          await storage.save(profile.id, { id: `${profile.id}-art`, png, thumbnail: png });
+        }
 
-      // Each run of the app gets a bridge of its own. A call that changes what is listed or stored
-      // answers late, early, or fails, as the test decides. A run that stopped gets no more answers.
-      let run = 0;
-      let chaos = true;
-      const parked: Array<{ run: number; land: () => void }> = [];
-      function bridgeFor(own: number): PlatformBridge {
-        function slow<A extends unknown[], T>(
-          call: (...args: A) => Promise<T>,
-          canFail: (...args: A) => boolean = () => true,
-        ): (...args: A) => Promise<T> {
-          return (...args) => {
-            if (own !== run) return never();
-            const roll = chaos ? random.next() : 1;
-            if (roll < 0.15 && canFail(...args)) return Promise.reject(new BridgeError('io', 'disk busy'));
-            if (roll < 0.55) {
-              return new Promise<T>((resolve, reject) =>
-                parked.push({ run: own, land: () => void call(...args).then(resolve, reject) }),
-              );
-            }
-            return call(...args);
+        // Each run of the app gets a bridge of its own. A call that changes what is listed or stored
+        // answers late, early, or fails, as the test decides. A run that stopped gets no more answers.
+        let run = 0;
+        let chaos = true;
+        const parked: Array<{ run: number; land: () => void }> = [];
+        function bridgeFor(own: number): PlatformBridge {
+          function slow<A extends unknown[], T>(
+            call: (...args: A) => Promise<T>,
+            canFail: (...args: A) => boolean = () => true,
+          ): (...args: A) => Promise<T> {
+            return (...args) => {
+              if (own !== run) return never();
+              const roll = chaos ? random.next() : 1;
+              if (roll < 0.15 && canFail(...args)) return Promise.reject(new BridgeError('io', 'disk busy'));
+              if (roll < 0.55) {
+                return new Promise<T>((resolve, reject) =>
+                  parked.push({ run: own, land: () => void call(...args).then(resolve, reject) }),
+                );
+              }
+              return call(...args);
+            };
+          }
+          return {
+            ...fake.bridge,
+            documents: {
+              ...disk,
+              write: slow(storage.write, (name) => name === 'profiles'),
+              removeProfile: slow(storage.removeProfile),
+            },
+            pictures: { ...gallery, save: slow(storage.save) },
           };
         }
-        return {
-          ...fake.bridge,
-          documents: {
-            ...disk,
-            write: slow(storage.write, (name) => name === 'profiles'),
-            removeProfile: slow(storage.removeProfile),
-          },
-          pictures: { ...gallery, save: slow(storage.save) },
+
+        /** What the app last told the adult about a profile, while that run was still going. */
+        const told = new Map<string, 'created' | 'not-removed' | 'removed'>();
+        const checkTold = (listed: readonly string[]) => {
+          for (const [id, outcome] of told) {
+            expect(listed.includes(id), `${at(step)}: ${id} was ${outcome}`).toBe(outcome !== 'removed');
+          }
         };
-      }
 
-      /** What the app last told the adult about a profile, while that run was still going. */
-      const told = new Map<string, 'created' | 'not-removed' | 'removed'>();
-      const checkTold = (listed: readonly string[]) => {
-        for (const [id, outcome] of told) {
-          expect(listed.includes(id), `${at(step)}: ${id} was ${outcome}`).toBe(outcome !== 'removed');
-        }
-      };
-
-      let timers = createManualScheduler({ wall: 0 });
-      let store = createSessionStore({ bridge: bridgeFor(run), clock: createClock().sessionClock, timers });
-      await store.start();
-
-      /** The app stops, the platform finishes or drops what it was doing, and the app starts again. */
-      const restart = async () => {
-        const stopped = run;
-        run += 1;
-        for (const entry of parked.filter((e) => e.run === stopped)) {
-          parked.splice(parked.indexOf(entry), 1);
-          if (random.next() < 0.5) entry.land();
-        }
-        await settle();
-        timers = createManualScheduler({ wall: 0 });
-        store = createSessionStore({ bridge: bridgeFor(run), clock: createClock().sessionClock, timers });
+        let timers = createManualScheduler({ wall: 0 });
+        let store = createSessionStore({ bridge: bridgeFor(run), clock: createClock().sessionClock, timers });
         await store.start();
-        checkTold(store.getSnapshot().profiles.map((p) => p.id));
-      };
 
-      for (step = 0; step < 100; step++) {
-        const roll = random.next();
-        const own = run;
-        const current = store;
-        const { profiles, status, activeProfile } = current.getSnapshot();
-        if (roll < 0.1 && profiles.length < 6) {
-          void (async () => {
-            const result = await current.createProfile({ avatarId: 'cat', colorId: 'sun', band: 'band-3-5' });
-            if (own !== run || !result.ok) return;
-            told.set(result.value.id, 'created');
-            if (!listedOnDisk().includes(result.value.id)) unlistedCreations.push(`${at(step)}: ${result.value.id}`);
-          })();
-        } else if (roll < 0.2 && profiles.length > 0) {
-          current.chooseProfile(random.pick(profiles).id);
-        } else if (roll < 0.25 && profiles.length > 0) {
-          current.updateProfile(random.pick(profiles).id, { name: `Kid ${String(step)}` });
-        } else if (roll < 0.33 && status === 'ready' && activeProfile !== null) {
-          current.updateSettings({ voiceVolume: random.int(0, 10) / 10 });
-        } else if (roll < 0.41 && status === 'ready') {
-          void current.pictures().save({ id: `picture-${String(step)}`, png, thumbnail: png });
-        } else if (roll < 0.55 && profiles.length > 0) {
-          const id = random.pick(profiles).id;
-          // Until this removal answers, nobody knows whether the profile stays.
-          told.delete(id);
-          void (async () => {
-            const result = await current.deleteProfile(id);
-            if (own !== run) return;
-            if (result.ok) told.set(id, 'removed');
-            else if (result.error.code === 'io') told.set(id, 'not-removed');
-          })();
-        } else if (roll < 0.65) {
+        /** The app stops, the platform finishes or drops what it was doing, and the app starts again. */
+        const restart = async () => {
+          const stopped = run;
+          run += 1;
+          for (const entry of parked.filter((e) => e.run === stopped)) {
+            parked.splice(parked.indexOf(entry), 1);
+            if (random.next() < 0.5) entry.land();
+          }
+          await settle();
+          timers = createManualScheduler({ wall: 0 });
+          store = createSessionStore({ bridge: bridgeFor(run), clock: createClock().sessionClock, timers });
+          await store.start();
+          checkTold(store.getSnapshot().profiles.map((p) => p.id));
+        };
+
+        for (step = 0; step < 100; step++) {
+          const roll = random.next();
+          const own = run;
+          const current = store;
+          const { profiles, status, activeProfile } = current.getSnapshot();
+          if (roll < 0.1 && profiles.length < 6) {
+            void (async () => {
+              const result = await current.createProfile({ avatarId: 'cat', colorId: 'sun', band: 'band-3-5' });
+              if (own !== run || !result.ok) return;
+              told.set(result.value.id, 'created');
+              if (!listedOnDisk().includes(result.value.id)) unlistedCreations.push(`${at(step)}: ${result.value.id}`);
+            })();
+          } else if (roll < 0.2 && profiles.length > 0) {
+            current.chooseProfile(random.pick(profiles).id);
+          } else if (roll < 0.25 && profiles.length > 0) {
+            current.updateProfile(random.pick(profiles).id, { name: `Kid ${String(step)}` });
+          } else if (roll < 0.33 && status === 'ready' && activeProfile !== null) {
+            current.updateSettings({ voiceVolume: random.int(0, 10) / 10 });
+          } else if (roll < 0.41 && status === 'ready') {
+            void current.pictures().save({ id: `picture-${String(step)}`, png, thumbnail: png });
+          } else if (roll < 0.55 && profiles.length > 0) {
+            const id = random.pick(profiles).id;
+            // Until this removal answers, nobody knows whether the profile stays.
+            told.delete(id);
+            void (async () => {
+              const result = await current.deleteProfile(id);
+              if (own !== run) return;
+              if (result.ok) told.set(id, 'removed');
+              else if (result.error.code === 'io') told.set(id, 'not-removed');
+            })();
+          } else if (roll < 0.65) {
+            timers.advance(SESSION_CALL_DEADLINE_MS);
+          } else if (roll < 0.95) {
+            const index = random.int(0, Math.max(parked.length - 1, 0));
+            const entry = parked[index];
+            if (entry !== undefined && entry.run === run) parked.splice(index, 1)[0]?.land();
+          } else {
+            await restart();
+          }
+          if (random.next() < 0.5) await settle();
+        }
+
+        // Everything answers, and the app starts again over the same storage.
+        chaos = false;
+        while (parked.some((e) => e.run === run) || store.hasPendingWork()) {
+          for (const entry of parked.filter((e) => e.run === run)) {
+            parked.splice(parked.indexOf(entry), 1);
+            entry.land();
+          }
           timers.advance(SESSION_CALL_DEADLINE_MS);
-        } else if (roll < 0.95) {
-          const index = random.int(0, Math.max(parked.length - 1, 0));
-          const entry = parked[index];
-          if (entry !== undefined && entry.run === run) parked.splice(index, 1)[0]?.land();
-        } else {
-          await restart();
+          await settle();
         }
-        if (random.next() < 0.5) await settle();
-      }
+        await restart();
+        await store.flush();
 
-      // Everything answers, and the app starts again over the same storage.
-      chaos = false;
-      while (parked.some((e) => e.run === run) || store.hasPendingWork()) {
-        for (const entry of parked.filter((e) => e.run === run)) {
-          parked.splice(parked.indexOf(entry), 1);
-          entry.land();
+        expect(deletedListed, `seed ${seed}: deletions of listed profiles`).toEqual([]);
+        expect(unlistedCreations, `seed ${seed}: created but not listed`).toEqual([]);
+        const listed = listedOnDisk();
+        expect(store.getSnapshot().profiles.map((p) => p.id)).toEqual(listed);
+        for (const id of listed) {
+          expect(fake.pictureIds(id, 'gallery'), `seed ${seed}: pictures of ${id}`).toEqual(
+            expect.arrayContaining(storedPictures.get(id) ?? []),
+          );
+          expect(fake.documents.has(documentNames.settings(id)), `seed ${seed}: settings of ${id}`).toBe(
+            storedSettings.has(id) || [FOX.id, OWL.id].includes(id),
+          );
         }
-        timers.advance(SESSION_CALL_DEADLINE_MS);
-        await settle();
       }
-      await restart();
-      await store.flush();
-
-      expect(deletedListed, `seed ${seed}: deletions of listed profiles`).toEqual([]);
-      expect(unlistedCreations, `seed ${seed}: created but not listed`).toEqual([]);
-      const listed = listedOnDisk();
-      expect(store.getSnapshot().profiles.map((p) => p.id)).toEqual(listed);
-      for (const id of listed) {
-        expect(fake.pictureIds(id, 'gallery'), `seed ${seed}: pictures of ${id}`).toEqual(
-          expect.arrayContaining(storedPictures.get(id) ?? []),
-        );
-        expect(fake.documents.has(documentNames.settings(id)), `seed ${seed}: settings of ${id}`).toBe(
-          storedSettings.has(id) || [FOX.id, OWL.id].includes(id),
-        );
-      }
-    }
-  });
+    },
+  );
 });

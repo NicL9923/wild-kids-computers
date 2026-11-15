@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- The app icon: one wildflower in the meadow. Drawn for 48 px and up; icon-small.svg is the 16 to 32 px cut. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9fd2ea"/>
+      <stop offset="1" stop-color="#e6f3ee"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <rect width="1024" height="1024" rx="224"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="url(#sky)"/>
+    <circle cx="830" cy="190" r="86" fill="#ffffff" opacity="0.7"/>
+    <path d="M-20 760C180 690 360 700 512 720s340 10 532-40v380H-20z" fill="#8cc372"/>
+    <path d="M-20 860C220 810 420 830 600 850s300 0 444-30v240H-20z" fill="#6fae58"/>
+    <!-- the stem and two leaves -->
+    <path d="M512 960V520" stroke="#2e4034" stroke-width="64" stroke-linecap="round"/>
+    <path d="M512 960V520" stroke="#4f9147" stroke-width="28" stroke-linecap="round"/>
+    <path d="M512 870c-40-90-150-130-250-100 40 100 150 140 250 100z" fill="#5aa04f" stroke="#2e4034" stroke-width="22" stroke-linejoin="round"/>
+    <path d="M512 800c40-90 150-130 250-100-40 100-150 140-250 100z" fill="#5aa04f" stroke="#2e4034" stroke-width="22" stroke-linejoin="round"/>
+    <!-- five petals around a sunny middle -->
+    <g fill="#e8664a" stroke="#2e4034" stroke-width="24">
+      <circle cx="512" cy="222" r="122"/>
+      <circle cx="680" cy="344" r="122"/>
+      <circle cx="616" cy="542" r="122"/>
+      <circle cx="408" cy="542" r="122"/>
+      <circle cx="344" cy="344" r="122"/>
+    </g>
+    <circle cx="512" cy="400" r="118" fill="#f5c542" stroke="#2e4034" stroke-width="24"/>
+    <circle cx="480" cy="368" r="30" fill="#ffffff" opacity="0.55"/>
+  </g>
+</svg>

@@ -104,4 +104,11 @@ describe('guardContents zoom', () => {
     emit('zoom-changed');
     expect(calls).toEqual(['zoom factor 1']);
   });
+
+  it('puts back the fitted zoom of a window smaller than the layout', () => {
+    const { contents, calls, emit } = fakeContents(() => Promise.resolve());
+    guardContents(contents, { os: 'linux', devRun: false, zoomFactor: () => 0.75 });
+    emit('zoom-changed');
+    expect(calls).toEqual(['zoom factor 0.75']);
+  });
 });

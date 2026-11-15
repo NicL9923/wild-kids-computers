@@ -6,6 +6,12 @@
   "description": "A free, offline desktop app where children aged 3 to 12 learn to use a computer by playing and painting.",
   "license": "MIT",
   "author": "Wild Flowers Tech",
+  "homepage": "https://github.com/NicL9923/wild-kids-computers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NicL9923/wild-kids-computers.git"
+  },
+  "desktopName": "wild-kids-computers.desktop",
   "type": "module",
   "main": "dist/electron/main.cjs",
   "engines": {
@@ -43,7 +49,8 @@
     "dist": "npm run build && electron-builder --publish never",
     "prepare": "husky",
     "coloring:render": "node tools/renderColoringPages.ts",
-    "coloring:regions": "node tools/coloringRegions.ts"
+    "coloring:regions": "node tools/coloringRegions.ts",
+    "icon:render": "node tools/renderAppIcon.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

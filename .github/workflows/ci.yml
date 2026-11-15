@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+    # A version tag also drafts a GitHub release once every job passes. See the release job.
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -26,11 +28,13 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      code: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.filter.outputs.code }}
+      # A manual run and a release tag run everything.
+      code: ${{ (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && 'true' || steps.filter.outputs.code }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Detect changed paths
+        if: github.ref_type != 'tag'
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
@@ -186,6 +190,10 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
+      # electron-builder's pacman target packs with bsdtar, and its rpm target needs rpmbuild.
+      - name: Install the Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libarchive-tools rpm
       - name: Build the installer
         run: npm run dist
         env:
@@ -203,14 +211,77 @@ jobs:
             npm run check:packaged-notices -- "$extracted/squashfs-root"
           fi
           npm run check:packaged-notices
+      # Each Linux package's desktop entry, icons, license, notices, metadata, and sandbox helper.
+      - name: Check the Linux packages
+        if: runner.os == 'Linux'
+        run: node tools/packaging/checkLinuxPackages.ts release
+      # Start each packaged build with no test hook and fail if it dies or logs a fatal error. On
+      # Linux the .deb is installed first, so the app runs from /opt under the AppArmor profile the
+      # package installs, with Ubuntu's user namespace restriction left on and the sandbox on.
+      - name: Start the packaged app (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install --yes ./release/*.deb
+          test -f /etc/apparmor.d/wild-kids-computers
+          xvfb-run -a -s "-screen 0 1920x1200x24" \
+            node tools/packaging/smokeLaunch.ts "/opt/Wild Kids - Computers/wild-kids-computers"
+      - name: Start the packaged app (macOS)
+        if: runner.os == 'macOS'
+        run: node tools/packaging/smokeLaunch.ts "release/mac-arm64/Wild Kids - Computers.app/Contents/MacOS/Wild Kids - Computers"
+      - name: Start the packaged app (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: node tools/packaging/smokeLaunch.ts "release/win-unpacked/Wild Kids - Computers.exe"
       - name: Upload the installer
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installer-${{ matrix.os }}
           path: |
             release/*.AppImage
+            release/*.pkg.tar.zst
+            release/*.deb
+            release/*.rpm
+            release/*.tar.gz
             release/*.dmg
             release/*.zip
             release/*.exe
           if-no-files-found: error
           retention-days: 14
+
+  # Runs only for a pushed v* tag, after every other job passed. It checks that the tag names the
+  # package.json version, writes SHA256SUMS over every installer, and creates a draft release. A
+  # person reviews the draft and publishes it. This is the only job that can write to the repo.
+  release:
+    name: Draft the GitHub release
+    needs: [static, unit, check, e2e, browser, installers]
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      # The release scripts use only Node's own modules, so this job needs no npm ci.
+      - name: Check the tag names the package.json version
+        run: node tools/packaging/release.ts tag "$GITHUB_REF_NAME"
+      - name: Download the installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: release-files
+      - name: Write SHA256SUMS
+        run: node tools/packaging/release.ts checksums release-files
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" release-files/*
+          --draft --verify-tag
+          --title "Wild Kids - Computers ${GITHUB_REF_NAME#v}"
+          --notes-file packaging/release-notes.md

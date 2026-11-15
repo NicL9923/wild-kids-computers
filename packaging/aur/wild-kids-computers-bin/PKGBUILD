@@ -1,0 +1,58 @@
+# Maintainer: Wild Flowers Tech <set the maintainer's name and address before publishing>
+#
+# Repackages the Arch package from the GitHub release. Set pkgver and the checksum with
+# `node tools/packaging/aurPackage.ts <SHA256SUMS>` from the repository root, never by hand. The
+# checksum of zeros below fails on purpose until then.
+
+pkgname=wild-kids-computers-bin
+_pkgname=wild-kids-computers
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Free, offline app where children learn to use a computer by playing and painting'
+arch=('x86_64')
+url='https://github.com/NicL9923/wild-kids-computers'
+license=('MIT')
+depends=(
+  'alsa-lib'
+  'at-spi2-core'
+  'cairo'
+  'dbus'
+  'expat'
+  'glib2'
+  'glibc'
+  'gtk3'
+  'hicolor-icon-theme'
+  'libcups'
+  'libgcc'
+  'libpulse'
+  'libx11'
+  'libxcb'
+  'libxcomposite'
+  'libxdamage'
+  'libxext'
+  'libxfixes'
+  'libxkbcommon'
+  'libxrandr'
+  'mesa'
+  'nspr'
+  'nss'
+  'pango'
+  'systemd-libs'
+)
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!strip' '!debug')
+install="$pkgname.install"
+source=("$_pkgname-$pkgver-1-x86_64.pkg.tar.zst::$url/releases/download/v$pkgver/$_pkgname-$pkgver-1-x86_64.pkg.tar.zst")
+noextract=("$_pkgname-$pkgver-1-x86_64.pkg.tar.zst")
+sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
+
+package() {
+  # The release package's own metadata and install script stay out; this package has its own.
+  bsdtar -xf "$srcdir/$_pkgname-$pkgver-1-x86_64.pkg.tar.zst" -C "$pkgdir" \
+    --exclude '.PKGINFO' --exclude '.MTREE' --exclude '.INSTALL' --exclude '.BUILDINFO'
+  install -d "$pkgdir/usr/bin"
+  ln -s "/opt/Wild Kids - Computers/$_pkgname" "$pkgdir/usr/bin/$_pkgname"
+  # Arch keeps a package's license under its own name.
+  mv "$pkgdir/usr/share/licenses/$_pkgname" "$pkgdir/usr/share/licenses/$pkgname"
+}

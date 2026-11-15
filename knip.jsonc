@@ -5,6 +5,7 @@
     "electron/main/index.ts",
     "electron/preload/index.ts",
     "tools/*.ts",
+    "tools/packaging/*.ts",
     // Public APIs the shell and the activity kit import. Drop each line once a consumer exists.
     "src/app/session/sessionHooks.ts",
     "src/audio/AudioProvider.tsx",
@@ -14,7 +15,8 @@
   ],
   "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "tools/**/*.ts", "e2e/**/*.ts"],
   // tools/voice and tools/emoji have their own package.json, so their packages stay out of the
-  // app. ffmpeg and ffprobe come from PATH and only the voice tools run them.
+  // app. ffmpeg and ffprobe come from PATH and only the voice tools run them. bsdtar, rpm, and
+  // sha256sum come from the system for the Linux package checks.
   "ignoreDependencies": ["svgo", "@resvg/resvg-js"],
-  "ignoreBinaries": ["ffmpeg", "ffprobe"],
+  "ignoreBinaries": ["ffmpeg", "ffprobe", "bsdtar", "rpm", "sha256sum"],
 }
