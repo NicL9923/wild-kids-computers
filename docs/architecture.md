@@ -57,7 +57,13 @@ A second end-to-end test asserts hard rule 8: `process` and `require` are undefi
 
 `e2e/network/layers.spec.ts` observes each main-process layer on its own, so a layer cannot go missing behind the others. Playwright's keyboard skips `before-input-event`, so the shortcut test sends keys with `webContents.sendInputEvent`.
 
-End-to-end tests run against the unpackaged build, so installer fuses never affect them. On GitHub's Ubuntu runner the workflow sets `kernel.apparmor_restrict_unprivileged_userns=0` so that Chromium's sandbox can start. Tests never pass `--no-sandbox`.
+End-to-end tests run against the unpackaged build, so installer fuses never affect them. On GitHub's Ubuntu runner the workflow sets `kernel.apparmor_restrict_unprivileged_userns=0` so that Chromium's sandbox can start. Tests never pass `--no-sandbox`: `launchApp` sets Playwright's `chromiumSandbox`, because Playwright adds `--no-sandbox` on Linux otherwise, and the app refuses to start with a switch that turns its sandbox off (`electron/main/sandboxGuard.ts`).
+
+### Window
+
+- The window shows on its first paint, and on Linux also when its page has loaded, because a hidden window under Wayland never paints (`electron/main/mainWindow.ts`).
+- Every screen lays out from 1024 by 640 CSS px. When a tiling compositor gives the window less, the main process zooms the page out until the layout is 1024 by 640 again, and the zoom guard keeps that factor (`electron/main/windowFit.ts`).
+- On Linux the app runs as a native Wayland client when the session is Wayland, and its app id and X11 class are `wild-kids-computers`, from `desktopName` in `package.json`.
 
 ## Repository layout
 
@@ -382,4 +388,4 @@ Each page has an entry, `src/features/paint-studio/coloringPages/<pageId>.ts`, f
 | `npm run e2e:browser`  | Bridge contract tests and a load test against the browser build                                              |
 | `npm run mutation`     | Stryker on paint math, level generators, the difficulty model, and storage validation                        |
 | `npm run perf`         | Performance measurements, including the time of each whole-picture effect. Prints numbers and does not gate. |
-| `npm run dist`         | Unsigned installer for the current operating system                                                          |
+| `npm run dist`         | Unsigned installers for the current operating system: on Linux the Arch package, deb, rpm, tarball, AppImage |

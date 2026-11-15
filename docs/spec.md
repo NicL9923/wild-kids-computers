@@ -173,7 +173,7 @@ A drawing from the robot can go to the paint studio as a starting picture.
 - **Time.** Activities that depend on the local clock also run under a timezone east of UTC.
 - **Mutation testing.** Run a mutation tool on the paint engine math, the level generators, the difficulty model, and storage validation.
 - **Performance targets on a 1920 by 1080 window.** A brush stroke keeps up with the display refresh rate. A full-canvas fill finishes in under 100 ms. Memory stays flat during 5 minutes of continuous strokes. The home map appears within 3 seconds of launch. These are targets, not measurements. Report measured numbers with the machine that produced them.
-- **CI.** One workflow with change detection. It lints, type checks, and runs unit and end-to-end tests on Linux. It builds unsigned installers on macOS, Windows, and Linux. Pin actions by commit SHA.
+- **CI.** One workflow with change detection. It lints, type checks, and runs unit and end-to-end tests on Linux. It builds unsigned installers on macOS, Windows, and Linux and starts each packaged build. A version tag drafts a GitHub release with every installer. Pin actions by commit SHA.
 
 ### Definition of done for an activity
 
@@ -189,7 +189,7 @@ A drawing from the robot can go to the paint studio as a starting picture.
 - Code signing and notarization
 - Public hosting of the browser build
 - Languages other than English
-- Store listings, tags, and GitHub Releases
+- Store listings
 - Teacher or classroom tools
 - Sync between computers
 

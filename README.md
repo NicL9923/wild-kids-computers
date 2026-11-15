@@ -6,7 +6,81 @@ The app has no accounts, ads, purchases, telemetry, or network requests.
 
 ## Status
 
-Milestone 1 is in development. Nothing is released yet.
+Milestone 1 is complete. Installers for Linux, macOS, and Windows are on the [releases page](https://github.com/NicL9923/wild-kids-computers/releases).
+
+## Install
+
+Download the file for your system from the [releases page](https://github.com/NicL9923/wild-kids-computers/releases). The installers are not signed, so each system warns before it opens the app the first time; the steps below say what you will see. To check a download, put it beside the release's `SHA256SUMS` file and run `sha256sum --check --ignore-missing SHA256SUMS`.
+
+Replace `0.1.0` below with the version you downloaded. The app never needs the internet after it is installed.
+
+### Omarchy and Arch Linux
+
+Install the Arch package:
+
+```sh
+sudo pacman -U ./wild-kids-computers-0.1.0-1-x86_64.pkg.tar.zst
+```
+
+Open it from the app launcher (Super + Space on Omarchy) as Wild Kids - Computers, or run `wild-kids-computers`. Remove it with `sudo pacman -R wild-kids-computers`.
+
+Once the AUR package is published, `yay -S wild-kids-computers-bin` or Omarchy's menu, Install > AUR, installs it and keeps it updated with the rest of the system.
+
+On Omarchy the app runs as a native Wayland window, with no setting needed. Super + W asks the app to close, which goes through the parent gate when kiosk lock is on. Kiosk lock makes the window fullscreen, but Hyprland's own shortcuts, such as switching workspaces, still work. No Hyprland window rule is needed. If you want one, the window's class is `wild-kids-computers`.
+
+### Debian and Ubuntu
+
+```sh
+sudo apt install ./wild-kids-computers-0.1.0-linux-amd64.deb
+```
+
+This works on Debian 12 and 13 and Ubuntu 22.04 and later. On Ubuntu 24.04 and later, the package also installs the AppArmor permission the app's sandbox needs. Remove it with `sudo apt remove wild-kids-computers`.
+
+### Fedora
+
+```sh
+sudo dnf install ./wild-kids-computers-0.1.0-linux-x86_64.rpm
+```
+
+Use `dnf`. Plain `rpm -i` refuses an unsigned package on current Fedora. Remove it with `sudo dnf remove wild-kids-computers`. The package names libraries rather than Fedora package names, so it may also install on openSUSE with `zypper`, which has not been tested.
+
+### AppImage, for other Linux systems
+
+```sh
+chmod +x wild-kids-computers-0.1.0-linux-x86_64.AppImage
+./wild-kids-computers-0.1.0-linux-x86_64.AppImage
+```
+
+It needs FUSE 3 (`fusermount3`, from the `fuse3` package), which most desktops already have. Without FUSE, add `--appimage-extract-and-run`. Remove it by deleting the file.
+
+Do not use the AppImage on Ubuntu 24.04 or later. Ubuntu blocks the sandbox the app needs for an AppImage, and the app will not run without its sandbox: it shows a message and quits. Use the `.deb` instead.
+
+### Tarball
+
+```sh
+tar -xzf wild-kids-computers-0.1.0-linux-x64.tar.gz
+./wild-kids-computers-0.1.0-linux-x64/wild-kids-computers
+```
+
+It needs the same libraries as any desktop browser, which a desktop system already has. On Ubuntu 24.04 or later, give the sandbox helper its setuid permission first: `sudo chown root:root chrome-sandbox && sudo chmod 4755 chrome-sandbox` in the extracted folder. Remove it by deleting the folder.
+
+### macOS
+
+The app is for Macs with Apple silicon. Open the `.dmg` and drag Wild Kids - Computers to Applications.
+
+The first time you open it, macOS says it could not verify the app is free of malware. Choose Done. Then open System Settings > Privacy & Security, scroll to Security, choose Open Anyway next to the message about Wild Kids - Computers, and confirm with your password. The button stays there for about an hour after the first try. Remove the app by moving it from Applications to the Trash.
+
+### Windows
+
+Run the `.exe` installer. Windows SmartScreen says "Windows protected your PC". Choose More info, then Run anyway. If Smart App Control is on, Windows blocks unsigned apps with no way past the message, and the app cannot be installed until it is signed. Remove it in Settings > Apps > Installed apps.
+
+### Where the app keeps its data
+
+Removing the app leaves each child's profiles, settings, and pictures. Delete this folder to remove them too:
+
+- Linux: `~/.config/Wild Kids - Computers`
+- macOS: `~/Library/Application Support/Wild Kids - Computers`
+- Windows: `%APPDATA%\Wild Kids - Computers`
 
 ## For grown-ups
 
@@ -52,6 +126,19 @@ npm run dist        # unsigned installer for this operating system, written to r
 ```
 
 Without a display, run the Electron tests under a virtual screen at least 1920 by 1080: `xvfb-run -a -s "-screen 0 1920x1200x24" npm run e2e`. [AGENTS.md](AGENTS.md) lists every command.
+
+### Linux packages
+
+`npm run dist` on Linux builds the Arch package, the `.deb`, the `.rpm`, the tarball, and the AppImage. It needs `bsdtar` (`libarchive-tools` on Debian and Ubuntu) and `rpmbuild` (`rpm`). Then, with podman:
+
+```sh
+node tools/packaging/checkLinuxPackages.ts release   # each package's entry, icons, licenses, metadata
+tools/packaging/check-linux.sh                       # install, start, and remove on Arch, Debian, Ubuntu, Fedora
+tools/packaging/check-aur.sh                         # build and install the AUR package from the local Arch package
+npm run build && tools/packaging/e2e-wayland.sh      # end-to-end specs on native Wayland in Arch
+```
+
+The container checks start each build under headless sway with no X server and write screenshots and results to `reports/packaging/`. [tools/packaging/README.md](tools/packaging/README.md) says what each one proves.
 
 ## License
 

@@ -17,6 +17,9 @@ A free, offline desktop app where children aged 3 to 12 learn to use a computer 
 | `assets/`                                                | Fonts, emoji, voice clips, art. Every file has a license entry.                               |
 | `e2e/`                                                   | Playwright tests against the Electron app                                                     |
 | `tools/`                                                 | Build, check, and generation scripts                                                          |
+| `tools/packaging/`                                       | Linux package checks in containers, the packaged smoke launch, and the release scripts        |
+| `packaging/`                                             | Linux install scripts, the AUR package, and the release notes template                        |
+| `build/`                                                 | The app icon for each system, drawn by `npm run icon:render`. Do not edit by hand.            |
 | `.github/agents/review-agent.md`                         | The pre-merge review prompt                                                                   |
 
 ## Hard rules
@@ -72,7 +75,8 @@ Node 24.22.2 is pinned in `.node-version` and `engines`. `.npmrc` sets `engine-s
 | `npm run e2e`                                         | Build, then Playwright against Electron                                                                                                                                                                                       |
 | `npm run e2e:browser`                                 | Build, then Playwright against the static renderer build in Chromium                                                                                                                                                          |
 | `npm run mutation`                                    | Stryker on `src/core/**`, and only the math and pixel arithmetic of the paint engine. Fails below 80%.                                                                                                                        |
-| `npm run dist`                                        | Build, then an unsigned installer for this operating system in `release/`                                                                                                                                                     |
+| `npm run dist`                                        | Build, then unsigned installers for this operating system in `release/`. Linux needs `bsdtar` and `rpmbuild`. `tools/packaging/README.md` lists the checks to run on them.                                                    |
+| `npm run icon:render`                                 | Draws the app icon from `assets/art/app-icon/` into `build/`. A unit test fails when the sources change without it.                                                                                                           |
 | `npm run perf`                                        | The paint engine benchmark, then studio timings in the built app at 1920 by 1080: frame pacing, fill latency, memory, and start time. Prints numbers and gates nothing. `WKC_PERF_MINUTES` sets the memory run, 5 by default. |
 | `npm run paint:goldens`                               | Rewrites changed paint goldens. Look at every changed image before you commit it.                                                                                                                                             |
 | `npm run voice:generate`                              | Makes the missing voice clips with Kokoro-82M. Needs `npm ci --prefix tools/voice` once and ffmpeg. See `tools/voice/README.md`.                                                                                              |
