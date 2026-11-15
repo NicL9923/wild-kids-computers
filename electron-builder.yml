@@ -101,6 +101,7 @@ pacman:
     - glib2
     - glibc
     - gtk3
+    - hicolor-icon-theme
     - libcups
     - libgcc
     - libpulse

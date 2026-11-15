@@ -196,7 +196,7 @@ NETNS
 note session_status "$session_status"
 
 case $kind in
-  pacman) pacman -R --noconfirm "$app" > "$out/remove.log" 2>&1 || fail "pacman -R failed" ;;
+  pacman) pacman -R --noconfirm "$(pacman -Qqp "$artifact")" > "$out/remove.log" 2>&1 || fail "pacman -R failed" ;;
   deb) apt-get purge -y "$app" > "$out/remove.log" 2>&1 || fail "apt-get purge failed" ;;
   rpm) dnf remove -y "$app" > "$out/remove.log" 2>&1 || fail "dnf remove failed" ;;
 esac

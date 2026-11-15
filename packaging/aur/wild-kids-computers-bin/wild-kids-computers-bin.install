@@ -1,0 +1,21 @@
+# Chromium's sandbox needs unprivileged user namespaces, which the Arch kernel allows, or else the
+# setuid helper, as on linux-hardened. This runs as root, which can always make a user namespace,
+# so it reads the kernel settings an ordinary user is held to.
+_sandbox_helper() {
+  local clone max
+  clone=$(cat /proc/sys/kernel/unprivileged_userns_clone 2> /dev/null || echo 1)
+  max=$(cat /proc/sys/user/max_user_namespaces 2> /dev/null || echo 0)
+  if [ -L /proc/self/ns/user ] && [ "$clone" = 1 ] && [ "$max" -gt 0 ]; then
+    chmod 0755 '/opt/Wild Kids - Computers/chrome-sandbox'
+  else
+    chmod 4755 '/opt/Wild Kids - Computers/chrome-sandbox'
+  fi
+}
+
+post_install() {
+  _sandbox_helper
+}
+
+post_upgrade() {
+  _sandbox_helper
+}
