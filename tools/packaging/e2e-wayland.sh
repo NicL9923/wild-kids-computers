@@ -51,12 +51,20 @@ set -euo pipefail
 out=$1
 shift
 export PATH="/opt/node/bin:$PATH"
+# The host home does not exist in the container, so caches go to a throwaway home.
+HOME=$(mktemp -d)
+export HOME
 XDG_RUNTIME_DIR=$(mktemp -d)
 export XDG_RUNTIME_DIR XDG_SESSION_TYPE=wayland WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1
 unset DISPLAY
-sway --unsupported-gpu --config tools/packaging/container/sway.conf > "$out/compositor.log" 2>&1 &
-for _ in $(seq 1 100); do [ -S "$XDG_RUNTIME_DIR/wayland-1" ] && break; sleep 0.1; done
-export WAYLAND_DISPLAY=wayland-1 npm_config_update_notifier=false
+sway --unsupported-gpu --config tools/packaging/container/sway-e2e.conf > "$out/compositor.log" 2>&1 &
+# Wait for both the Wayland socket and sway's IPC socket, which comes a moment later.
+for _ in $(seq 1 100); do
+  [ -S "$XDG_RUNTIME_DIR/wayland-1" ] && compgen -G "$XDG_RUNTIME_DIR/sway-ipc.*" > /dev/null && break
+  sleep 0.1
+done
+# electron/main/testMode.ts drops a Playwright switch that keeps the window from mapping here.
+export WAYLAND_DISPLAY=wayland-1 npm_config_update_notifier=false WKC_TEST_WAYLAND=1
 SWAYSOCK=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'sway-ipc.*' -print -quit)
 export SWAYSOCK
 {

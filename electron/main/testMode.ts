@@ -46,3 +46,21 @@ export function stripDebugSwitches(commandLine: CommandLine, isPackaged: boolean
   for (const name of removed) commandLine.removeSwitch(name);
   return removed;
 }
+
+/**
+ * Playwright's Electron loader appends --enable-unsafe-swiftshader to every launch. On a Wayland
+ * compositor without a GPU, Chromium 45 then never maps the window: no frame arrives, so
+ * requestAnimationFrame stalls and every click waits forever. tools/packaging/e2e-wayland.sh sets
+ * WKC_TEST_WAYLAND=1 to drop the switch in its test runs. The packaged app never gets the switch,
+ * and the runs under Xvfb keep it, so their canvas pixels do not change. Returns what it removed.
+ */
+export function dropWaylandHarnessSwitches(
+  commandLine: CommandLine,
+  testMode: TestMode,
+  env: NodeJS.ProcessEnv,
+): string[] {
+  if (!testMode.enabled || env.WKC_TEST_WAYLAND !== '1' || !commandLine.hasSwitch('enable-unsafe-swiftshader'))
+    return [];
+  commandLine.removeSwitch('enable-unsafe-swiftshader');
+  return ['enable-unsafe-swiftshader'];
+}

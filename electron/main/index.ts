@@ -19,7 +19,7 @@ import { osFamily } from './platformInfo.ts';
 import { claimSingleInstance } from './singleInstance.ts';
 import { sandboxOffSwitch, sandboxRefusal } from './sandboxGuard.ts';
 import { resolveStartUrl } from './startUrl.ts';
-import { readTestMode, stripDebugSwitches } from './testMode.ts';
+import { dropWaylandHarnessSwitches, readTestMode, stripDebugSwitches } from './testMode.ts';
 import { createWindowControl } from './windowControl.ts';
 import { keepPageFitted } from './windowFit.ts';
 
@@ -37,6 +37,7 @@ if (sandboxOff !== null) {
 // Test hooks and debugging switches work only unpackaged. The packaged app ignores both.
 stripDebugSwitches(app.commandLine, app.isPackaged);
 const testMode = readTestMode(process.env, app.isPackaged);
+dropWaylandHarnessSwitches(app.commandLine, testMode, process.env);
 if (testMode.userDataDir !== undefined) app.setPath('userData', testMode.userDataDir);
 
 // The lock is keyed on the user data directory, so it is taken after the path is final and

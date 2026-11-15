@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readTestMode, stripDebugSwitches } from './testMode.ts';
+import { dropWaylandHarnessSwitches, readTestMode, stripDebugSwitches } from './testMode.ts';
 
 const absoluteDir = path.resolve('/tmp/wkc-e2e-1');
 
@@ -69,5 +69,30 @@ describe('stripDebugSwitches', () => {
     const line = commandLine(['remote-debugging-port']);
     expect(stripDebugSwitches(line, false)).toEqual([]);
     expect([...line.present]).toEqual(['remote-debugging-port']);
+  });
+});
+
+describe('dropWaylandHarnessSwitches', () => {
+  const on = readTestMode({ WKC_TEST: '1' }, false);
+  const off = readTestMode({}, false);
+
+  it('drops the SwiftShader switch from a Wayland test run', () => {
+    const line = commandLine(['enable-unsafe-swiftshader', 'lang']);
+    expect(dropWaylandHarnessSwitches(line, on, { WKC_TEST_WAYLAND: '1' })).toEqual(['enable-unsafe-swiftshader']);
+    expect([...line.present]).toEqual(['lang']);
+  });
+
+  it.each([
+    ['outside test mode', off, { WKC_TEST_WAYLAND: '1' }],
+    ['in a test run that is not on Wayland', on, {}],
+    ['when WKC_TEST_WAYLAND is not exactly 1', on, { WKC_TEST_WAYLAND: 'true' }],
+  ])('keeps the switch %s', (_label, mode, env) => {
+    const line = commandLine(['enable-unsafe-swiftshader']);
+    expect(dropWaylandHarnessSwitches(line, mode, env)).toEqual([]);
+    expect([...line.present]).toEqual(['enable-unsafe-swiftshader']);
+  });
+
+  it('does nothing when the switch is absent', () => {
+    expect(dropWaylandHarnessSwitches(commandLine([]), on, { WKC_TEST_WAYLAND: '1' })).toEqual([]);
   });
 });
