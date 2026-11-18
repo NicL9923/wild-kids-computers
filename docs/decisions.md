@@ -16,6 +16,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 
 - **esbuild bundles the main process and the preload. Vite bundles the renderer.** The sandboxed preload must be one CommonJS file, and two plain bundlers have fewer moving parts than an Electron-specific Vite wrapper.
 - **`tsrs` checks types.** It is the checker Nicolas's other repositories use. TypeScript 7.0.2 is the language version.
+- **Type-aware lint runs on `tsrs-lint`, and `oxlint-tsgolint` is not installed.** Oxlint prefers `tsrs-lint` over `tsgolint`, and a missing `tsrs` then fails lint loudly instead of falling back to a second backend. `npm run typecheck` stays separate from `oxlint --type-check`: Oxlint checks each file under one tsconfig, so `src/core/paint` and `src/core/platform` are never checked against the Node-only and preload projects, and a DOM global there would pass lint but fail `tsrs -b`.
 - **`@types/node` follows the pinned Node major version**, not the newest types, so code cannot type check against an API the runtime lacks.
 - **electron-builder's `electronFuses` option sets the fuses.** No separate fuses package.
 
