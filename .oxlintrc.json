@@ -334,10 +334,77 @@
             "paths": [
               {
                 "name": "electron",
-                "importNames": ["autoUpdater", "crashReporter"],
-                "message": "Hard rule 1: the app has no auto-update and no crash reporting."
+                "importNames": ["autoUpdater", "crashReporter", "net", "shell"],
+                "message": "Hard rule 1: the app has no network access, auto-update, crash reporting, or external shell launches."
+              },
+              {
+                "name": "http",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:http",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "https",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:https",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "http2",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:http2",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "net",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:net",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "tls",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:tls",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "dgram",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:dgram",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "dns",
+                "message": "Hard rule 1: no networking modules in Electron code."
+              },
+              {
+                "name": "node:dns",
+                "message": "Hard rule 1: no networking modules in Electron code."
               }
             ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "fetch",
+            "message": "Hard rule 1: Electron main/preload code must not call fetch."
+          },
+          {
+            "name": "WebSocket",
+            "message": "Hard rule 1: Electron main/preload code must not open WebSockets."
           }
         ]
       }

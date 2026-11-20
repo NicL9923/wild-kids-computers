@@ -8,13 +8,10 @@ import type { SpokenHandle, StringHandle } from '../../../core/strings/defineStr
  * the instruction line shows from band-6-8 up; leave out the part that would give the answer
  * away, such as the letter itself.
  *
- * The shell speaks the main instruction in an effect that runs after the activity's own effects,
- * so this waits a tick on the round's scope, which also cancels it if the round ends first. The new instruction cuts the old
- * one off, so the child hears the whole instruction once. A round component is remounted for
- * each round, so this runs once per round even when the kit is rebuilt.
+ * A round component is remounted for each round, so this runs once per round.
  */
 export function useRoundInstruction(
-  kit: Pick<ActivityKit<unknown>, 'scope' | 'setInstruction'>,
+  kit: Pick<ActivityKit<unknown>, 'setInstruction'>,
   spoken: readonly SpokenHandle[],
   shown: readonly StringHandle[] = spoken,
 ): void {
@@ -22,12 +19,8 @@ export function useRoundInstruction(
   useLayoutEffect(() => {
     live.current = { kit, spoken, shown };
   });
-  useEffect(
-    () =>
-      live.current.kit.scope.setTimeout(() => {
-        const now = live.current;
-        now.kit.setInstruction(now.spoken, { shown: now.shown });
-      }, 0),
-    [],
-  );
+  useEffect(() => {
+    const now = live.current;
+    now.kit.setInstruction(now.spoken, { shown: now.shown });
+  }, []);
 }

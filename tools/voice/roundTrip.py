@@ -28,6 +28,7 @@ from transformers import AutoModelForCTC, AutoProcessor, pipeline
 
 REPO = Path(__file__).resolve().parents[2]
 SPOKEN_LIST = REPO / "node_modules" / ".cache" / "wkc-voice" / "spoken.json"
+CACHE_PATH = REPO / "node_modules" / ".cache" / "wkc-voice" / "round-trip-cache.json"
 CLIP_DIR = REPO / "assets" / "voice" / "en"
 REPORT = REPO / "docs" / "voice-round-trip.md"
 WHISPER = "openai/whisper-large-v3-turbo"
@@ -134,42 +135,113 @@ class SoundResult:
     ok: bool
 
 
+def load_cache(use_cache: bool) -> dict[str, str]:
+    if not use_cache or not CACHE_PATH.exists():
+        return {}
+    try:
+        loaded = json.loads(CACHE_PATH.read_text())
+        return loaded if isinstance(loaded, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_cache(cache: dict[str, str]) -> None:
+    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CACHE_PATH.write_text(json.dumps(cache, indent=2, sort_keys=True) + "\n")
+
+
+def parse_only_filter(argv: list[str]) -> set[str] | None:
+    if "--only" not in argv:
+        return None
+    idx = argv.index("--only")
+    if idx + 1 >= len(argv):
+        raise SystemExit("--only expects a comma-separated list of clip filenames or string ids")
+    return {item.strip() for item in argv[idx + 1].split(",") if item.strip()}
+
+
 def main() -> None:
+    argv = sys.argv[1:]
+    use_cache = "--no-cache" not in argv
+    only = parse_only_filter(argv)
     spoken = json.loads(SPOKEN_LIST.read_text())
     profile = spoken["profile"]
     clips = spoken["clips"]
+    if only is not None:
+        clips = [
+            entry for entry in clips if entry["clip"] in only or any(string_id in only for string_id in entry["ids"])
+        ]
+    cache = load_cache(use_cache)
     torch.set_num_threads(max(1, torch.get_num_threads()))
 
-    asr = pipeline("automatic-speech-recognition", model=WHISPER, device="cpu", torch_dtype=torch.float32)
-    processor = AutoProcessor.from_pretrained(PHONEMES)
-    phoneme_model = AutoModelForCTC.from_pretrained(PHONEMES).eval()
+    asr = None
+    processor = None
+    phoneme_model = None
 
     words: list[WordResult] = []
     sounds: list[SoundResult] = []
     started = time.time()
+    cache_hits = 0
+    transcribed = 0
     for index, entry in enumerate(clips, 1):
-        audio = decode(CLIP_DIR / entry["clip"])
         speech = entry["speech"]
         match = re.fullmatch(r"/(.+)/", speech)
-        if match:
-            padded = np.concatenate([np.zeros(4000, np.float32), audio, np.zeros(4000, np.float32)])
-            values = processor(padded, sampling_rate=16000, return_tensors="pt").input_values
-            with torch.no_grad():
-                ids = phoneme_model(values).logits.argmax(-1)
-            heard = processor.batch_decode(ids)[0].strip()
+        is_letter_sound = bool(match) and all(i.startswith("letter-sounds.") for i in entry["ids"])
+        if is_letter_sound and match is not None:
+            cache_key = f"{PHONEMES}|{entry['clip']}|{speech}"
+            heard = cache.get(cache_key)
+            if heard is None:
+                if processor is None or phoneme_model is None:
+                    processor = AutoProcessor.from_pretrained(PHONEMES)
+                    phoneme_model = AutoModelForCTC.from_pretrained(PHONEMES).eval()
+                audio = decode(CLIP_DIR / entry["clip"])
+                padded = np.concatenate([np.zeros(4000, np.float32), audio, np.zeros(4000, np.float32)])
+                values = processor(padded, sampling_rate=16000, return_tensors="pt").input_values
+                with torch.no_grad():
+                    ids = phoneme_model(values).logits.argmax(-1)
+                heard = processor.batch_decode(ids)[0].strip()
+                cache[cache_key] = heard
+                transcribed += 1
+            else:
+                cache_hits += 1
             letter = entry["ids"][0].split(".")[-1]
             onsets = LETTER_SOUND_ONSETS.get(letter, [])
             first = [p for p in heard.split() if p != "ʔ"]
             ok = bool(first) and any(first[0].startswith(o) for o in onsets)
             sounds.append(SoundResult(entry["clip"], entry["ids"], match.group(1), heard, ok))
         else:
-            heard = asr(audio, generate_kwargs={"language": "english", "task": "transcribe"})["text"].strip()
-            expected_words = normalize_words(speech)
+            cache_key = f"{WHISPER}|{entry['clip']}|{speech}"
+            heard = cache.get(cache_key)
+            if heard is None:
+                if asr is None:
+                    asr = pipeline("automatic-speech-recognition", model=WHISPER, device="cpu", torch_dtype=torch.float32)
+                audio = decode(CLIP_DIR / entry["clip"])
+                heard = asr(audio, generate_kwargs={"language": "english", "task": "transcribe"})["text"].strip()
+                cache[cache_key] = heard
+                transcribed += 1
+            else:
+                cache_hits += 1
+            # Word clips that use explicit /phonemes/ overrides are still evaluated against their English display text.
+            expected_text = entry.get("text", speech) if match else speech
+            expected_words = normalize_words(expected_text)
             errors = edit_distance(expected_words, normalize_words(heard))
-            words.append(WordResult(entry["clip"], entry["ids"], speech, heard, errors, len(expected_words)))
+            words.append(WordResult(entry["clip"], entry["ids"], expected_text, heard, errors, len(expected_words)))
+        if transcribed > 0 and transcribed % 50 == 0:
+            save_cache(cache)
         if index % 50 == 0:
-            print(f"{index}/{len(clips)} clips, {time.time() - started:.0f} s", file=sys.stderr)
+            print(
+                f"{index}/{len(clips)} clips ({transcribed} new, {cache_hits} cached), {time.time() - started:.0f} s",
+                file=sys.stderr,
+            )
 
+    save_cache(cache)
+    if only is not None:
+        for r in words:
+            status = "OK" if r.errors == 0 else f"ERR({r.errors})"
+            print(f"{status}\t{r.clip}\t{','.join(r.ids)}\texpected={r.expected!r}\theard={r.heard!r}")
+        for s in sounds:
+            status = "OK" if s.ok else "ERR"
+            print(f"{status}\t{s.clip}\t{','.join(s.ids)}\tphonemes={s.phonemes!r}\theard={s.heard!r}")
+        return
     write_report(profile, words, sounds)
 
 

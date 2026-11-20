@@ -36,5 +36,9 @@ describe('trackpad moves when scrolls come faster than the screen draws', () => 
     expect(fake.calls.filter((call) => call.call === 'instruction' && call.ids[0] === strings.tapIt.id)).toHaveLength(
       1,
     );
+    // Advancing timers does not overwrite "Tap it." with the scroll instruction.
+    act(() => fake.scheduler.advance(10));
+    const instructions = fake.calls.filter((call) => call.call === 'instruction');
+    expect(instructions.at(-1)?.ids).toEqual([strings.tapIt.id]);
   });
 });

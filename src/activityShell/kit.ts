@@ -183,14 +183,16 @@ function count(value: number | undefined, fallback: number, name: string): numbe
  * with the same tally, and cancels the round's speech when the round ends.
  */
 export function createKit<S>(parts: KitParts<S>): ActivityKit<S> {
-  const { scope, host, tally, onRoundComplete, state } = parts;
+  const { scope, host, tally, onRoundComplete } = parts;
   const speakSequence = (handles: readonly SpokenHandle[]): Promise<void> =>
     scope.disposed ? Promise.resolve() : host.audio.speakSequence(handles);
 
   return {
     scope,
     clock: host.clock,
-    reducedMotion: parts.reducedMotion,
+    get reducedMotion(): boolean {
+      return parts.reducedMotion;
+    },
     speak: (handle) => (scope.disposed ? Promise.resolve() : host.audio.speak(handle)),
     speakSequence,
     setInstruction(instruction, options) {
@@ -246,11 +248,14 @@ export function createKit<S>(parts: KitParts<S>): ActivityKit<S> {
       onRoundComplete(result);
     },
     get state(): KitState<S> {
+      const state = parts.state;
       if (state === null) {
         throw new Error(`Activity ${host.activityId} uses kit.state but declares no state in activity.ts.`);
       }
       return state;
     },
-    pictures: parts.pictures,
+    get pictures(): Pick<ProfilePictures, 'list' | 'read'> {
+      return parts.pictures;
+    },
   };
 }

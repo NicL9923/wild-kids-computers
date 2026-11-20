@@ -76,4 +76,22 @@ describe('closing screen', () => {
     expect(screen.queryByRole('button', { name: strings.moreTime.text })).toBeNull();
     expect(harness.router.state.location.pathname).toBe('/closing');
   });
+
+  it('lets a grown-up switch player when there are multiple profiles, and hides Close in browser mode', async () => {
+    const OWL = { id: 'owl-kid', avatarId: 'owl', colorId: 'fern', band: 'band-6-8', name: 'Ada' } as const;
+    const harness = await renderShell('/closing', {
+      documents: savedProfiles([FOX, OWL], FOX.id, { sessionLengthMinutes: 5 }),
+      isElectron: false,
+    });
+    harness.clock.mono += FIVE_MINUTES;
+    fireEvent.click(await screen.findByRole('button', { name: shellStrings.grownUps.text }));
+    passGate();
+    await screen.findByRole('button', { name: strings.moreTime.text });
+    expect(screen.queryByRole('button', { name: strings.closeApp.text })).toBeNull();
+    expect(screen.getByRole('button', { name: strings.parentCorner.text })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: strings.switchPlayer.text }));
+    await waitFor(() => expect(harness.router.state.location.pathname).toBe('/'));
+    expect(harness.store.getSnapshot().activeProfile).toBeNull();
+  });
 });

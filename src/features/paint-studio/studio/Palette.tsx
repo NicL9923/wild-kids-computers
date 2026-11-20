@@ -24,18 +24,19 @@ export function Palette({
 }: {
   band: Band;
   color: Color;
-  onPick: (color: Color, name: SpokenHandle) => void;
+  onPick: (color: Color, name?: SpokenHandle) => void;
 }) {
   const palette = paletteFor(band);
   const [mixing, setMixing] = useState(false);
   const [hue, setHue] = useState(200);
   const [lightness, setLightness] = useState(50);
   const custom = !palette.some((entry) => sameColor(entry.color, color));
+  const mixDisplayColor = custom ? color : mixedColor(hue, lightness);
 
-  const mix = (nextHue: number, nextLightness: number): void => {
+  const mix = (nextHue: number, nextLightness: number, speak = false): void => {
     setHue(nextHue);
     setLightness(nextLightness);
-    onPick(mixedColor(nextHue, nextLightness), strings.mixColor);
+    onPick(mixedColor(nextHue, nextLightness), speak ? strings.mixColor : undefined);
   };
 
   return (
@@ -52,7 +53,10 @@ export function Palette({
             aria-label={t(entry.name)}
             aria-pressed={chosen}
             style={{ '--wk-swatch': cssColor(entry.color) }}
-            onClick={() => onPick(entry.color, entry.name)}
+            onClick={() => {
+              setMixing(false);
+              onPick(entry.color, entry.name);
+            }}
           >
             {chosen && <CheckMark />}
           </button>
@@ -63,14 +67,14 @@ export function Palette({
           type='button'
           className='wk-paint-swatch'
           data-color='mix'
-          data-mark={needsDarkMark(color) ? 'dark' : 'light'}
+          data-mark={needsDarkMark(mixDisplayColor) ? 'dark' : 'light'}
           aria-label={t(strings.mixColor)}
           aria-pressed={custom}
           aria-expanded={mixing}
-          style={{ '--wk-swatch': cssColor(custom ? color : mixedColor(hue, lightness)) }}
+          style={{ '--wk-swatch': cssColor(mixDisplayColor) }}
           onClick={() => {
             setMixing((open) => !open);
-            if (!custom) mix(hue, lightness);
+            if (!custom) mix(hue, lightness, true);
           }}
         >
           {custom ? <CheckMark /> : <EmojiPicture id='paint-palette' />}

@@ -1,5 +1,5 @@
-import { Clock, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { Clock, LogOut, Settings, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '../../components/ui/Button.tsx';
 import { CalmPanel } from '../../components/ui/CalmPanel.tsx';
@@ -9,9 +9,10 @@ import { InterfaceIcon } from '../../components/ui/InterfaceIcon.tsx';
 import { t } from '../../core/strings/defineStrings.ts';
 import { useQuitApp } from '../kiosk/QuitGuard.tsx';
 import { useParentGate } from '../parent-gate/ParentGate.tsx';
-import { HOME_PATH } from '../paths.ts';
-import { useSessionLength, useSessionStatus } from '../session/sessionHooks.ts';
+import { HOME_PATH, PARENT_CORNER_PATH, START_PATH } from '../paths.ts';
+import { useProfiles, useSessionLength, useSessionStatus } from '../session/sessionHooks.ts';
 import { useSpeakOnShow } from '../shell/Instruction.tsx';
+import { useShellPlatform } from '../shell/shellPlatform.tsx';
 import { strings as shellStrings } from '../shell/strings.ts';
 import { strings } from './strings.ts';
 import { MORE_TIME_MS } from './useSessionLimit.ts';
@@ -22,16 +23,35 @@ const SPOKEN = [strings.heading];
 /**
  * The calm screen after the session length is used up: the closing picture and one spoken
  * sentence. It has no clock, no count, and no way for the child to leave. A grown-up control in
- * the corner, behind the parent gate, gives a little more time or closes the app.
+ * the corner, behind the parent gate, gives a little more time, switches player, opens the parent
+ * corner, or closes the app.
  */
 export default function ClosingScreen() {
   const status = useSessionStatus();
+  const { profiles, chooseProfile } = useProfiles();
+  const platform = useShellPlatform();
   const askParent = useParentGate();
   const navigate = useNavigate();
   const quitApp = useQuitApp();
   const { grantPlayTime } = useSessionLength();
   const [choosing, setChoosing] = useState(false);
+  const [isElectron, setIsElectron] = useState(true);
   useSpeakOnShow(SPOKEN);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const info = await platform.info();
+        if (live) setIsElectron(info.isElectron);
+      } catch {
+        // Leave the default desktop assumption when platform info cannot be read.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [platform]);
 
   const openChoices = async () => {
     if (await askParent('closing')) setChoosing(true);
@@ -42,6 +62,17 @@ export default function ClosingScreen() {
     if (status === 'ready') grantPlayTime(MORE_TIME_MS);
     setChoosing(false);
     void navigate({ to: HOME_PATH, replace: true });
+  };
+
+  const switchPlayer = () => {
+    setChoosing(false);
+    chooseProfile(null);
+    void navigate({ to: START_PATH, replace: true });
+  };
+
+  const openParentCorner = () => {
+    setChoosing(false);
+    void navigate({ to: PARENT_CORNER_PATH, replace: true });
   };
 
   return (
@@ -58,16 +89,26 @@ export default function ClosingScreen() {
         open={choosing}
         onOpenChange={setChoosing}
         title={t(strings.choicesTitle)}
-        description={t(strings.choicesAbout)}
+        description={t(isElectron ? strings.choicesAbout : strings.choicesAboutBrowser)}
         closeLabel={t(strings.close)}
         actions={
           <>
             <Button icon={<Clock className='wk-lucide' aria-hidden='true' />} onClick={moreTime}>
               {t(strings.moreTime)}
             </Button>
-            <Button icon={<LogOut className='wk-lucide' aria-hidden='true' />} onClick={() => void quitApp()}>
-              {t(strings.closeApp)}
+            {profiles.length > 1 && (
+              <Button icon={<Users className='wk-lucide' aria-hidden='true' />} onClick={switchPlayer}>
+                {t(strings.switchPlayer)}
+              </Button>
+            )}
+            <Button icon={<Settings className='wk-lucide' aria-hidden='true' />} onClick={openParentCorner}>
+              {t(strings.parentCorner)}
             </Button>
+            {isElectron && (
+              <Button icon={<LogOut className='wk-lucide' aria-hidden='true' />} onClick={() => void quitApp()}>
+                {t(strings.closeApp)}
+              </Button>
+            )}
           </>
         }
       />

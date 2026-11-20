@@ -40,6 +40,8 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **A Bluetooth device request is cancelled in the main process.** Electron answers `select-bluetooth-device` with the first device in range when nothing handles it. Linux builds have no Web Bluetooth, so only macOS and Windows reach the handler.
 - **Known limit: the file store narrows, but does not close, a race with another program that swaps a folder in the data directory for a link.** The store refuses links below the data directory, and right before each read, write, rename, or removal it confirms the folder's real path is still its own place under the data directory, which was fixed at the store's first check. A program that swaps the folder in the instant between that confirmation and the call can still redirect it. Closing that gap needs every call anchored to an open directory handle (`openat` with `O_NOFOLLOW` on each part), which Node does not offer and Windows does not have in that form. The program that could do the swap already runs as the same user and can read and change every file the app can, including the data directory itself, so the app cannot protect anything from it; the check exists so a link left by a backup restore or a sync tool is refused rather than followed. The renderer cannot make a link or choose a path. Checked against Node 24.22.2, 2026-11-14.
 - **Test runs reach the bridge through `window.wkcTest.bridge`.** The contract suite then exercises the exact object the app uses, in both builds.
+- **Printing uses a one-time `app://bundle/__print/<token>/` route under a script-blocking CSP, not a `data:` URL.** Serving the print HTML and PNG from an in-memory single-use token store with `default-src 'none'; img-src 'self'; style-src 'unsafe-inline'` blocks page scripts, avoids multi-megabyte data URLs, and cleans up immediately when the print window closes or crashes.
+- **Main-process network APIs are blocked in both lint and the main bundle check.** `.oxlintrc.json` bans Node network modules, Electron `net`, and global network constructors in `electron/main/`, and `tools/buildElectron.ts` inspects the built `main.cjs` so transitive requires cannot slip in.
 
 ### Storage
 
@@ -52,6 +54,8 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **The parent PIN is 4 to 8 digits, hashed with PBKDF2-SHA256 at 600,000 iterations and a 16-byte salt.** That is OWASP's current minimum. The record stores the iteration count, so a later build can raise it. A short PIN stays guessable by anyone who can read the file; the hash only keeps it from being read in plain text.
 - **A parent PIN record the gate cannot verify is corrupt saved data.** The schema accepts only the exact base64 of a 16-byte salt and a 32-byte hash, so a damaged record sets the whole `app.json` aside like any other corrupt document, and the app falls back to the word gate and the first-launch sound and kiosk steps. If checking a PIN still fails at run time, the open gate switches to the word gate with a note. Refusing every answer instead would lock the adult out of the parent corner and, under kiosk lock, out of quitting. A child cannot damage the file or make Web Crypto fail, so the fallback opens nothing a child can reach.
 - **Settings defaults:** voice volume 1, effects volume 0.6, not muted, standard text size and letter spacing, reduced motion follows the system, no session limit, and export and print behind the parent gate.
+- **`BridgeError` distinguishes `storage-full` from general `io` failures.** Both the Electron file store (`ENOSPC`/`EDQUOT`) and the browser IndexedDB bridge (`QuotaExceededError`) map quota/disk-full errors to `'storage-full'` so the parent corner can tell an adult directly that storage is full.
+- **The browser bridge splits picture metadata and blobs in IndexedDB v2.** Keeping `pictureMeta` separate from `pictureBlobs` (migrating v1 records on upgrade) keeps gallery listings fast and avoids reading every full PNG into memory just to list thumbnails.
 
 ### Paint
 
@@ -69,7 +73,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Whole-picture effects run in a Web Worker.** A measured kaleidoscope took 100 ms and a blur 200 ms on a fast laptop CPU, which would freeze a slow one.
 - **The autosave PNG encoding runs in the same worker.** On the main thread it delayed a fill that landed during a save. `npm run perf` on an i9-14900HX under Xvfb measured fill click to pixels at a median of 43.3 ms and a p95 of 87.2 ms before, and 26.1 ms and 55.3 ms after. The studio copies the pixels before it hands them over, so painting goes on during the encode.
 - **The text tool fills glyph outlines from a table built at build time.** The app ships no font parser.
-- **The paint text face is Andika Bold 7.000, shipped as the glyph table "Meadow Sans".** Bold strokes read better on a painting. "Andika" is a Reserved Font Name under the OFL, and a subset table is a modified version, so it takes another name.
+- **The paint text face is Andika Bold 7.000, shipped as the glyph table "Meadow Sans".** Bold strokes read better on a painting. "Andika" is a Reserved Font Name under the OFL, and a subset table is a modified version, so it takes another name. The table includes ASCII plus Latin-1 Supplement (197 glyphs) so accented letters render cleanly.
 - **Within one stroke, a pixel keeps the highest coverage any dab gave it.** Overlapping dabs never darken each other, so a see-through marker stays even and a soft brush shows no beads.
 - **Outlines and lines are stroked by distance to the polyline, not by filling overlapping pieces.** Summing the coverage of overlapping pieces doubles their antialiased edges.
 - **The fill bucket grows one pixel under line art and unmixes antialiased painted edges.** Neither leaves a pale fringe between the paint and a line.
@@ -133,7 +137,7 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Every speech is synthesized with end punctuation.** Without a final period, Kokoro clipped the last sound of short words: "bed" was heard as "bad", "worm" as "wham".
 - **Letter sounds are Kokoro phonemes between slashes.** As text, "mmm" reaches the model as "em em em". Stops carry a light schwa ("buh"), because the model cannot release a stop alone. A person should still listen to them; see docs/voice-round-trip.md.
 - **Clips are mono Opus at 24 kbit/s in voice mode, evened to -20 dBFS voiced RMS.** Speech stays clear and a word is about 3 KB.
-- **The round trip runs Whisper large-v3-turbo and a wav2vec2 phoneme recognizer** in a Python environment outside the repository. Whisper hallucinates on clips under half a second, so letter sounds use the phoneme recognizer.
+- **The round trip runs Whisper large-v3-turbo and a wav2vec2 phoneme recognizer** in a Python environment outside the repository. Whisper hallucinates on clips under half a second, so `letter-sounds.*` clips use the phoneme recognizer while phoneme-overridden words still run through Whisper against their display text. Transcriptions are cached per clip hash and model under `node_modules/.cache/wkc-voice/` so incremental runs only transcribe changed clips.
 - **The voice and emoji tools have their own `package.json` files** in `tools/voice` and `tools/emoji`. Their packages never enter the app's dependency tree or license check.
 - **`check:voice` and `voice:generate` run as Vitest tasks under `tools/tasks/`**, not in `npm test`, because a feature branch adds strings before its clips exist.
 - **The content rules go beyond the spec's list** to pressure words (hurry, one more) and scolding words (wrong, oh no, sad). An honest use opts in per string.
@@ -180,6 +184,8 @@ Choices the [product spec](spec.md) left open, with the reason for each. "Human"
 - **Session length choices are off, 15, 30, 45, 60, and 90 minutes.**
 - **The grown-ups' control sits alone in the bottom right corner** of the meadow, the closing screen, and the profile choice when a profile could not be opened, away from the places and the child's top bar.
 - **`index.html` declares the cascade layer order** before any stylesheet. A CSS chunk that the first screen imports can load ahead of the Tailwind entry, and its `@layer components` would then lose to Tailwind's base reset. A unit test keeps the statement in step with Tailwind.
+- **The parent corner includes direct picture export and print, and a mute switch.** Because the parent corner is already behind the parent gate, adults can save, print, or batch-save the chosen child's paintings without re-answering the gate, and can toggle mute directly alongside the volume sliders.
+- **The closing screen lets an adult switch player or open the parent corner** without going through the meadow first, and hides "Close the app" in the browser build where closing the tab is up to the browser.
 
 ### Linux packages and release
 

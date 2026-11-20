@@ -33,8 +33,8 @@ export const HOME_PLACES: Record<HomePlaceId, HomePlace> = {
   'paint-studio': { picture: paintStudio, left: 0.081_25, top: 0.2 },
   'early-learning': { picture: earlyLearning, left: 0.393_75, top: 0.3 },
   'toy-desktop': { picture: toyDesktop, left: 0.706_25, top: 0.2 },
-  'computer-skills': { picture: computerSkills, left: 0.1875, top: 0.59 },
-  'robot-painter': { picture: robotPainter, left: 0.6, top: 0.59 },
+  'computer-skills': { picture: computerSkills, left: 0.1875, top: 0.55 },
+  'robot-painter': { picture: robotPainter, left: 0.6, top: 0.55 },
 };
 
 /** The picture of an area, for an area screen or a tile. */

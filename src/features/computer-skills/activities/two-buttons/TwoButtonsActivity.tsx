@@ -51,15 +51,12 @@ export default function TwoButtonsActivity({ level, kit }: ActivityProps<Buttons
   const boxes = useRef(new Map<MouseButton, HTMLElement>());
   const current = level.things[sorted];
 
-  // The replay control also says how to right-click on a trackpad. The shell has just said the
-  // main instruction, so this only changes what replay says.
+  // The replay control also says how to right-click on a trackpad. The shell still speaks the
+  // main instruction because this sets `speak: false`.
   useEffect(() => {
-    if (set.current) return undefined;
-    // Marked only once it runs: a kit rebuilt meanwhile cancels the timer, and this sets a new one.
-    return kit.scope.setTimeout(() => {
-      set.current = true;
-      kit.setInstruction([strings.instruction, strings.trackpad], { speak: false });
-    }, 0);
+    if (set.current) return;
+    set.current = true;
+    kit.setInstruction([strings.instruction, strings.trackpad], { speak: false });
   }, [kit]);
 
   function press(button: MouseButton, card: HTMLElement): void {

@@ -8,7 +8,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { SessionProvider } from '../app/session/SessionProvider.tsx';
@@ -651,6 +651,73 @@ describe('the kit across renders', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'rendered 1' }));
     await screen.findByRole('button', { name: 'rendered 2' });
     expect(seenKits.size).toBe(1);
+  });
+
+  it('keeps the same kit object and does not drop a hold when saved state updates', async () => {
+    const kits = new Set<unknown>();
+    function HoldingStateFixture({ kit }: ActivityProps<string, { taps: number }>) {
+      kits.add(kit);
+      const { holdCheckpoint } = kit;
+      const [holding, setHolding] = useState(false);
+      useEffect(() => (holding ? holdCheckpoint() : undefined), [holding, holdCheckpoint]);
+      return (
+        <div>
+          <button type='button' onClick={() => setHolding(true)}>
+            hold
+          </button>
+          <button type='button' onClick={() => kit.state.update((s) => ({ taps: s.taps + 1 }))}>
+            {`taps ${String(kit.state.value.taps)}`}
+          </button>
+          <button type='button' onClick={() => kit.checkpoint()}>
+            checkpoint
+          </button>
+        </div>
+      );
+    }
+    const definition = defineActivity<string, { taps: number }>({
+      id: 'run-stable-state',
+      area: 'toy-desktop',
+      order: 1,
+      bands: ['band-3-5'],
+      goal: strings.goal,
+      title: strings.title,
+      icon: { emoji: 'flower' },
+      inputs: ['click'],
+      spoken: [strings.say],
+      state: { schema: z.object({ taps: z.int().min(0) }), defaults: () => ({ taps: 0 }) },
+      load: () => Promise.resolve({ default: HoldingStateFixture }),
+      kind: 'free',
+      generateLevel: () => 'free',
+    });
+    const h = await run(definition, { sessionMinutes: 5 });
+    await screen.findByRole('button', { name: 'taps 0' });
+    h.clock.mono = 5 * 60_000;
+    click('hold');
+    click('checkpoint');
+    click('taps 0');
+    await screen.findByRole('button', { name: 'taps 1' });
+    await advance(BETWEEN_ROUNDS_MS * 2);
+    // The hold stayed active across the saved-state update, so the session did not close.
+    expect(h.path()).toBe('/play');
+    expect(kits.size).toBe(1);
+  });
+
+  it('preserves an instruction set directly in a child mount effect without clobbering it', async () => {
+    function DirectInstructionFixture({ kit }: ActivityProps<string>) {
+      useEffect(() => {
+        kit.setInstruction(strings.other);
+      }, [kit]);
+      return <p data-testid='direct'>ready</p>;
+    }
+    const definition = defineActivity<string>({
+      ...roundsFields('run-direct-instruction'),
+      load: () => Promise.resolve({ default: DirectInstructionFixture }),
+    });
+    const h = await run(definition);
+    await screen.findByTestId('direct');
+    expect(h.spoken()).toEqual([strings.other.id]);
+    click(shellStrings.replay.text);
+    expect(h.spoken()).toEqual([strings.other.id, strings.other.id]);
   });
 });
 

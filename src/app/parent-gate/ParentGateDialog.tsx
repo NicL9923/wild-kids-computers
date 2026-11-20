@@ -100,6 +100,9 @@ export function ParentGateDialog({ reason, opener, onSettle }: ParentGateDialogP
         <DialogPrimitive.Overlay className='wk-dialog-scrim' />
         <DialogPrimitive.Content
           className='wk-dialog wk-gate'
+          data-band='band-9-12'
+          data-text-size='standard'
+          data-letter-spacing='standard'
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             input.current?.focus();

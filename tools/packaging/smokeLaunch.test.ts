@@ -31,6 +31,16 @@ describe('smokeProblems', () => {
       { processes: [...RUNNING.processes, '/opt/app/wild-kids-computers --no-sandbox'] },
       'sandbox off',
     ],
+    [
+      'a process has --disable-gpu-sandbox',
+      { processes: [...RUNNING.processes, '/opt/app/wild-kids-computers --disable-gpu-sandbox'] },
+      'sandbox off',
+    ],
+    [
+      'a process has --in-process-gpu',
+      { processes: [...RUNNING.processes, '/opt/app/wild-kids-computers --in-process-gpu'] },
+      'sandbox off',
+    ],
     ['a renderer has no seccomp filter', { rendererSeccomp: [2, 0] }, 'not in seccomp filter mode: 2, 0'],
   ])('fails when %s', (_label, change, reason) => {
     expect(smokeProblems({ ...RUNNING, ...change })).toContainEqual(expect.stringContaining(reason));

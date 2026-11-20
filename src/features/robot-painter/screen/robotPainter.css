@@ -363,6 +363,10 @@
   padding: calc(var(--wk-space-unit) * 1) calc(var(--wk-space-unit) * 1) var(--wk-space-item);
 }
 
+.rp-take-out {
+  order: -1;
+}
+
 .rp-take-out,
 .rp-end-slot {
   display: flex;

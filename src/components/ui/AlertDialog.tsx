@@ -34,7 +34,13 @@ export function AlertDialog({
     <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className='wk-dialog-scrim' />
-        <AlertDialogPrimitive.Content className='wk-dialog' {...returnFocus}>
+        <AlertDialogPrimitive.Content
+          className='wk-dialog'
+          data-band='band-9-12'
+          data-text-size='standard'
+          data-letter-spacing='standard'
+          {...returnFocus}
+        >
           <AlertDialogPrimitive.Title className='wk-dialog-title'>{title}</AlertDialogPrimitive.Title>
           <AlertDialogPrimitive.Description className='wk-dialog-description'>
             {description}

@@ -47,10 +47,10 @@ export default function FractionsActivity({ level, kit }: ActivityProps<Fraction
   const round = useChoiceRound(kit, { answer: level.answer, sayCorrect: [name, feedback.thatsIt] });
   const pickPicture = level.mode === 'pick-picture';
 
-  // The shell asks to find a picture as the round starts; this adds the fraction, or asks the other way.
+  // Names the fraction to find, or asks the other way.
   useEffect(() => {
     const instruction = pickPicture ? [strings.findPicture, name] : [strings.whichFraction];
-    return kit.scope.setTimeout(() => kit.setInstruction(instruction), 0);
+    kit.setInstruction(instruction);
   }, [kit, pickPicture, name]);
 
   if (pickPicture) {

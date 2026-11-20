@@ -1,6 +1,8 @@
 import {
+  useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -34,6 +36,8 @@ export interface ToolDriver {
   readonly behavior: PenBehavior;
   /** Size of the pen ring in document pixels, or 0 for none. */
   readonly ringSize: number;
+  /** False for preview tools (line, shapes) that only need the final point of a coalesced batch. */
+  readonly coalesce?: boolean;
   /** A picture that follows the pointer, such as the chosen stamp, with its CSS transform. */
   readonly ghost?: { readonly url: string; readonly size: number; readonly transform: string };
   begin(at: ToolPoint): void;
@@ -44,6 +48,8 @@ export interface ToolDriver {
 export interface StudioCanvasHandle {
   /** Ends any stroke in progress, such as when the tool changes. */
   lift(): void;
+  /** Moves keyboard focus back to the canvas, such as after committing or cancelling text. */
+  focus(): void;
   readonly penDown: boolean;
 }
 
@@ -89,29 +95,60 @@ const KEY_STEP_FAR = 100;
  * document's own size, scaled together by CSS to fit. Pointer input runs through the sticky pen,
  * and the area each stroke changes is copied to the screen once per animation frame.
  */
+function mapClient(clientX: number, clientY: number, box: DOMRect | undefined): ToolPoint {
+  if (box === undefined || box.width === 0 || box.height === 0) return { x: 0, y: 0 };
+  return {
+    x: ((clientX - box.left) / box.width) * DOCUMENT_WIDTH,
+    y: ((clientY - box.top) / box.height) * DOCUMENT_HEIGHT,
+  };
+}
+
 export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleRef, overlay }: StudioCanvasProps) {
   const paintRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const cursorElRef = useRef<HTMLDivElement>(null);
   const penRef = useRef<PenState>(PEN_UP);
+  const activePointerId = useRef<number | null>(null);
+  const pointerPosRef = useRef<ToolPoint | null>(null);
+  const pointerFocusing = useRef(false);
   const driverRef = useRef(driver);
   const busyRef = useRef(busy);
   const leaveTimer = useRef<() => void>(() => undefined);
-  const [pointer, setPointer] = useState<ToolPoint | null>(null);
   const [cursor, setCursor] = useState<ToolPoint>({ x: DOCUMENT_WIDTH / 2, y: DOCUMENT_HEIGHT / 2 });
   const [keyboardActive, setKeyboardActive] = useState(false);
+  const keyboardActiveRef = useRef(keyboardActive);
   const [down, setDown] = useState(false);
+  const downRef = useRef(down);
   const keysId = useId();
 
   const frameScheduler = useRef<() => void>(() => undefined);
 
   const scopeRef = useRef(scope);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     driverRef.current = driver;
     busyRef.current = busy;
     scopeRef.current = scope;
-  }, [driver, busy, scope]);
+    keyboardActiveRef.current = keyboardActive;
+    downRef.current = down;
+  }, [driver, busy, scope, keyboardActive, down]);
+
+  const syncCursorElement = useCallback((point: ToolPoint | null): void => {
+    const el = cursorElRef.current;
+    if (el === null) return;
+    if (point === null) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.style.left = `${(point.x / DOCUMENT_WIDTH) * 100}%`;
+    el.style.top = `${(point.y / DOCUMENT_HEIGHT) * 100}%`;
+  }, []);
+
+  useEffect(() => {
+    syncCursorElement(keyboardActive ? cursor : pointerPosRef.current);
+  }, [keyboardActive, cursor, syncCursorElement]);
 
   // Copy changed pixels to the screen once per frame, and redraw the lines when the mask changes.
   useEffect(() => {
@@ -147,12 +184,7 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
   }, [studio]);
 
   function toDocument(clientX: number, clientY: number): ToolPoint {
-    const box = paintRef.current?.getBoundingClientRect();
-    if (box === undefined || box.width === 0) return { x: 0, y: 0 };
-    return {
-      x: ((clientX - box.left) / box.width) * DOCUMENT_WIDTH,
-      y: ((clientY - box.top) / box.height) * DOCUMENT_HEIGHT,
-    };
+    return mapClient(clientX, clientY, paintRef.current?.getBoundingClientRect());
   }
 
   /** Runs the pen's actions on the tool, mapping screen points to document points. */
@@ -166,7 +198,8 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
     }
     frameScheduler.current();
     const nowDown = isPenDown(result.state);
-    if (nowDown !== down) {
+    if (nowDown !== downRef.current) {
+      downRef.current = nowDown;
       setDown(nowDown);
       onPenChange(nowDown);
     }
@@ -174,44 +207,99 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
 
   const screenToDoc = (point: ScreenPoint): ToolPoint => toDocument(point.x, point.y);
 
+  function releaseCapture(pointerId: number | null): void {
+    if (pointerId === null) return;
+    const frame = frameRef.current;
+    if (frame === null) return;
+    try {
+      if (frame.hasPointerCapture?.(pointerId)) frame.releasePointerCapture(pointerId);
+    } catch {
+      // Capture may already have ended.
+    }
+  }
+
   function lift(): void {
     leaveTimer.current();
+    releaseCapture(activePointerId.current);
+    activePointerId.current = null;
     apply(penLift(penRef.current), screenToDoc);
   }
 
   useEffect(() => {
-    handleRef.current = { lift, penDown: down };
+    handleRef.current = {
+      lift,
+      focus: () => frameRef.current?.focus(),
+      penDown: down,
+    };
   });
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
     if (busyRef.current || event.button !== 0) return;
+    if (activePointerId.current !== null && activePointerId.current !== event.pointerId) return;
+    pointerFocusing.current = true;
     event.preventDefault();
     leaveTimer.current();
     setKeyboardActive(false);
-    apply(penDown(penRef.current, { x: event.clientX, y: event.clientY }), screenToDoc);
+    activePointerId.current = event.pointerId;
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Some synthetic or touch environments do not allow capture.
+    }
+    const box = paintRef.current?.getBoundingClientRect();
+    const at = mapClient(event.clientX, event.clientY, box);
+    pointerPosRef.current = at;
+    syncCursorElement(at);
+    apply(penDown(penRef.current, { x: event.clientX, y: event.clientY }), (point) => mapClient(point.x, point.y, box));
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
-    const at = toDocument(event.clientX, event.clientY);
-    setPointer(at);
+    if (activePointerId.current !== null && event.pointerId !== activePointerId.current) return;
+    const box = paintRef.current?.getBoundingClientRect();
+    const at = mapClient(event.clientX, event.clientY, box);
+    pointerPosRef.current = at;
+    if (!keyboardActiveRef.current) syncCursorElement(at);
     if (busyRef.current || !isPenDown(penRef.current)) return;
-    // Every point the pointer passed through since the last event, for a smooth stroke.
-    const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
-    const points = coalesced.length > 0 ? coalesced.map((e) => toDocument(e.clientX, e.clientY)) : [at];
-    apply(penMove(penRef.current, { x: event.clientX, y: event.clientY }), screenToDoc, points);
-  }
-
-  function onPointerUp(event: ReactPointerEvent<HTMLDivElement>): void {
-    if (busyRef.current) return;
+    // Preview tools (line, shapes) only draw to the latest endpoint; skip intermediate coalesced points.
+    let points: readonly ToolPoint[];
+    if (driverRef.current.coalesce === false) {
+      points = [at];
+    } else {
+      const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
+      points = coalesced.length > 0 ? coalesced.map((e) => mapClient(e.clientX, e.clientY, box)) : [at];
+    }
     apply(
-      penUp(penRef.current, { x: event.clientX, y: event.clientY }, pointerKind(event), driverRef.current.behavior),
-      screenToDoc,
+      penMove(penRef.current, { x: event.clientX, y: event.clientY }),
+      (point) => mapClient(point.x, point.y, box),
+      points,
     );
   }
 
+  function finishPointerUp(clientX: number, clientY: number, pointerId: number, kind: PointerKind): void {
+    if (activePointerId.current !== null && pointerId !== activePointerId.current) return;
+    releaseCapture(pointerId);
+    activePointerId.current = null;
+    if (busyRef.current) return;
+    apply(penUp(penRef.current, { x: clientX, y: clientY }, kind, driverRef.current.behavior), screenToDoc);
+  }
+
+  function onPointerUp(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    finishPointerUp(event.clientX, event.clientY, event.pointerId, pointerKind(event));
+  }
+
+  function onPointerCancel(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (activePointerId.current !== null && event.pointerId !== activePointerId.current) return;
+    lift();
+  }
+
   function onPointerLeave(): void {
-    setPointer(null);
+    pointerPosRef.current = null;
+    if (!keyboardActiveRef.current) syncCursorElement(null);
     if (!isPenDown(penRef.current)) return;
+    // When a button is held (pressed/dragging/lifting), pointer capture and the window pointerup
+    // listener end the stroke cleanly on release; only sticky hover mode needs the leave timer.
+    if (penRef.current.mode !== 'sticky') return;
     leaveTimer.current();
     leaveTimer.current = scope.setTimeout(lift, LEAVE_LIFT_MS);
   }
@@ -253,14 +341,32 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
     }
   }
 
-  // Lift when the window loses focus, so a pen never stays down behind another window.
+  // Lift when the window loses focus, or if a held pointer is released outside the canvas without capture.
+  const finishPointerUpRef = useRef(finishPointerUp);
+  useLayoutEffect(() => {
+    finishPointerUpRef.current = finishPointerUp;
+  });
   useEffect(() => {
     const onBlur = (): void => handleRef.current?.lift();
+    const onWindowUp = (event: PointerEvent): void => {
+      if (activePointerId.current === null || event.pointerId !== activePointerId.current) return;
+      const kind: PointerKind = event.pointerType === 'touch' ? 'touch' : event.pointerType === 'pen' ? 'pen' : 'mouse';
+      finishPointerUpRef.current(event.clientX, event.clientY, event.pointerId, kind);
+    };
+    const onWindowCancel = (event: PointerEvent): void => {
+      if (activePointerId.current === null || event.pointerId !== activePointerId.current) return;
+      handleRef.current?.lift();
+    };
     window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
+    window.addEventListener('pointerup', onWindowUp);
+    window.addEventListener('pointercancel', onWindowCancel);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('pointerup', onWindowUp);
+      window.removeEventListener('pointercancel', onWindowCancel);
+    };
   }, [handleRef]);
 
-  const shown = keyboardActive ? cursor : pointer;
   const ringPercent = (driver.ringSize / DOCUMENT_WIDTH) * 100;
 
   return (
@@ -283,9 +389,18 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
       onPointerEnter={onPointerEnter}
-      onPointerCancel={lift}
+      onPointerCancel={onPointerCancel}
       onKeyDown={onKeyDown}
-      onBlur={() => setKeyboardActive(false)}
+      onFocus={(event) => {
+        const fromPointer = pointerFocusing.current;
+        pointerFocusing.current = false;
+        if (!fromPointer || event.currentTarget.matches(':focus-visible')) setKeyboardActive(true);
+      }}
+      onBlur={() => {
+        const wasKeyboard = keyboardActiveRef.current;
+        setKeyboardActive(false);
+        if (wasKeyboard && isPenDown(penRef.current)) lift();
+      }}
     >
       <span id={keysId} hidden>
         {t(strings.canvasKeys)}
@@ -304,29 +419,28 @@ export function StudioCanvas({ studio, driver, scope, busy, onPenChange, handleR
         height={studio.doc.height}
         data-layer='lines'
       />
-      {shown !== null && (
-        <div
-          className='wk-paint-cursor'
-          data-keyboard={keyboardActive ? 'true' : undefined}
-          style={{ left: `${(shown.x / DOCUMENT_WIDTH) * 100}%`, top: `${(shown.y / DOCUMENT_HEIGHT) * 100}%` }}
-          aria-hidden='true'
-        >
-          {driver.ghost !== undefined && !down ? (
-            <img
-              className='wk-paint-ghost'
-              src={driver.ghost.url}
-              alt=''
-              draggable={false}
-              style={{
-                width: `${(driver.ghost.size / DOCUMENT_WIDTH) * 100}cqw`,
-                transform: `translate(-50%, -50%) ${driver.ghost.transform}`,
-              }}
-            />
-          ) : (
-            <span className='wk-paint-ring' style={{ width: `max(${ringPercent}cqw, 14px)` }} />
-          )}
-        </div>
-      )}
+      <div
+        ref={cursorElRef}
+        hidden
+        className='wk-paint-cursor'
+        data-keyboard={keyboardActive ? 'true' : undefined}
+        aria-hidden='true'
+      >
+        {driver.ghost !== undefined && !down ? (
+          <img
+            className='wk-paint-ghost'
+            src={driver.ghost.url}
+            alt=''
+            draggable={false}
+            style={{
+              width: `${(driver.ghost.size / DOCUMENT_WIDTH) * 100}cqw`,
+              transform: `translate(-50%, -50%) ${driver.ghost.transform}`,
+            }}
+          />
+        ) : (
+          <span className='wk-paint-ring' style={{ width: `max(${ringPercent}cqw, 14px)` }} />
+        )}
+      </div>
       {overlay}
     </div>
   );

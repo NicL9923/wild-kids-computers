@@ -46,6 +46,7 @@ All of these apply at once. Each has a test.
 7. Every permission request and permission check is denied.
 8. The session cancels every download in `will-download`, so a file reaches the disk only through the bridge's export, which checks the bytes and sits behind the parent gate.
 9. `tools/checkDependencies.ts` fails when `package.json` or the lockfile contains a denied package. The deny list covers HTTP clients, analytics, crash reporting, and auto-update packages. It also fails when a production dependency has a license outside a permissive allow list.
+10. Oxlint bans Node network modules (`http`, `https`, `net`, `tls`, `dgram`, `dns`, `http2`), Electron `net`, and global network constructors in `electron/main/`, and `tools/buildElectron.ts` fails the build if the bundled main entry requires any of them.
 
 The end-to-end no-network test starts a local HTTP server on a free port. From the renderer it tries `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, an `<img>`, a `<link rel="dns-prefetch">`, a fetch from a Worker, a WebRTC peer connection, `window.open`, and a navigation. It asserts that each fails and that the server saw zero requests.
 
@@ -195,10 +196,10 @@ The contract covers:
 - **Documents.** Read, write, and set aside a named JSON document, and remove everything of one profile. Names come from a fixed set of patterns in `src/core/platform/names.ts`, such as `profiles` and `profile/<id>/progress`.
 - **Pictures.** Save a PNG with its thumbnail, list, read, copy, move to trash, restore, and purge, per profile. Purge works only on a trashed picture.
 - **Window.** Fullscreen, kiosk lock, close request, and quit. Every close attempt calls the renderer's `onCloseRequest` listener with `{ kioskLock }`. The renderer calls `acknowledgeCloseRequest()` at once and `quit()` when it is done: under kiosk lock after the parent gate passes, and without it right after saving. Without an answer within 3 seconds, the main process destroys the window, because a hung page never finishes its unload handlers. Before it calls `quit()`, the renderer's quit flow (`src/app/kiosk/closeRequest.ts`) finishes the work screens hold in its registry, such as an unsaved picture, and the session's queued writes. The browser build cannot hold a close request, so there the page holds the close back with `beforeunload` while anything is unsaved. Work that has not finished after 5 seconds no longer holds the app open.
-- **Export and print.** Save a PNG to a place the adult chooses, and print a PNG.
+- **Export and print.** Save a PNG to a place the adult chooses, and print a PNG. In Electron, printing serves the page and PNG from memory on a one-time `app://bundle/__print/<token>/` route under a script-blocking `default-src 'none'` CSP in a hidden sandboxed window.
 - **Info.** Operating system family, app version, and whether the app runs in Electron. With `WKC_TEST=1` it also returns the `test` object that `launchApp` passed in `WKC_TEST_INFO`.
 
-Errors reject with a `BridgeError` whose `code` is `invalid-argument`, `too-large`, `not-found`, `forbidden`, or `io`. Over IPC the main process answers with a result envelope, because Electron flattens a thrown error into a string.
+Errors reject with a `BridgeError` whose `code` is `invalid-argument`, `too-large`, `not-found`, `forbidden`, `storage-full`, or `io`. Over IPC the main process answers with a result envelope, because Electron flattens a thrown error into a string.
 
 Rules:
 
@@ -206,7 +207,7 @@ Rules:
 - The main process writes files atomically: write a temporary file, flush it, then rename. Writes to one file run in call order.
 - A picture and its thumbnail commit as a pair. Both are staged complete and flushed, then the picture's rename commits the save and the thumbnail's rename follows. Before any picture call, the store finishes a commit that stopped after the picture's rename and discards one that stopped before it, so a listing never pairs a picture with another save's thumbnail.
 - The main process follows no link under the data directory. A path with a symbolic link or junction anywhere below `<userData>/data/` is refused with `forbidden`, and a linked picture file is left out of a listing. Reads stop at the size cap of their kind.
-- The Electron build keeps data under `<userData>/data/`: `app.json`, `profiles.json`, and `profile/<id>/` with `settings.json`, `progress.json`, `activity/<activity-id>.json`, and `pictures/` with a `trash/` folder. The browser build keeps the same names in IndexedDB.
+- The Electron build keeps data under `<userData>/data/`: `app.json`, `profiles.json`, and `profile/<id>/` with `settings.json`, `progress.json`, `activity/<activity-id>.json`, and `pictures/` with a `trash/` folder. The browser build keeps the same names in IndexedDB (v2, storing picture metadata in `pictureMeta` separately from PNG bytes in `pictureBlobs` so gallery listings do not deserialize full images).
 - In a test run the page exposes the bridge it uses as `window.wkcTest.bridge`. The Electron app does this only with `WKC_TEST=1`. The browser build does it with a `wkc-test` query parameter, which grants nothing the page could not already do.
 - The bridge moves bytes and text. Schema validation of documents happens in `src/core/storage/`, so both implementations share it.
 - One contract test suite, `e2e/bridge/contract.ts`, runs against the Electron app from `e2e/bridge/electron.spec.ts` and against the browser build from `e2e/browser/bridge.spec.ts`.
@@ -289,7 +290,7 @@ The seed for a round comes from `roundSeed(sessionSeed, roundIndex)` in core. Te
 
 ### What the kit supplies
 
-- **Instruction player.** Speaks the main instruction when a round starts and shows a replay control that is always visible. Bands above `band-3-5` also show the text. An activity whose instruction changes within a round calls `kit.setInstruction(handleOrSequence)`, and the replay control then plays that. Pass `{ shown }` when the instruction line must show less than the voice says, such as a sound the child is asked to match to its letter.
+- **Instruction player.** Speaks the main instruction when a round starts and shows a replay control that is always visible. Bands above `band-3-5` also show the text. An activity whose instruction changes within a round calls `kit.setInstruction(handleOrSequence)` directly in its mount effect or handler, and the shell preserves it without overwriting it with the default instruction. Pass `{ shown }` when the instruction line must show less than the voice says, such as a sound the child is asked to match to its letter. The `kit` handle stays referentially stable across `state`, `reducedMotion`, and `pictures` updates during a round so active checkpoint holds and effects are never disrupted.
 - **Speech.** `kit.speak(handle)` and `kit.speakSequence([...])` play clips through the scope, so leaving cancels them. `kit.hint(say?)` counts a hint. `kit.play(name)` and `kit.startSound(name)` play effects.
 - **Feedback.** `kit.feedback.correct({ at, say, silent })` gives a soft chime and a check mark. `kit.feedback.wrong(...)` gives a low nudge and an open ring in a quiet color, and counts a mistake. No character shows disappointment. A wrong action never ends the round.
 - **Difficulty adjustment.** `src/core/activityKit/difficulty.ts` is a pure model. It raises the level by one after two clean rounds in a row at the current level, and lowers it by one right after a round with three or more mistakes and hints together, within the range for the band. Each saved round records the level it was played at. A test's difficulty is clamped into the band's range.

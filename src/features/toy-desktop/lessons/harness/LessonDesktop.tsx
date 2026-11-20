@@ -54,14 +54,11 @@ export function LessonDesktop({ level, band, kit, steps, backdrop }: LessonDeskt
     live.current = { kit, steps };
   });
 
-  // The first step's own instruction replaces the definition's main one. The shell sets the main
-  // instruction in its own effect, which runs after this one, so this waits for that to finish.
+  // The first step's own instruction replaces the definition's main one.
   const first = steps[0]?.instruction;
   useEffect(() => {
     if (first === undefined) return;
-    queueMicrotask(() => {
-      if (!kit.scope.disposed) kit.setInstruction(first);
-    });
+    kit.setInstruction(first);
   }, [first, kit]);
 
   const { listen, replace } = desktop;

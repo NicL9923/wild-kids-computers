@@ -11,10 +11,10 @@ import { Screen } from '../../../components/ui/Screen.tsx';
 import { TextField } from '../../../components/ui/TextField.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
 import type { Color } from '../../../core/paint/color.ts';
-import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH, PAPER } from '../../../core/paint/document.ts';
+import { DOCUMENT_HEIGHT, DOCUMENT_WIDTH, PAPER, flattenDocument } from '../../../core/paint/document.ts';
 import type { GlyphTable } from '../../../core/paint/glyphs.ts';
 import type { StrokePainter } from '../../../core/paint/session.ts';
-import { createSurface, surfaceFromData, type Surface } from '../../../core/paint/surface.ts';
+import { createSurface, surfaceFromData, wrapSurface, type Surface } from '../../../core/paint/surface.ts';
 import type { PictureEffect, ShapeSettings, ToolPoint, ToolSettings } from '../../../core/paint/types.ts';
 import { t, type SpokenHandle } from '../../../core/strings/defineStrings.ts';
 import { strings as emojiNames, type EmojiId } from '../../../core/strings/shared/emoji.ts';
@@ -177,7 +177,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     flipX: false,
     rotation: 0,
   });
-  const [stampBitmap, setStampBitmap] = useState<{ key: string; surface: Surface } | null>(null);
+  const [stampBitmap, setStampBitmap] = useState<{ id: EmojiId; key: string; surface: Surface } | null>(null);
   const [effectId, setEffectId] = useState<string>(effects[0]?.id ?? 'confetti');
   const [panel, setPanel] = useState<Panel | null>(null);
   const [busy, setBusy] = useState(false);
@@ -256,12 +256,17 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       const saver = saverRef.current;
       if (saver === null) return false;
       const wasFailing = saver.failing;
+      lockedRef.current = true;
       setLeaving(true);
-      const switched = await saver.switchTo(next);
-      setLeaving(false);
-      if (switched) setStudio(next.studio);
-      else repeatNotSaved(wasFailing);
-      return switched;
+      try {
+        const switched = await saver.switchTo(next);
+        if (switched) setStudio(next.studio);
+        else repeatNotSaved(wasFailing);
+        return switched;
+      } finally {
+        lockedRef.current = false;
+        setLeaving(false);
+      }
     },
     [repeatNotSaved],
   );
@@ -327,13 +332,18 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     };
   }, [youngest]);
 
-  // Draw the chosen stamp at the size it will land, so it stays sharp.
+  // Draw the chosen stamp at the size it will land, so it stays sharp. Retain the previous bitmap
+  // for the same stamp while resizing so fast clicks do not drop stamps, and ignore rasterize errors.
   const stampKey = `${stamp.id}@${stampSize}`;
   useEffect(() => {
     let live = true;
     void (async () => {
-      const surface = await rasterizeSvg(emojiUrl(stamp.id), stampSize);
-      if (live) setStampBitmap({ key: stampKey, surface });
+      try {
+        const surface = await rasterizeSvg(emojiUrl(stamp.id), stampSize);
+        if (live) setStampBitmap({ id: stamp.id, key: stampKey, surface });
+      } catch {
+        // Leave the previous bitmap or no bitmap; never reject unhandled.
+      }
     })();
     return () => {
       live = false;
@@ -362,14 +372,23 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     if (saver === null) return true;
     settle();
     const wasFailing = saver.failing;
+    lockedRef.current = true;
     setLeaving(true);
-    const kept = await saver.keep();
-    if (!kept) {
-      setLeaving(false);
-      repeatNotSaved(wasFailing);
-    } else {
-      // The screen closes next. If something stopped that route change, input comes back.
-      runtime?.scope.setTimeout(() => setLeaving(false), STALLED_LEAVE_MS);
+    let kept = false;
+    try {
+      kept = await saver.keep();
+    } finally {
+      if (!kept) {
+        lockedRef.current = false;
+        setLeaving(false);
+        repeatNotSaved(wasFailing);
+      } else {
+        // The screen closes next. If something stopped that route change, input comes back.
+        runtime?.scope.setTimeout(() => {
+          lockedRef.current = false;
+          setLeaving(false);
+        }, STALLED_LEAVE_MS);
+      }
     }
     return kept;
   }, [settle, repeatNotSaved, runtime]);
@@ -415,14 +434,24 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       settle();
       const target = studioRef.current;
       const version = target.version;
+      const hadMask = target.doc.mask !== null;
+      const source = hadMask ? flattenDocument(target.doc) : target.doc.paint;
       setBusy(true);
       lockedRef.current = true;
       audio.play('sparkle');
       try {
-        const pixels = await runtime.runner.run(chosen, target.doc.paint);
-        // A result for a picture that changed meanwhile is dropped; see replacePaintFrom.
-        if (studioRef.current === target && !runtime.scope.disposed) target.replacePaintFrom(version, pixels);
+        const pixels = await runtime.runner.run(chosen, source);
+        // A result for a picture that changed meanwhile is dropped. On a coloring page, bake the
+        // flattened result and clear the mask in one undoable step so undo restores both.
+        if (studioRef.current === target && !runtime.scope.disposed) {
+          if (hadMask) {
+            target.replaceFrom(version, wrapSurface(target.doc.width, target.doc.height, pixels), null, null);
+          } else {
+            target.replacePaintFrom(version, pixels);
+          }
+        }
       } finally {
+        lockedRef.current = false;
         if (!runtime.scope.disposed) setBusy(false);
       }
     },
@@ -455,11 +484,20 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }, [textOpen]);
 
   const placeText = (): void => {
+    if (text === null || text.content.trim() === '') return;
     studioRef.current.end();
     setText(null);
     audio.play('put-down');
+    canvasRef.current?.focus();
   };
 
+  const cancelText = (): void => {
+    studioRef.current.cancel();
+    setText(null);
+    canvasRef.current?.focus();
+  };
+
+  const stampReady = stampBitmap !== null && stampBitmap.id === stamp.id;
   const settings = (): ToolSettings => {
     seedRef.current = nextSeed(seedRef.current);
     const base: ToolSettings = {
@@ -470,7 +508,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       shape,
       fill: fillStyle(fillStyleId, color),
     };
-    if (tool === 'stamp' && stampBitmap?.key === stampKey) {
+    if (tool === 'stamp' && stampReady) {
       return {
         ...base,
         size: stampSize,
@@ -484,38 +522,44 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     const behavior = penBehavior(tool, effect);
     const paintWith = (
       painterId: string | StrokePainter,
-      onEnd?: () => void,
+      onEnd?: (changed: boolean) => void,
       continuous?: 'brush' | 'eraser',
-    ): ToolDriver => ({
-      behavior,
-      ringSize: tool === 'fill' ? 0 : (sizeChoice?.brush ?? 32),
-      begin(at) {
-        const painter = typeof painterId === 'string' ? toolById(painterId) : painterId;
-        studioRef.current.begin(painter, settings(), at);
-        lastMove.current = { point: at, time: performance.now() };
-        if (continuous !== undefined) {
+      coalesce = true,
+    ): ToolDriver => {
+      let versionBefore = 0;
+      return {
+        behavior,
+        coalesce,
+        ringSize: tool === 'fill' ? 0 : (sizeChoice?.brush ?? 32),
+        begin(at) {
+          versionBefore = studioRef.current.version;
+          const painter = typeof painterId === 'string' ? toolById(painterId) : painterId;
+          studioRef.current.begin(painter, settings(), at);
+          lastMove.current = { point: at, time: performance.now() };
+          if (continuous !== undefined) {
+            sound.current?.stop();
+            sound.current = audio.startContinuous(continuous);
+          }
+        },
+        move(points) {
+          studioRef.current.move(points);
+          const last = points.at(-1);
+          const previous = lastMove.current;
+          if (last === undefined || previous === null) return;
+          const now = performance.now();
+          const distance = Math.sqrt((last.x - previous.point.x) ** 2 + (last.y - previous.point.y) ** 2);
+          const speed = distance / Math.max(1, now - previous.time);
+          sound.current?.set(Math.min(1, speed / LOUDEST_SPEED));
+          lastMove.current = { point: last, time: now };
+        },
+        end() {
+          studioRef.current.end();
           sound.current?.stop();
-          sound.current = audio.startContinuous(continuous);
-        }
-      },
-      move(points) {
-        studioRef.current.move(points);
-        const last = points.at(-1);
-        const previous = lastMove.current;
-        if (last === undefined || previous === null) return;
-        const now = performance.now();
-        const distance = Math.sqrt((last.x - previous.point.x) ** 2 + (last.y - previous.point.y) ** 2);
-        const speed = distance / Math.max(1, now - previous.time);
-        sound.current?.set(Math.min(1, speed / LOUDEST_SPEED));
-        lastMove.current = { point: last, time: now };
-      },
-      end() {
-        studioRef.current.end();
-        sound.current?.stop();
-        sound.current = null;
-        onEnd?.();
-      },
-    });
+          sound.current = null;
+          onEnd?.(studioRef.current.version !== versionBefore);
+        },
+      };
+    };
 
     switch (tool) {
       case 'brush':
@@ -524,12 +568,14 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
         return paintWith('eraser', undefined, 'eraser');
       case 'line':
       case 'shapes':
-        return paintWith(tool, () => audio.play('snap'));
+        return paintWith(tool, () => audio.play('snap'), undefined, false);
       case 'fill':
         return paintWith('fill', () => audio.play('fill'));
       case 'stamp':
         return {
-          ...paintWith('stamp', () => audio.play('stamp')),
+          ...paintWith('stamp', (changed) => {
+            if (changed) audio.play('stamp');
+          }),
           ringSize: 0,
           ghost: {
             url: emojiUrl(stamp.id),
@@ -543,8 +589,11 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
           ringSize: 0,
           begin(at) {
             if (font === null) return;
-            studioRef.current.end();
-            setText({ at, content: '' });
+            setText((current) => {
+              if (current !== null) return { ...current, at };
+              studioRef.current.end();
+              return { at, content: '' };
+            });
           },
           move: () => undefined,
           end: () => undefined,
@@ -591,6 +640,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   function undo(): void {
     if (lockedRef.current) return;
     settle();
+    if (!studioRef.current.canUndo) return;
     studioRef.current.undo();
     audio.play('page-turn');
     say(strings.undo);
@@ -599,6 +649,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   function redo(): void {
     if (lockedRef.current) return;
     settle();
+    if (!studioRef.current.canRedo) return;
     studioRef.current.redo();
     audio.play('page-turn');
     say(strings.redo);
@@ -622,7 +673,8 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
   }
 
   async function openPage(page: ColoringPage): Promise<void> {
-    if (lockedRef.current) return;
+    if (lockedRef.current || runtime === null) return;
+    lockedRef.current = true;
     setPanel(null);
     settle();
     say(page.title);
@@ -631,6 +683,11 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       mask = await withDeadline(decodePngUrl(page.mask), DECODE_DEADLINE_MS, realTime, 'Decoding the page');
     } catch {
       // The page could not be read, so the picture on screen stays.
+      lockedRef.current = false;
+      return;
+    }
+    if (runtime.scope.disposed) {
+      lockedRef.current = false;
       return;
     }
     const blank = createSurface(DOCUMENT_WIDTH, DOCUMENT_HEIGHT, PAPER);
@@ -642,22 +699,43 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
     await switchPicture({ studio: next, id: null, savedVersion: next.version });
   }
 
-  // Undo and redo from the keyboard, except while typing letters.
+  // Undo and redo from the keyboard, except while typing letters. Attached once via refs.
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  undoRef.current = undo;
+  redoRef.current = redo;
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (!(event.ctrlKey || event.metaKey) || event.target instanceof HTMLInputElement) return;
       const key = event.key.toLowerCase();
       if (key === 'z' && !event.shiftKey) {
         event.preventDefault();
-        undo();
+        undoRef.current();
       } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
         event.preventDefault();
-        redo();
+        redoRef.current();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  });
+  }, []);
+
+  const tipOptionPreview = useMemo(() => (tip === undefined ? null : tipPreview(tip, color)), [tip, color]);
+  const shapeOptionPreview = useMemo(
+    () => shapePreview(shape.kind, shape.style, color, 48),
+    [shape.kind, shape.style, color],
+  );
+  const shapeStylePreviews = useMemo(
+    () => ({
+      filled: shapePreview('ellipse', 'filled', color, 40),
+      outline: shapePreview('ellipse', 'outline', color, 40),
+    }),
+    [color],
+  );
+  const fillOptionPreviews = useMemo(
+    () => new Map(FILL_STYLE_IDS.map((id) => [id, fillPreview(fillStyle(id, color), color, 56, 36)])),
+    [color],
+  );
 
   const ready = loaded && warm && runtime !== null;
   const canUndo = !locked && studio.canUndo;
@@ -686,11 +764,11 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       case 'brush':
         return (
           <>
-            {!youngest && tip !== undefined && (
+            {!youngest && tipOptionPreview !== null && (
               <StudioButton
                 className='wk-paint-wide'
                 label={t(strings.tips)}
-                picture={<SurfaceImage surface={tipPreview(tip, color)} />}
+                picture={<SurfaceImage surface={tipOptionPreview} />}
                 aria-expanded={panel === 'tips'}
                 onClick={() => {
                   setPanel(panel === 'tips' ? null : 'tips');
@@ -710,7 +788,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
             <StudioButton
               className='wk-paint-wide'
               label={t(strings.shapes)}
-              picture={<SurfaceImage surface={shapePreview(shape.kind, shape.style, color, 48)} />}
+              picture={<SurfaceImage surface={shapeOptionPreview} />}
               aria-expanded={panel === 'shapes'}
               onClick={() => {
                 setPanel(panel === 'shapes' ? null : 'shapes');
@@ -722,7 +800,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
                 <StudioButton
                   key={style}
                   label={t(strings[style])}
-                  picture={<SurfaceImage surface={shapePreview('ellipse', style, color, 40)} />}
+                  picture={<SurfaceImage surface={shapeStylePreviews[style]} />}
                   pressed={shape.style === style}
                   onClick={() => {
                     setShape({ ...shape, style });
@@ -737,18 +815,21 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
       case 'fill':
         return youngest ? null : (
           <fieldset className='wk-paint-option-group' aria-label={t(strings.fillStyles)}>
-            {FILL_STYLE_IDS.map((id) => (
-              <StudioButton
-                key={id}
-                label={t(FILL_STYLE_NAMES[id])}
-                picture={<SurfaceImage surface={fillPreview(fillStyle(id, color), color, 56, 36)} />}
-                pressed={fillStyleId === id}
-                onClick={() => {
-                  setFillStyleId(id);
-                  say(FILL_STYLE_NAMES[id]);
-                }}
-              />
-            ))}
+            {FILL_STYLE_IDS.map((id) => {
+              const preview = fillOptionPreviews.get(id);
+              return (
+                <StudioButton
+                  key={id}
+                  label={t(FILL_STYLE_NAMES[id])}
+                  picture={preview === undefined ? null : <SurfaceImage surface={preview} />}
+                  pressed={fillStyleId === id}
+                  onClick={() => {
+                    setFillStyleId(id);
+                    say(FILL_STYLE_NAMES[id]);
+                  }}
+                />
+              );
+            })}
           </fieldset>
         );
       case 'text':
@@ -765,10 +846,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
               onChange={(event) => setText({ ...text, content: event.currentTarget.value })}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') placeText();
-                if (event.key === 'Escape') {
-                  studioRef.current.cancel();
-                  setText(null);
-                }
+                if (event.key === 'Escape') cancelText();
               }}
             />
             <Button variant='primary' onClick={placeText} disabled={text.content.trim() === ''}>
@@ -941,6 +1019,17 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
                   handleRef={canvasRef}
                   overlay={
                     <>
+                      {text !== null && (
+                        <span
+                          className='wk-paint-text-caret'
+                          aria-hidden='true'
+                          style={{
+                            left: `${(text.at.x / DOCUMENT_WIDTH) * 100}%`,
+                            top: `${(text.at.y / DOCUMENT_HEIGHT) * 100}%`,
+                            height: `${((sizeChoice?.letters ?? 70) / DOCUMENT_HEIGHT) * 100}%`,
+                          }}
+                        />
+                      )}
                       {penIsDown && (
                         <output className='wk-paint-pen-badge'>
                           <EmojiPicture id='paintbrush' />
@@ -1025,7 +1114,7 @@ export function PaintStudioScreen({ pictureId }: { pictureId: string | null }) {
             color={color}
             onPick={(next, name) => {
               setColor(next);
-              say(name);
+              if (name !== undefined) say(name);
             }}
           />
         </div>

@@ -225,6 +225,16 @@ describe('making and renaming folders', () => {
     const inTrash = act(start(), ex({ type: 'open-node', nodeId: TRASH_ID })).state;
     expect(act(inTrash, run('new-folder')).events[0]).toMatchObject({ reason: 'command-disabled' });
   });
+
+  it('clears an active search when making a new folder so the new folder is shown for naming', () => {
+    const searched = act(start(), ...typeInto('search', 'fox')).state;
+    const { state: next } = act(searched, run('new-folder'));
+    expect(explorer(next).search.text).toBe('');
+    const made = nodeAtPath(next.fs, NEW_FOLDER_NAME);
+    expect(made?.kind).toBe('folder');
+    expect(explorer(next).rename?.nodeId).toBe(made?.id);
+    expect(explorerItems(next.fs, explorer(next)).some((node) => node.id === made?.id)).toBe(true);
+  });
 });
 
 describe('moving, deleting, and restoring', () => {

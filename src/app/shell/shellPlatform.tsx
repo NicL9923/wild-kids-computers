@@ -2,8 +2,8 @@ import { createContext, use, type ReactNode } from 'react';
 import type { PlatformBridge } from '../../core/platform/bridge.ts';
 import { getBridge } from '../../platform/getBridge.ts';
 
-/** The parts of the bridge the shell uses directly: window control and platform info. */
-export type ShellPlatform = Pick<PlatformBridge, 'window' | 'info'>;
+/** The parts of the bridge the shell uses directly: window control, picture output, and platform info. */
+export type ShellPlatform = Pick<PlatformBridge, 'window' | 'info' | 'output'>;
 
 const ShellPlatformContext = createContext<ShellPlatform | null>(null);
 

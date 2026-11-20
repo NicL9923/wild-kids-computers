@@ -111,6 +111,19 @@ export interface AudioEngine {
 const END_MARGIN_SECONDS = 1;
 
 /**
+ * How long to wait for a suspended AudioContext to resume before skipping a clip. Short enough
+ * that a browser blocking autoplay before the first gesture never stalls a sequence, and long
+ * enough for Electron's asynchronous resume IPC to finish on a cached clip.
+ */
+const RESUME_DEADLINE_MS = 250;
+
+/** Short fade when stopping a voice clip mid-speech, so cutting a clip never clicks. */
+const VOICE_STOP_FADE_SECONDS = 0.006;
+
+/** Smoothing time constant for live volume and mute changes, to avoid gain-step pops. */
+const VOLUME_RAMP_TIME_CONSTANT = 0.015;
+
+/**
  * How long fetching and decoding one clip may take before it counts as missing. A clip is a few
  * kilobytes of Opus read from the app's own files, which takes milliseconds even on a slow laptop.
  */
@@ -135,6 +148,14 @@ interface Graph {
   readonly effects: GainNode;
 }
 
+interface PlayingVoice {
+  readonly source: AudioBufferSourceNode;
+  readonly gain: GainNode;
+  readonly context: AudioContext;
+  readonly finish: () => void;
+  readonly disconnect: () => void;
+}
+
 export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
   const { environment, sfx } = options;
   const startedAt = environment.now();
@@ -143,7 +164,7 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
   const decoded = new Map<string, Promise<AudioBuffer | null>>();
   let volume: VolumeSettings = { ...DEFAULT_VOLUME, ...options.volume };
   let graph: Graph | null | undefined;
-  let current: { source: AudioBufferSourceNode; finish: () => void } | undefined;
+  let current: PlayingVoice | undefined;
   const running = new Set<ContinuousSound>();
   // Bumped by every speak and cancel, so a sequence or a slow decode knows it was superseded.
   let speechGeneration = 0;
@@ -175,20 +196,34 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     effects.connect(master);
     master.connect(context.destination);
     graph = { context, master, voice, effects };
-    applyVolume(graph);
+    applyVolume(graph, true);
     return graph;
   }
 
-  function applyVolume(target: Graph): void {
-    target.master.gain.value = volume.muted ? 0 : 1;
-    target.voice.gain.value = clamp01(volume.voice);
-    target.effects.gain.value = clamp01(volume.effects);
+  function applyVolume(target: Graph, immediate = false): void {
+    const masterValue = volume.muted ? 0 : 1;
+    const voiceValue = clamp01(volume.voice);
+    const effectsValue = clamp01(volume.effects);
+    if (immediate) {
+      target.master.gain.value = masterValue;
+      target.voice.gain.value = voiceValue;
+      target.effects.gain.value = effectsValue;
+      return;
+    }
+    const now = target.context.currentTime;
+    target.master.gain.setTargetAtTime(masterValue, now, VOLUME_RAMP_TIME_CONSTANT);
+    target.voice.gain.setTargetAtTime(voiceValue, now, VOLUME_RAMP_TIME_CONSTANT);
+    target.effects.gain.setTargetAtTime(effectsValue, now, VOLUME_RAMP_TIME_CONSTANT);
   }
 
-  function resume(target: Graph): void {
-    // Chromium may start a context suspended until the first user gesture. Every play call comes
-    // from one, so resuming here is enough. A rejected resume leaves the sound silent, not broken.
-    if (target.context.state === 'suspended') target.context.resume().catch(() => undefined);
+  function resume(target: Graph): Promise<void> {
+    // Chromium may start a context suspended until the first user gesture. Returning the promise
+    // lets speakOne wait briefly for an async resume on cached clips. A rejected resume leaves the
+    // sound silent, not broken.
+    if (target.context.state === 'suspended') {
+      return target.context.resume().catch(() => undefined);
+    }
+    return Promise.resolve();
   }
 
   function decode(target: Graph, clip: string, url: string): Promise<AudioBuffer | null> {
@@ -215,10 +250,14 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     const playing = current;
     current = undefined;
     if (playing === undefined) return;
+    const now = playing.context.currentTime;
     try {
-      playing.source.stop();
+      playing.gain.gain.setValueAtTime(playing.gain.gain.value, now);
+      playing.gain.gain.linearRampToValueAtTime(0, now + VOICE_STOP_FADE_SECONDS);
+      playing.source.stop(now + VOICE_STOP_FADE_SECONDS);
     } catch {
-      // Already stopped.
+      // Already stopped: disconnect immediately since no ended event will arrive.
+      playing.disconnect();
     }
     playing.finish();
   }
@@ -230,7 +269,7 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     abortSpeech();
   }
 
-  async function speakOne(handle: SpokenHandle, generation: number): Promise<void> {
+  async function speakOne(handle: SpokenHandle, generation: number, aborted: Promise<void>): Promise<void> {
     const clip = voiceClipName(handle.speech);
     const url = environment.clipUrl(clip);
     record({ kind: 'voice', name: handle.id, clip, found: url !== undefined });
@@ -238,31 +277,58 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
     if (url === undefined || volume.muted) return;
     const target = ensureGraph();
     if (target === null) return;
-    resume(target);
+    const resuming = resume(target);
     const buffer = await decode(target, clip, url);
     if (buffer === null || generation !== speechGeneration) return;
+    if (target.context.state === 'suspended') {
+      await Promise.race([
+        withDeadline(resuming, RESUME_DEADLINE_MS, realTime, 'Resuming audio').catch(() => undefined),
+        aborted,
+      ]);
+    }
     // A context the browser keeps suspended, such as before the first click in the browser build,
     // would hold the clip forever. Skip it so a sequence never stalls.
-    if (target.context.state !== 'running') return;
+    if (generation !== speechGeneration || target.context.state !== 'running') return;
 
     await new Promise<void>((resolve) => {
       const source = target.context.createBufferSource();
+      const clipGain = target.context.createGain();
       source.buffer = buffer;
-      source.connect(target.voice);
+      source.connect(clipGain);
+      clipGain.connect(target.voice);
       let finished = false;
+      let disconnected = false;
+      const disconnect = () => {
+        if (disconnected) return;
+        disconnected = true;
+        source.disconnect();
+        clipGain.disconnect();
+      };
       // If the end event never arrives, for example because the system suspended audio mid-clip,
       // settle anyway a little after the clip's length.
-      const fallback = setTimeout(() => finish(), (buffer.duration + END_MARGIN_SECONDS) * 1000);
+      const fallback = setTimeout(
+        () => {
+          disconnect();
+          finish();
+        },
+        (buffer.duration + END_MARGIN_SECONDS) * 1000,
+      );
       const finish = () => {
         if (finished) return;
         finished = true;
         clearTimeout(fallback);
         if (current?.source === source) current = undefined;
-        source.disconnect();
         resolve();
       };
-      source.addEventListener('ended', finish, { once: true });
-      current = { source, finish };
+      source.addEventListener(
+        'ended',
+        () => {
+          disconnect();
+          finish();
+        },
+        { once: true },
+      );
+      current = { source, gain: clipGain, context: target.context, finish, disconnect };
       source.start();
     });
   }
@@ -283,7 +349,7 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
           if (generation !== speechGeneration) return;
           // A clip still loading when speech stops is left to finish on its own; it sees the newer
           // generation and plays nothing.
-          await Promise.race([speakOne(handle, generation), aborted]);
+          await Promise.race([speakOne(handle, generation, aborted), aborted]);
         }
       })();
       speaking = run;
@@ -311,7 +377,10 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
       record({ kind: 'sfx', name });
       const target = ensureGraph();
       if (target === null) return;
-      resume(target);
+      void resume(target);
+      // Do not schedule one-shot oscillators on a suspended context: Chromium holds them at t=0
+      // and plays them all in a burst once the first gesture resumes the context.
+      if (target.context.state !== 'running') return;
       try {
         sfx.oneShots[name](target.context, target.effects);
       } catch {
@@ -323,7 +392,7 @@ export function createAudioEngine(options: AudioEngineOptions): AudioEngine {
       record({ kind: 'sfx', name });
       const target = ensureGraph();
       if (target === null) return SILENT_CONTINUOUS;
-      resume(target);
+      void resume(target);
       let sound: ContinuousSound;
       try {
         sound = sfx.continuous[name](target.context, target.effects);

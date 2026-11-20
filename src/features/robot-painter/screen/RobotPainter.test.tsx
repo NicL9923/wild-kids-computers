@@ -81,4 +81,33 @@ describe('robot free draw and the session length', () => {
     });
     expect([fake.holds(), checkpoints(fake)]).toEqual([0, 1]);
   });
+
+  it('clears the robot drawing as well as the blocks when Start over is clicked in editor layout', async () => {
+    const band = 'band-6-8';
+    const { fake, view } = await renderFree(band);
+    const { container } = view;
+    fireEvent.click(pick(container, '[data-end-slot="main"]'));
+    fireEvent.keyDown(pick(container, '[data-tool="move-right"]'), { key: 'Enter' });
+    fireEvent.click(pick(container, '[data-control="go"]'));
+    const pause = stepPause(runProgram(buildProgram([d.right()]), generateLevel(0, band).world).steps, band);
+    await act(async () => {
+      fake.scheduler.advance(pause);
+    });
+    expect(container.querySelectorAll('.rp-paper line').length).toBeGreaterThan(0);
+
+    fireEvent.click(pick(container, '[data-control="start-over"]'));
+    expect(container.querySelectorAll('[data-list="main"] > li > .rp-block')).toHaveLength(0);
+    expect(container.querySelectorAll('.rp-paper line')).toHaveLength(0);
+  });
+
+  it('lands keyboard carry on a program slot first instead of take-out', async () => {
+    const { view } = await renderFree('band-6-8');
+    const { container } = view;
+    fireEvent.click(pick(container, '[data-end-slot="main"]'));
+    fireEvent.keyDown(pick(container, '[data-tool="move-right"]'), { key: 'Enter' });
+    const blockButton = pick(container, '.rp-block-button');
+    fireEvent.keyDown(blockButton, { key: 'Enter' });
+    expect(pick(container, '.rp-take-out').getAttribute('data-carry-over')).toBe('false');
+    expect(container.querySelector('[data-carry-over="true"]')?.getAttribute('data-carry-target')).toMatch(/^slot:/);
+  });
 });

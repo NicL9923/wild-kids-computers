@@ -96,6 +96,10 @@
   --wk-focus-width: 4px;
   --wk-focus-offset: 3px;
 
+  /* ---- layers ---- */
+  --wk-z-scrim: 100;
+  --wk-z-dialog: 110;
+
   /* ---- motion. Movement multiplies by --wk-motion-scale, which reduced motion sets to 0. ---- */
   --wk-duration-quick: 140ms;
   --wk-duration-base: 220ms;
@@ -179,12 +183,21 @@
 
 /* ---- parent settings ---- */
 
+[data-text-size='standard'] {
+  --wk-text-scale: 1;
+}
+
 [data-text-size='large'] {
   --wk-text-scale: 1.25;
 }
 
 [data-text-size='larger'] {
   --wk-text-scale: 1.5;
+}
+
+[data-letter-spacing='standard'] {
+  --wk-letter-spacing: 0em;
+  --wk-word-spacing: 0em;
 }
 
 [data-letter-spacing='wide'] {

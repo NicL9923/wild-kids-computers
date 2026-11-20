@@ -103,6 +103,7 @@ export const strings = defineStrings('paint-studio', {
   exportPicture: { text: 'Save to the computer', silent: 'parent' },
   printPicture: { text: 'Print', silent: 'parent' },
   outputFailed: { text: 'That did not work. Try again.', silent: 'parent' },
+  galleryLoadFailed: { text: 'Your pictures could not be loaded right now. Try again in a moment.', silent: 'parent' },
   pictureNotSaved: { text: 'This picture could not be saved yet. It is still here. Please get a grown-up.' },
   effectWorking: { text: 'Adding the effect', silent: 'decorative' },
   loading: { text: 'Getting the paper ready', silent: 'decorative' },

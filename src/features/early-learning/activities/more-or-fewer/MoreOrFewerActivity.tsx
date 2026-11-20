@@ -39,8 +39,8 @@ export default function MoreOrFewerActivity({ level, kit }: ActivityProps<MoreLe
   // The shell asks "more" as the round starts; any other question replaces it.
   const question = QUESTION[level.ask];
   useEffect(() => {
-    if (question === strings.more) return undefined;
-    return kit.scope.setTimeout(() => kit.setInstruction(question), 0);
+    if (question === strings.more) return;
+    kit.setInstruction(question);
   }, [kit, question]);
 
   return (

@@ -47,6 +47,12 @@ export function FileDialogView({ window, layer }: { readonly window: WindowState
       data-file-dialog={dialog.mode}
       data-dialog-window={windowId}
       style={{ zIndex: DIALOG_LAYER + layer }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        run({ type: 'cancel' });
+      }}
     >
       <h2 id={headingId} className='td-dialog-heading'>
         {t(saving ? strings.saveAs : strings.open)}

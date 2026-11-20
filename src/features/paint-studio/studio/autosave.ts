@@ -1,8 +1,22 @@
 import type { PictureSummary, SavePictureInput } from '../../../core/platform/bridge.ts';
 import type { BridgeResult } from '../../../app/session/sessionStore.ts';
 import type { Scope } from '../../../core/activityKit/scope.ts';
+import { PAPER, type PaintDocument } from '../../../core/paint/document.ts';
 import { newPictureId } from '../../../core/storage/ids.ts';
 import type { StudioDocument } from './studioDocument.ts';
+
+const PAPER_PACKED = new Uint32Array(new Uint8ClampedArray([PAPER.r, PAPER.g, PAPER.b, PAPER.a]).buffer)[0] ?? 0;
+
+/** Whether the document is untouched blank paper with no coloring page mask. */
+function isBlankPaper(doc: PaintDocument): boolean {
+  if (doc.mask !== null) return false;
+  const data = doc.paint.data;
+  const pixels = new Uint32Array(data.buffer, data.byteOffset, doc.width * doc.height);
+  for (let i = 0; i < pixels.length; i++) {
+    if (pixels[i] !== PAPER_PACKED) return false;
+  }
+  return true;
+}
 
 export interface EncodedPicture {
   readonly png: Uint8Array;
@@ -87,7 +101,10 @@ export class Autosaver {
   }
 
   private get hasUnsavedCommits(): boolean {
-    return this.picture.version !== this.saved;
+    if (this.picture.version === this.saved) return false;
+    // Never create a brand-new gallery entry for blank white paper (e.g. undoing an untouched coloring page).
+    if (!this.inGallery && isBlankPaper(this.picture.doc)) return false;
+    return true;
   }
 
   /**

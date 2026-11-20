@@ -68,7 +68,9 @@ describe('speak', () => {
     const done = engine.speak(strings.b);
     await settle();
     expect(playingClips(context)).toEqual([`app://bundle/assets/${voiceClipName('B.')}`]);
-    expect(context.sources[0]?.output).toBe(context.gains[1]);
+    const clipGain = context.gains[3];
+    expect(context.sources[0]?.output).toBe(clipGain);
+    expect(clipGain?.output).toBe(context.gains[1]);
 
     finish(context.sources[0]);
     await expect(done).resolves.toBeUndefined();
@@ -183,6 +185,41 @@ describe('speak', () => {
     await settle();
     expect(context.state).toBe('running');
   });
+
+  it('waits briefly for an async resume on a cached clip instead of dropping it', async () => {
+    const { context, environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    const first = engine.speak(strings.done);
+    await settle();
+    finish(context.sources[0]);
+    await first;
+
+    const resumeGate = Promise.withResolvers<void>();
+    context.state = 'suspended';
+    context.resume = async () => {
+      await resumeGate.promise;
+      context.state = 'running';
+    };
+
+    const second = engine.speak(strings.done);
+    await settle();
+    expect(playingClips(context)).toEqual([]);
+    resumeGate.resolve();
+    await settle();
+    expect(playingClips(context)).toEqual([`app://bundle/assets/${voiceClipName('All done.')}`]);
+    finish(context.sources[1]);
+    await expect(second).resolves.toBeUndefined();
+  });
+
+  it('ramps a cut voice clip down before stopping it to avoid clicks', async () => {
+    const { context, environment } = harness();
+    const engine = createAudioEngine({ environment, sfx, testLog: false });
+    void engine.speak(strings.find);
+    await settle();
+    const clipGain = context.gains[3];
+    engine.cancelSpeech();
+    expect(clipGain?.gain.events.some(([kind, value]) => kind === 'linear' && value === 0)).toBe(true);
+  });
 });
 
 describe('speakSequence', () => {
@@ -293,6 +330,16 @@ describe('effects', () => {
     expect(engine.testLog).toEqual([{ kind: 'sfx', name: 'chime', at: 10 }]);
   });
 
+  it('does not schedule one-shot oscillators while the context stays suspended', () => {
+    const { context, environment } = harness();
+    context.state = 'suspended';
+    context.resume = () => Promise.resolve();
+    const engine = createAudioEngine({ environment, sfx, testLog: true });
+    engine.play('chime');
+    expect(context.oscillators).toEqual([]);
+    expect(engine.testLog).toEqual([{ kind: 'sfx', name: 'chime', at: 10 }]);
+  });
+
   it('keeps working when an effect fails to build', () => {
     const { environment } = harness();
     const broken: SfxLibrary = {
@@ -345,6 +392,7 @@ describe('volume', () => {
 
     engine.setVolume({ muted: true });
     expect(master?.gain.value).toBe(0);
+    expect(master?.gain.events.at(-1)?.[0]).toBe('target');
     engine.setVolume({ muted: false, voice: 2, effects: -1 });
     expect([master?.gain.value, voice?.gain.value, effects?.gain.value]).toEqual([1, 1, 0]);
   });

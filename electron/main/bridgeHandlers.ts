@@ -2,6 +2,9 @@ import { z } from 'zod';
 import { BridgeError, type PlatformBridge } from '../../src/core/platform/bridge.ts';
 import { BRIDGE_METHODS, type BridgeMethod, type IpcResult } from '../../src/core/platform/ipc.ts';
 import { isDocumentName, isExportFileStem, isSafeId } from '../../src/core/platform/names.ts';
+import { errorCode } from './atomicWrite.ts';
+
+const STORAGE_FULL_CODES = new Set(['ENOSPC', 'EDQUOT']);
 
 /** The bridge as the main process implements it. Close requests travel the other way. */
 export type BridgeImplementation = Omit<PlatformBridge, 'window'> & {
@@ -33,6 +36,9 @@ function handler<A extends z.ZodTuple>(
       return { ok: true, value: await call(bridge, parsed.data) };
     } catch (error) {
       if (error instanceof BridgeError) return { ok: false, code: error.code, message: error.message };
+      if (STORAGE_FULL_CODES.has(errorCode(error))) {
+        return { ok: false, code: 'storage-full', message: `${name} ran out of storage space.` };
+      }
       console.error(`Bridge call ${name} failed`, error);
       return { ok: false, code: 'io', message: `${name} failed.` };
     }

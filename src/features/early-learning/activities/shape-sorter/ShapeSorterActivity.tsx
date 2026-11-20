@@ -41,6 +41,10 @@ export default function ShapeSorterActivity({ level, kit }: ActivityProps<ShapeS
     onPlaced: (piece) => [shapeNames[shapeOf(piece)]],
     onDone: (piece) => [shapeNames[shapeOf(piece)]],
     onMiss: (piece) => [shapeNames[shapeOf(piece)]],
+    targetName: (target) => {
+      const shape = level.holes.find((each) => holeId(each) === target);
+      return shape === undefined ? shapeNames.circle : shapeNames[shape];
+    },
   });
 
   return (

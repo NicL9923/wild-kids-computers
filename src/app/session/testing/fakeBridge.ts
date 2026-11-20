@@ -54,6 +54,8 @@ export interface FakeBridgeOptions {
   test?: TestInfo;
   /** Implementations for window calls the test expects. Anything else throws. */
   window?: Partial<PlatformBridge['window']>;
+  /** Whether `info()` reports Electron (default true). */
+  isElectron?: boolean;
   /** The clock pictures use for `updatedAt`. */
   now?: () => number;
 }
@@ -128,7 +130,7 @@ export function createFakeBridge(options: FakeBridgeOptions = {}): FakeBridge {
       return Promise.resolve({
         os: 'linux',
         appVersion: '0.0.0-test',
-        isElectron: true,
+        isElectron: options.isElectron ?? true,
         ...(options.test === undefined ? {} : { test: options.test }),
       });
     },

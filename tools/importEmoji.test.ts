@@ -56,13 +56,20 @@ describe('resolveSelection', () => {
 });
 
 describe('emojiStringsSource', () => {
-  it('writes the names, the allow list, and the categories', () => {
+  it('writes the names, speech overrides, the allow list, and the categories', () => {
     const source = emojiStringsSource(
-      resolveSelection({ animals: [['Dog', 'dog']], sky: [['Star', 'star', 'star', ['star']]] }),
+      resolveSelection({
+        animals: [
+          ['Dog', 'dog'],
+          ['Duck', 'duck', undefined, undefined, '/dˈʌk/'],
+        ],
+        sky: [['Star', 'star', 'star', ['star']]],
+      }),
     );
     expect(source).toContain(`  'dog': { text: "dog" },`);
+    expect(source).toContain(`  'duck': { text: "duck", speech: "/dˈʌk/" },`);
     expect(source).toContain(`  'star': { text: "star", allow: ['star'] },`);
-    expect(source).toContain(`  animals: ['dog'],`);
+    expect(source).toContain(`  animals: ['dog', 'duck'],`);
   });
 });
 

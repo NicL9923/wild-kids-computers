@@ -88,6 +88,7 @@ function PinDialog({ onSave, onCancel }: { onSave: (record: PinRecord) => void; 
   const [pin, setPin] = useState('');
   const [repeat, setRepeat] = useState('');
   const [problem, setProblem] = useState<ReturnType<typeof pinProblem>>(null);
+  const [hashFailed, setHashFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const formId = useId();
 
@@ -95,9 +96,17 @@ function PinDialog({ onSave, onCancel }: { onSave: (record: PinRecord) => void; 
     event.preventDefault();
     const found = pinProblem(pin, repeat);
     setProblem(found);
+    setHashFailed(false);
     if (found !== null || saving) return;
     setSaving(true);
-    onSave(await hashParentPin(pin));
+    try {
+      const record = await hashParentPin(pin);
+      onSave(record);
+    } catch {
+      setHashFailed(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -120,6 +129,9 @@ function PinDialog({ onSave, onCancel }: { onSave: (record: PinRecord) => void; 
       }
     >
       <form id={formId} className='wk-parent-editor' onSubmit={(event) => void submit(event)}>
+        <p role='alert' className='wk-parent-problem-text'>
+          {hashFailed ? t(strings.pinSaveProblem) : ''}
+        </p>
         <TextField
           label={t(strings.newPin)}
           hint={t(strings.pinHint)}

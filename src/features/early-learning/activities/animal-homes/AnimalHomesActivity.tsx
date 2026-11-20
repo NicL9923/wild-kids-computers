@@ -47,6 +47,10 @@ export default function AnimalHomesActivity({ level, kit }: ActivityProps<Animal
     onPlaced: (animal) => [emojiNames[animal], HOME_NAMES[homeOf(animal)]],
     onDone: (animal) => [emojiNames[animal], HOME_NAMES[homeOf(animal)]],
     onMiss: (animal) => [emojiNames[animal]],
+    targetName: (target) => {
+      const home = level.homes.find((each) => homeId(each) === target);
+      return home === undefined ? emojiNames.nest : HOME_NAMES[home];
+    },
   });
 
   return (

@@ -128,6 +128,22 @@ describe('handleBridgeCall', () => {
     });
   });
 
+  it('turns ENOSPC and EDQUOT failures into storage-full errors', async () => {
+    for (const code of ['ENOSPC', 'EDQUOT']) {
+      const { bridge } = fakeBridge();
+      bridge.documents.write = async () => {
+        const error = new Error('no space left') as NodeJS.ErrnoException;
+        error.code = code;
+        throw error;
+      };
+      expect(await handleBridgeCall(bridge, 'documents.write', ['app', '{}'])).toEqual({
+        ok: false,
+        code: 'storage-full',
+        message: 'documents.write ran out of storage space.',
+      });
+    }
+  });
+
   it('turns any other failure into an io error without its details', async () => {
     const { bridge } = fakeBridge();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

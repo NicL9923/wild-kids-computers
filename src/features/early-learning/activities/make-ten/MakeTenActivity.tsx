@@ -31,8 +31,8 @@ export default function MakeTenActivity({ level, kit }: ActivityProps<TenLevel>)
 
   // The shell asks about ten as the round starts; a five frame asks about five instead.
   useEffect(() => {
-    if (level.whole === 10) return undefined;
-    return kit.scope.setTimeout(() => kit.setInstruction(strings.five), 0);
+    if (level.whole === 10) return;
+    kit.setInstruction(strings.five);
   }, [kit, level.whole]);
 
   function toggle(index: number): void {

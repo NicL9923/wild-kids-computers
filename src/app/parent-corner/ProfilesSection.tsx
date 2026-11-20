@@ -1,6 +1,6 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
-import { useId, useState } from 'react';
+import { useId, useRef, useState, type RefObject } from 'react';
 import { Avatar } from '../../components/ui/Avatar.tsx';
 import { AVATAR_IDS } from '../../components/ui/avatars.ts';
 import { Button } from '../../components/ui/Button.tsx';
@@ -53,6 +53,7 @@ export function ProfilesSection() {
   const { profiles } = useProfiles();
   const [editing, setEditing] = useState<Editing | null>(null);
   const [deleting, setDeleting] = useState<Profile | null>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
   const headingId = useId();
   const full = profiles.length >= MAX_PROFILES;
 
@@ -82,6 +83,7 @@ export function ProfilesSection() {
       </ul>
       <div className='wk-parent-row'>
         <Button
+          ref={addButtonRef}
           variant='primary'
           disabled={full}
           icon={<Plus className='wk-lucide' aria-hidden='true' />}
@@ -92,7 +94,9 @@ export function ProfilesSection() {
         {full && <p className='wk-parent-about'>{t(strings.profilesFull)}</p>}
       </div>
       {editing !== null && <ProfileEditor editing={editing} onDone={() => setEditing(null)} />}
-      {deleting !== null && <DeleteProfile profile={deleting} onDone={() => setDeleting(null)} />}
+      {deleting !== null && (
+        <DeleteProfile profile={deleting} afterDeleteFocus={addButtonRef} onDone={() => setDeleting(null)} />
+      )}
     </section>
   );
 }
@@ -218,10 +222,19 @@ function ProfileEditor({ editing, onDone }: { editing: Editing; onDone: () => vo
  * Asks before deleting, and names what goes with the profile. Focus starts on "Keep profile", so
  * Enter by habit keeps it. The dialog stays open until the deletion finishes or fails.
  */
-function DeleteProfile({ profile, onDone }: { profile: Profile; onDone: () => void }) {
+function DeleteProfile({
+  profile,
+  afterDeleteFocus,
+  onDone,
+}: {
+  profile: Profile;
+  afterDeleteFocus: RefObject<HTMLButtonElement | null>;
+  onDone: () => void;
+}) {
   const { deleteProfile, chooseProfile } = useProfiles();
   const store = useSessionStore();
   const returnFocus = useReturnFocus();
+  const deleted = useRef(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -234,12 +247,18 @@ function DeleteProfile({ profile, onDone }: { profile: Profile; onDone: () => vo
       setFailed(true);
       return;
     }
+    deleted.current = true;
     // Deleting the active child leaves none active. Only now, with the profile gone from the
     // list, can the settings move to the first child left without picking the deleted one.
     const { activeProfile, profiles } = store.getSnapshot();
     const next = profiles[0];
     if (activeProfile === null && next !== undefined) chooseProfile(next.id);
     onDone();
+    // Move focus explicitly because the deleted row's button is gone from the DOM.
+    queueMicrotask(() => {
+      const target = afterDeleteFocus.current;
+      if (target !== null && target.isConnected && !target.disabled) target.focus();
+    });
   };
 
   return (
@@ -251,7 +270,24 @@ function DeleteProfile({ profile, onDone }: { profile: Profile; onDone: () => vo
     >
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className='wk-dialog-scrim' />
-        <AlertDialogPrimitive.Content className='wk-dialog' {...returnFocus}>
+        <AlertDialogPrimitive.Content
+          className='wk-dialog'
+          data-band='band-9-12'
+          data-text-size='standard'
+          data-letter-spacing='standard'
+          {...returnFocus}
+          onCloseAutoFocus={(event) => {
+            if (deleted.current) {
+              const target = afterDeleteFocus.current;
+              if (target !== null && target.isConnected && !target.disabled) {
+                event.preventDefault();
+                target.focus();
+                return;
+              }
+            }
+            returnFocus.onCloseAutoFocus(event);
+          }}
+        >
           <AlertDialogPrimitive.Title className='wk-dialog-title'>{t(strings.deleteTitle)}</AlertDialogPrimitive.Title>
           <ProfileBadge profile={profile} />
           <AlertDialogPrimitive.Description className='wk-dialog-description'>

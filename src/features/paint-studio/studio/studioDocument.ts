@@ -168,6 +168,17 @@ export class StudioDocument {
     return true;
   }
 
+  /**
+   * Replaces paint and mask together from a snapshot taken at `version`, as one undoable step.
+   * Used when a whole-picture effect flattens a coloring page's lines into the picture so undo
+   * brings back both the original paint and the original line-art mask.
+   */
+  replaceFrom(version: number, paint: Surface, mask: Surface | null, pageId: string | null): boolean {
+    if (this.stroke !== null || this.version !== version) return false;
+    this.replace(paint, mask, pageId);
+    return true;
+  }
+
   /** Marks everything for repainting, such as after the canvas element is replaced. */
   invalidate(): void {
     this.paint({ x: 0, y: 0, width: this.doc.width, height: this.doc.height });

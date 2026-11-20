@@ -1,4 +1,5 @@
-import { surfaceFromData } from '../../../core/paint/surface.ts';
+import { blendPixel } from '../../../core/paint/color.ts';
+import { cloneSurface, wrapSurface } from '../../../core/paint/surface.ts';
 import { encodePicture } from '../studio/pictureFile.ts';
 import { paintEffects } from '../../../registry/paint.ts';
 import type { EffectRequest, EffectResponse } from './protocol.ts';
@@ -34,9 +35,18 @@ scope.addEventListener('message', (event: MessageEvent<EffectRequest>) => {
   }
   if (request.kind === 'encode') {
     const { width, height } = request;
-    const paint = surfaceFromData(width, height, request.paint);
-    const mask = request.mask === null ? null : surfaceFromData(width, height, request.mask);
-    encodePicture({ width, height, paint, mask }, request.pageId).then(
+    // The worker already owns these transferred buffers, so wrap them in place and blend the mask
+    // directly onto paint instead of allocating extra full-canvas copies.
+    const paint = wrapSurface(width, height, request.paint);
+    if (request.mask !== null) {
+      const mask = request.mask;
+      const target = paint.data;
+      for (let i = 0; i < mask.length; i += 4) {
+        const a = mask[i + 3] ?? 0;
+        if (a !== 0) blendPixel(target, i, mask[i] ?? 0, mask[i + 1] ?? 0, mask[i + 2] ?? 0, a);
+      }
+    }
+    encodePicture({ width, height, paint, mask: null }, request.pageId).then(
       ({ png, thumbnail }) =>
         respond({ kind: 'encoded', id: request.id, png, thumbnail }, [png.buffer, thumbnail.buffer]),
       (error: unknown) =>
@@ -47,8 +57,8 @@ scope.addEventListener('message', (event: MessageEvent<EffectRequest>) => {
   try {
     const effect = paintEffects.find((item) => item.id === request.effectId);
     if (effect?.group !== 'whole-picture') throw new Error(`No whole-picture effect "${request.effectId}".`);
-    const source = surfaceFromData(request.width, request.height, request.pixels);
-    const target = surfaceFromData(request.width, request.height, request.pixels);
+    const source = wrapSurface(request.width, request.height, request.pixels);
+    const target = cloneSurface(source);
     effect.apply(source, target);
     respond({ kind: 'result', id: request.id, pixels: target.data }, [target.data.buffer]);
   } catch (error) {

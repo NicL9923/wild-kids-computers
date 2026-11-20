@@ -14,7 +14,8 @@ export interface Surface {
 /** The largest side a surface may have. Larger sizes are a caller bug, not a big picture. */
 export const MAX_SURFACE_SIDE = 16384;
 
-export function createSurface(width: number, height: number, fill?: Color): Surface {
+/** Validates surface dimensions. */
+function checkDimensions(width: number, height: number): void {
   for (const [name, value] of [
     ['width', width],
     ['height', height],
@@ -23,6 +24,10 @@ export function createSurface(width: number, height: number, fill?: Color): Surf
       throw new RangeError(`Surface ${name} must be an integer from 1 to ${MAX_SURFACE_SIDE}, got ${value}.`);
     }
   }
+}
+
+export function createSurface(width: number, height: number, fill?: Color): Surface {
+  checkDimensions(width, height);
   const data = new Uint8ClampedArray(width * height * 4);
   if (fill !== undefined && (fill.r | fill.g | fill.b | fill.a) !== 0) {
     const pixels = new Uint32Array(data.buffer);
@@ -36,7 +41,16 @@ export function createSurface(width: number, height: number, fill?: Color): Surf
   return { width, height, data };
 }
 
-/** Wraps existing RGBA bytes, such as a decoded PNG, after checking the length. */
+/** Wraps an existing RGBA buffer without copying it, after checking dimensions and length. */
+export function wrapSurface(width: number, height: number, data: Uint8ClampedArray): Surface {
+  checkDimensions(width, height);
+  if (data.length !== width * height * 4) {
+    throw new RangeError(`Expected ${width * height * 4} bytes for ${width} by ${height} pixels, got ${data.length}.`);
+  }
+  return { width, height, data };
+}
+
+/** Copies existing RGBA bytes, such as a decoded PNG, into a new surface after checking the length. */
 export function surfaceFromData(width: number, height: number, data: Uint8ClampedArray | Uint8Array): Surface {
   if (data.length !== width * height * 4) {
     throw new RangeError(`Expected ${width * height * 4} bytes for ${width} by ${height} pixels, got ${data.length}.`);

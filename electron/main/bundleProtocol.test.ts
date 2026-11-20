@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { contentTypeFor, resolveBundleFile } from './bundleProtocol.ts';
+import { contentTypeFor, createPrintStore, resolveBundleFile, resolvePrintResponse } from './bundleProtocol.ts';
 
 const root = path.resolve('/opt/wkc/dist/renderer');
 
@@ -24,8 +24,39 @@ describe('resolveBundleFile', () => {
     ['malformed percent encoding', 'app://bundle/%E0%A4%A'],
     ['a NUL byte', 'app://bundle/index.html%00.png'],
     ['an unparseable URL', 'not a url'],
+    ['a print path', 'app://bundle/__print/0123456789abcdef0123456789abcdef/page.html'],
   ])('rejects %s', (_label, url) => {
     expect(resolveBundleFile(url, root)).toBeNull();
+  });
+});
+
+describe('resolvePrintResponse', () => {
+  const token = '0123456789abcdef0123456789abcdef';
+  const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]);
+
+  it('serves a registered print page and PNG with CSP and no-store headers', async () => {
+    const store = createPrintStore();
+    store.set(token, { html: '<img src="./picture.png">', png });
+
+    const page = resolvePrintResponse(`app://bundle/__print/${token}/page.html`, store);
+    expect(page?.status).toBe(200);
+    expect(page?.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(page?.headers.get('content-security-policy')).toContain("default-src 'none'");
+    expect(page?.headers.get('content-security-policy')).not.toContain('script-src');
+    expect(await page?.text()).toBe('<img src="./picture.png">');
+
+    const image = resolvePrintResponse(`app://bundle/__print/${token}/picture.png`, store);
+    expect(image?.status).toBe(200);
+    expect(image?.headers.get('content-type')).toBe('image/png');
+    expect(new Uint8Array(await (image ?? new Response()).arrayBuffer())).toEqual(png);
+  });
+
+  it('returns 404 for unknown, expired, or malformed print URLs', () => {
+    const store = createPrintStore();
+    expect(resolvePrintResponse(`app://bundle/__print/${token}/page.html`, store)?.status).toBe(404);
+    expect(resolvePrintResponse('app://bundle/__print/not-a-token/page.html', store)?.status).toBe(404);
+    expect(resolvePrintResponse(`app://bundle/__print/${token}/other.txt`, store)?.status).toBe(404);
+    expect(resolvePrintResponse('app://bundle/index.html', store)).toBeNull();
   });
 });
 

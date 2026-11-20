@@ -17,6 +17,7 @@
 
   .wk-activity-stage {
     position: relative;
+    isolation: isolate;
     min-width: 0;
     min-height: 0;
   }

@@ -96,13 +96,10 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
   const paper = useRef<HTMLElement | null>(null);
   const choices = useRef<HTMLDivElement | null>(null);
 
-  // Each puzzle kind has its own instruction. The shell speaks the main one when the step
-  // starts, in an effect that runs after this one, so this waits for it to finish.
+  // Each puzzle kind has its own instruction.
   const instruction = instructionOf(mode, layout);
   useEffect(() => {
-    queueMicrotask(() => {
-      if (!kit.scope.disposed) kit.setInstruction(instruction);
-    });
+    kit.setInstruction(instruction);
   }, [instruction, kit]);
 
   useEffect(() => {
@@ -360,7 +357,7 @@ export function RobotPainter({ mode, band, kit }: RobotPainterProps) {
               picture={<StartOverPicture />}
               data-control='start-over'
               disabled={solved || running}
-              onClick={() => edit(clearProgram(editor))}
+              onClick={startOver}
             />
             {mode.kind === 'free' && <PaintItButton kit={kit} onClick={paintIt} />}
           </>

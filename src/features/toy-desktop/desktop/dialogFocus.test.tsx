@@ -82,4 +82,14 @@ describe('keyboard focus around save and open dialogs', () => {
     fireEvent.click(get('[data-command="open"]'));
     expect(get('[data-file-dialog="open"]').contains(document.activeElement)).toBe(true);
   });
+
+  it('closes the open dialog when Escape is pressed inside it', () => {
+    const { container, get } = show();
+    fireEvent.click(get('[data-menu="file"]'));
+    fireEvent.click(get('[data-command="open"]'));
+    const dialog = get('[data-file-dialog="open"]');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(container.querySelector('[data-file-dialog]')).toBeNull();
+    expect(document.activeElement).toBe(get('[data-window] textarea'));
+  });
 });
