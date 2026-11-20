@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Band } from '../../../core/bands.ts';
 import type { Color } from '../../../core/paint/color.ts';
 import type { Surface } from '../../../core/paint/surface.ts';
@@ -45,7 +45,8 @@ export function PickerPanel({
   useEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
-  useEffect(() => {
+  // Layout effect so cleanup runs while the panel is still mounted and panel.contains(activeElement) is accurate.
+  useLayoutEffect(() => {
     const panel = ref.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const chosen = panel?.querySelector<HTMLElement>('.wk-paint-panel-body [aria-pressed="true"]');

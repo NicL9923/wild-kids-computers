@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { blockFileChoosers, type ChooserDebugger } from './fileChooserBlock.ts';
 
 const INTERCEPT = ['Page.setInterceptFileChooserDialog', { enabled: true, cancel: true }];
 
 /** Electron's in-process debugger, recording what the block asks of it. */
-function fakeDebugger(options: { attachThrows?: boolean; failCommand?: string } = {}) {
+function fakeDebugger(options: { attachThrows?: boolean; failCommand?: string; hangCommands?: boolean } = {}) {
   const calls: unknown[] = [];
   let attached = false;
   let onDetach: ((event: unknown, reason: string) => void) | undefined;
@@ -17,6 +17,7 @@ function fakeDebugger(options: { attachThrows?: boolean; failCommand?: string } 
     isAttached: () => attached,
     sendCommand(method, params) {
       calls.push(params === undefined ? [method] : [method, params]);
+      if (options.hangCommands === true) return new Promise(() => undefined);
       return method === options.failCommand ? Promise.reject(new Error('target closed')) : Promise.resolve({});
     },
     on(event, listener) {
@@ -92,18 +93,33 @@ describe('blockFileChoosers', () => {
   });
 
   it('stops reattaching after repeated consecutive detaches', () => {
-    const reports: string[] = [];
-    const { debug, detach } = fakeDebugger();
-    blockFileChoosers(
-      debug,
-      () => false,
-      (message) => reports.push(message),
-    );
-    for (let i = 0; i < 10; i++) {
-      // Simulate immediate detach before retry fires (scheduled stays true) and then repeated detaches.
+    vi.useFakeTimers();
+    try {
+      const reports: string[] = [];
+      const { debug, calls, detach } = fakeDebugger({ hangCommands: true });
+      blockFileChoosers(
+        debug,
+        () => false,
+        (message) => reports.push(message),
+      );
+      calls.length = 0;
+
+      // Drive 8 consecutive detach -> retry cycles while commands never finish.
+      for (let attempt = 1; attempt <= 8; attempt++) {
+        detach('target closed');
+        vi.runOnlyPendingTimers();
+        expect(calls.filter((call) => call === 'attach')).toHaveLength(attempt);
+      }
+      expect(reports).toEqual([]);
+
+      // The 9th consecutive detach hits the retry cap, reports the loop, and stops reattaching.
+      calls.length = 0;
       detach('target closed');
+      vi.runAllTimers();
+      expect(calls).toEqual([]);
+      expect(reports).toEqual(['The file chooser block stopped reattaching after repeated detaches.']);
+    } finally {
+      vi.useRealTimers();
     }
-    // At least one retry scheduled without crashing; verify repeated detaches hit the cap once retries run.
-    expect(reports).toEqual([]);
   });
 });
