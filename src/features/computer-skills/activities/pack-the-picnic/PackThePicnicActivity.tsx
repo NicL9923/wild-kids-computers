@@ -67,12 +67,9 @@ export default function PackThePicnicActivity({ level, kit }: ActivityProps<Picn
 
   // The shell says the basket instruction as the round starts; the blanket needs its own.
   useEffect(() => {
-    if (level.mode !== 'spots' || spoke.current) return undefined;
-    // Marked only once it runs: a kit rebuilt meanwhile cancels the timer, and this sets a new one.
-    return kit.scope.setTimeout(() => {
-      spoke.current = true;
-      kit.setInstruction(strings.spots);
-    }, 0);
+    if (level.mode !== 'spots' || spoke.current) return;
+    spoke.current = true;
+    kit.setInstruction(strings.spots);
   }, [kit, level.mode]);
 
   const carry = useCarry<string, string>(kit, {

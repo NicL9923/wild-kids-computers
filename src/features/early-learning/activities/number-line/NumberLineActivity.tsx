@@ -53,8 +53,8 @@ export default function NumberLineActivity({ level, kit }: ActivityProps<LineLev
 
   // The shell asks for the missing number as the round starts; a place round asks for its number.
   useEffect(() => {
-    if (!placing) return undefined;
-    return kit.scope.setTimeout(() => kit.setInstruction([strings.placeFor, number]), 0);
+    if (!placing) return;
+    kit.setInstruction([strings.placeFor, number]);
   }, [kit, placing, number]);
 
   const count = level.marks.length;

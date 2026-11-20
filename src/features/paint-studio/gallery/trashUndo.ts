@@ -37,6 +37,35 @@ export class TrashUndo {
     this.options.onChange(id);
   }
 
+  /**
+   * Holds the pending purge while an async restore runs. Call `finishBringBack` once the restore
+   * lands, or `cancelBringBack` if it failed so the child can try again.
+   */
+  beginBringBack(): string | null {
+    const id = this.waiting;
+    if (id === null) return null;
+    this.cancelTimer();
+    return id;
+  }
+
+  /** Completes a restore that landed, hiding the control. */
+  finishBringBack(id: string): void {
+    if (this.waiting !== id) return;
+    this.cancelTimer();
+    this.waiting = null;
+    this.options.onChange(null);
+  }
+
+  /** Restores the undo timer after a failed restore so the child can try again. */
+  cancelBringBack(id: string): void {
+    if (this.waiting !== id) return;
+    this.cancelTimer();
+    this.cancelTimer = this.options.scope.setTimeout(() => {
+      this.purgeWaiting();
+      this.options.onChange(null);
+    }, this.options.undoMs);
+  }
+
   /** The child clicked "bring it back". Returns the picture to restore, or null. */
   bringBack(): string | null {
     const id = this.waiting;

@@ -97,11 +97,9 @@ export default function ClimbTheTallTreeActivity({ level, kit }: ActivityProps<T
 
   // Each find is said as it comes up: "Scroll and find the" and the animal's name.
   useEffect(() => {
-    if (target === undefined || announced.current === found) return undefined;
-    return kit.scope.setTimeout(() => {
-      announced.current = found;
-      kit.setInstruction([strings.find, emojiNames[target.animal]]);
-    }, 0);
+    if (target === undefined || announced.current === found) return;
+    announced.current = found;
+    kit.setInstruction([strings.find, emojiNames[target.animal]]);
   }, [kit, found, target]);
 
   /** The top of the window, in tree units. */

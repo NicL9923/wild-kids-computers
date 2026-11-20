@@ -5,10 +5,15 @@ export const strings = defineStrings('parent-corner', {
   title: { text: 'Parent corner', silent: 'parent' },
   back: { text: 'Back to the meadow', silent: 'parent' },
   saveProblem: { text: 'A change could not be saved. It still shows here; try again in a moment.', silent: 'parent' },
+  saveProblemFull: {
+    text: 'This computer does not have enough free storage to save a change. Free up space and try again.',
+    silent: 'parent',
+  },
   loadProblem: {
     text: 'Some saved data could not be read, so it went back to the defaults. The unreadable file was kept beside it.',
     silent: 'parent',
   },
+  loadProblemFiles: { text: 'Affected data:', silent: 'parent' },
 
   children: { text: 'Children', silent: 'parent' },
   childrenAbout: { text: 'Each child has an animal, a color, an age band, and their own pictures.', silent: 'parent' },
@@ -43,6 +48,8 @@ export const strings = defineStrings('parent-corner', {
     silent: 'parent',
   },
   sound: { text: 'Sound', silent: 'parent' },
+  muteSound: { text: 'Mute all sound', silent: 'parent' },
+  muteSoundAbout: { text: 'Turns off voice and sound effects for this child.', silent: 'parent' },
   voiceVolume: { text: 'Voice volume', silent: 'parent' },
   effectsVolume: { text: 'Sound effects volume', silent: 'parent' },
   playVoice: { text: 'Play the voice', silent: 'parent' },
@@ -103,6 +110,7 @@ export const strings = defineStrings('parent-corner', {
   pinMismatch: { text: 'The two PINs are different. Type the same PIN twice.', silent: 'parent' },
   savePin: { text: 'Save PIN', silent: 'parent' },
   savingPin: { text: 'Saving the PIN', silent: 'parent' },
+  pinSaveProblem: { text: 'The PIN could not be created on this computer. Try again.', silent: 'parent' },
   removePinTitle: { text: 'Remove the PIN?', silent: 'parent' },
   removePinAbout: { text: 'The gate goes back to three numbers written as words.', silent: 'parent' },
   keepPin: { text: 'Keep PIN', silent: 'parent' },
@@ -117,6 +125,24 @@ export const strings = defineStrings('parent-corner', {
   'area-early-learning': { text: 'Early learning', silent: 'parent' },
   'area-robot-painter': { text: 'Robot painter', silent: 'parent' },
   'area-other': { text: 'Other activities', silent: 'parent' },
+
+  childPictures: { text: 'Saved pictures', silent: 'parent' },
+  childPicturesAbout: {
+    text: 'Save or print pictures this child painted, without opening the parent gate again.',
+    silent: 'parent',
+  },
+  picturesLoading: { text: 'Loading pictures', silent: 'parent' },
+  picturesEmpty: { text: 'No saved pictures yet.', silent: 'parent' },
+  picturesLoadProblem: { text: 'The saved pictures could not be loaded.', silent: 'parent' },
+  pictureItem: { text: 'Picture', silent: 'parent' },
+  savePicture: { text: 'Save', silent: 'parent' },
+  printPicture: { text: 'Print', silent: 'parent' },
+  saveAllPictures: { text: 'Save all pictures', silent: 'parent' },
+  pictureSaved: { text: 'Picture saved to the computer.', silent: 'parent' },
+  picturesAllSaved: { text: 'Saved pictures to the computer.', silent: 'parent' },
+  picturePrinted: { text: 'Sent the picture to the printer.', silent: 'parent' },
+  pictureSaveProblem: { text: 'The picture could not be saved to the computer.', silent: 'parent' },
+  picturePrintProblem: { text: 'The picture could not be printed.', silent: 'parent' },
 
   notices: { text: 'Licenses and credits', silent: 'parent' },
   noticesAbout: {

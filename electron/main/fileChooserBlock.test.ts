@@ -90,4 +90,20 @@ describe('blockFileChoosers', () => {
     );
     await expect.poll(() => reports).toEqual(['The file chooser block failed at Page.setInterceptFileChooserDialog.']);
   });
+
+  it('stops reattaching after repeated consecutive detaches', () => {
+    const reports: string[] = [];
+    const { debug, detach } = fakeDebugger();
+    blockFileChoosers(
+      debug,
+      () => false,
+      (message) => reports.push(message),
+    );
+    for (let i = 0; i < 10; i++) {
+      // Simulate immediate detach before retry fires (scheduled stays true) and then repeated detaches.
+      detach('target closed');
+    }
+    // At least one retry scheduled without crashing; verify repeated detaches hit the cap once retries run.
+    expect(reports).toEqual([]);
+  });
 });

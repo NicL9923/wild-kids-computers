@@ -30,7 +30,7 @@ export default function TimesTablesActivity({ level, kit }: ActivityProps<TimesL
       level.show === 'array'
         ? [rows, strings.rowsOf, columns, strings.howMany]
         : [strings.whatIs, rows, math.times, columns];
-    return kit.scope.setTimeout(() => kit.setInstruction(instruction), 0);
+    kit.setInstruction(instruction);
   }, [kit, level.show, rows, columns]);
 
   const showArray = level.show !== 'fact' || round.hinted || round.answered;

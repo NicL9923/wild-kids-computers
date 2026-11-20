@@ -32,6 +32,10 @@ export default function ColorMatchActivity({ level, kit }: ActivityProps<ColorMa
     onPlaced: (toy) => [colorNames[colorOf(toy)]],
     onDone: (toy) => [colorNames[colorOf(toy)]],
     onMiss: (toy) => [colorNames[colorOf(toy)]],
+    targetName: (target) => {
+      const color = level.boxes.find((each) => boxId(each) === target);
+      return color === undefined ? colorNames.red : colorNames[color];
+    },
   });
   const { carry, placed, hint, attachTray } = round;
 

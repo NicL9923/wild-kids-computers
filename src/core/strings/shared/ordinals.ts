@@ -7,7 +7,7 @@ export const strings = defineStrings('ordinals', {
   third: { text: 'third' },
   fourth: { text: 'fourth' },
   fifth: { text: 'fifth' },
-  sixth: { text: 'sixth' },
+  sixth: { text: 'sixth', speech: '/sɪksθː/' },
   seventh: { text: 'seventh' },
   eighth: { text: 'eighth' },
   ninth: { text: 'ninth' },

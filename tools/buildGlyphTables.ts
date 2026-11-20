@@ -26,9 +26,12 @@ const FONT_DIR = path.join(process.cwd(), 'assets/paint-fonts');
 
 const FACES = [{ id: 'meadow-sans', family: 'Meadow Sans', file: 'Andika-Bold.ttf' }] as const;
 
-/** What children type on an English keyboard: printable ASCII, plus curly quotes and dashes that paste in. */
+/** Printable ASCII, Latin-1 Supplement (accented letters like é, ñ, ü, ø), and curly quotes/dashes. */
 export const CHARACTERS = [
   ...Array.from({ length: 0x7e - 0x20 + 1 }, (_, i) => String.fromCodePoint(0x20 + i)),
+  ...Array.from({ length: 0xff - 0xa0 + 1 }, (_, i) => 0xa0 + i)
+    .filter((code) => code !== 0xad)
+    .map((code) => String.fromCodePoint(code)),
   '‘',
   '’',
   '“',

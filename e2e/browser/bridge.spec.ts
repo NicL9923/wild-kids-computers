@@ -50,7 +50,7 @@ defineBridgeContract({
     return { outcome, printedWidth };
   },
 
-  // The browser build keeps a picture and its thumbnail in one IndexedDB record.
+  // The browser build keeps picture bytes in the pictureBlobs store keyed by [profileId, id, file].
   async damageThumbnail(session, profileId, id, stored) {
     await session.page.evaluate(
       async ({ key, bytes }) => {
@@ -59,16 +59,16 @@ defineBridgeContract({
           opening.addEventListener('success', () => resolve(opening.result));
           opening.addEventListener('error', () => reject(opening.error ?? new Error('IndexedDB did not open.')));
         });
-        const store = database.transaction('pictures', 'readwrite').objectStore('pictures');
+        const store = database.transaction('pictureBlobs', 'readwrite').objectStore('pictureBlobs');
         const reading = store.get(key);
         await new Promise((resolve) => reading.addEventListener('success', resolve));
         const record: unknown = reading.result;
-        if (typeof record !== 'object' || record === null) throw new Error('No stored picture to damage.');
-        const writing = store.put({ ...record, thumbnail: Uint8Array.from(bytes) });
+        if (typeof record !== 'object' || record === null) throw new Error('No stored thumbnail to damage.');
+        const writing = store.put({ ...record, bytes: Uint8Array.from(bytes) });
         await new Promise((resolve) => writing.addEventListener('success', resolve));
         database.close();
       },
-      { key: [profileId, id], bytes: stored },
+      { key: [profileId, id, 'thumbnail'], bytes: stored },
     );
   },
 });

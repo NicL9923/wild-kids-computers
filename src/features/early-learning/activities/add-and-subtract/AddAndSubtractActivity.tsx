@@ -48,9 +48,9 @@ export default function AddAndSubtractActivity({ level, kit }: ActivityProps<Add
 
   // The shell starts with the adding instruction; taking away and the number sentence replace it.
   useEffect(() => {
-    if (level.show === 'things' && level.operation === 'add') return undefined;
+    if (level.show === 'things' && level.operation === 'add') return;
     const instruction = level.show === 'things' ? [strings.subtract] : [strings.whatIs, first, sign, second];
-    return kit.scope.setTimeout(() => kit.setInstruction(instruction), 0);
+    kit.setInstruction(instruction);
   }, [kit, level.show, level.operation, first, sign, second]);
 
   function count(id: string): void {

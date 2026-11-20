@@ -37,9 +37,10 @@ export default function TypeTheWordActivity({ level, kit }: ActivityProps<TypeWo
   const done = typed >= word.letters.length;
   const next = word.letters[typed];
 
-  // Each word is named as it comes up. A timeout lets the shell's own start of the round speak
-  // first, so this one is not cut off by it.
-  useEffect(() => kit.scope.setTimeout(() => kit.setInstruction([strings.type, name]), 0), [kit, name]);
+  // Each word is named as it comes up.
+  useEffect(() => {
+    kit.setInstruction([strings.type, name]);
+  }, [kit, name]);
 
   function light(code: string): void {
     setPressed(code);

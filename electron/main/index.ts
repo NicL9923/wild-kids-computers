@@ -7,13 +7,15 @@ import {
   MENU_COMMAND_CHANNEL,
 } from '../../src/core/platform/ipc.ts';
 import { appMenuTemplate } from './appMenu.ts';
+import { KeyedQueue } from './atomicWrite.ts';
 import { handleBridgeCall, isTrustedSender, originOf, type BridgeImplementation } from './bridgeHandlers.ts';
-import { BUNDLE_SCHEME, registerBundleProtocol } from './bundleProtocol.ts';
+import { BUNDLE_SCHEME, createPrintStore, registerBundleProtocol } from './bundleProtocol.ts';
 import { guardContents } from './contentsGuard.ts';
 import { createFileStore } from './fileStore.ts';
 import { createMainWindow } from './mainWindow.ts';
 import { applyNetworkSwitches, hardenSession, sessionControls } from './networkBlock.ts';
 import { applyPageSwitches } from './pageSwitches.ts';
+import { resolvePicturesDir } from './outputChecks.ts';
 import { exportPicture, printPicture } from './pictureOutput.ts';
 import { osFamily } from './platformInfo.ts';
 import { claimSingleInstance } from './singleInstance.ts';
@@ -92,17 +94,29 @@ app.on('window-all-closed', () => app.quit());
 async function start(): Promise<void> {
   await app.whenReady();
   await hardenSession(sessionControls(session.defaultSession), networkPolicy);
-  registerBundleProtocol(protocol, rendererRoot);
+  const printStore = createPrintStore();
+  const activePrintWindows = new Set<BrowserWindow>();
+  registerBundleProtocol(protocol, rendererRoot, printStore);
   const window = createMainWindow({ startUrl, preloadPath, os, icon: windowIcon });
   mainWindow = window;
+  window.on('closed', () => {
+    for (const printWindow of activePrintWindows) {
+      if (!printWindow.isDestroyed()) printWindow.destroy();
+    }
+    activePrintWindows.clear();
+  });
   keepPageFitted(window, (factor) => (pageZoom = factor));
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
-      appMenuTemplate(os, app.getName(), (command) => window.webContents.send(MENU_COMMAND_CHANNEL, command)),
+      appMenuTemplate(os, app.getName(), (command) => {
+        if (!window.isDestroyed()) window.webContents.send(MENU_COMMAND_CHANNEL, command);
+      }),
     ),
   );
   const windowControl = createWindowControl(window, {
-    notifyCloseRequest: (request) => window.webContents.send(CLOSE_REQUEST_CHANNEL, request),
+    notifyCloseRequest: (request) => {
+      if (!window.isDestroyed()) window.webContents.send(CLOSE_REQUEST_CHANNEL, request);
+    },
     setTimeout: (callback, ms) => setTimeout(callback, ms),
     clearTimeout: (timer) => clearTimeout(timer),
   });
@@ -112,6 +126,7 @@ async function start(): Promise<void> {
   powerMonitor.on('shutdown', () => windowControl.forceClose());
 
   const store = createFileStore(path.join(app.getPath('userData'), 'data'));
+  const outputQueue = new KeyedQueue();
   const bridge: BridgeImplementation = {
     info: async () => ({
       os,
@@ -129,8 +144,16 @@ async function start(): Promise<void> {
       quit: async () => windowControl.allowClose(),
     },
     output: {
-      exportPicture: (png, fileStem) => exportPicture(window, png, fileStem, app.getPath('pictures')),
-      printPicture: (png) => printPicture(png),
+      exportPicture: (png, fileStem) =>
+        outputQueue.run('output', () =>
+          exportPicture(
+            window,
+            png,
+            fileStem,
+            resolvePicturesDir((name) => app.getPath(name)),
+          ),
+        ),
+      printPicture: (png) => outputQueue.run('output', () => printPicture(window, png, printStore, activePrintWindows)),
     },
   };
 
@@ -152,4 +175,12 @@ async function start(): Promise<void> {
   }
 }
 
-if (isPrimaryInstance) void start();
+if (isPrimaryInstance) {
+  void start().catch((error: unknown) => {
+    console.error('Wild Kids - Computers failed to start.', error);
+    if (app.isReady()) {
+      dialog.showErrorBox('Wild Kids - Computers cannot start', error instanceof Error ? error.message : String(error));
+    }
+    app.exit(1);
+  });
+}

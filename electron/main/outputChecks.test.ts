@@ -1,7 +1,8 @@
+import os from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { isBridgeError } from '../../src/core/platform/bridge.ts';
 import { MAX_PICTURE_BYTES } from '../../src/core/platform/limits.ts';
-import { checkOutputPng, exportTarget, printOutcome } from './outputChecks.ts';
+import { checkOutputPng, exportTarget, printOutcome, resolvePicturesDir } from './outputChecks.ts';
 
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -52,5 +53,22 @@ describe('printOutcome', () => {
       'io',
       `Printing failed: ${reason}`,
     ]);
+  });
+});
+
+describe('resolvePicturesDir', () => {
+  it('falls back from pictures to documents, home, and os.homedir when xdg-user-dirs is missing', () => {
+    expect(resolvePicturesDir((name) => (name === 'pictures' ? '/home/a/Pictures' : ''))).toBe('/home/a/Pictures');
+    expect(
+      resolvePicturesDir((name) => {
+        if (name === 'pictures') throw new Error("Failed to get 'pictures' path");
+        return name === 'documents' ? '/home/a/Documents' : '/home/a';
+      }),
+    ).toBe('/home/a/Documents');
+    expect(
+      resolvePicturesDir(() => {
+        throw new Error('no path');
+      }),
+    ).toBe(os.homedir());
   });
 });

@@ -64,27 +64,38 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
   let realRoot: string | undefined;
 
   /**
-   * Refuses when `dir` resolves anywhere but its own place under the root, which means a folder
-   * on its way became a link after the store checked it. A folder that does not exist yet is
-   * fine: the call that follows makes it, or fails.
+   * Refuses when `dir` (or its nearest existing ancestor when `dir` does not exist yet) resolves
+   * anywhere but its own place under the root, which means a folder on its way became a link.
    */
   async function confirmDir(dir: string): Promise<void> {
-    let actual: string;
-    try {
-      actual = await realpath(dir);
-    } catch (error) {
-      if (errorCode(error) === 'ENOENT') return;
-      throw error;
+    let current = dir;
+    for (;;) {
+      let actual: string;
+      try {
+        actual = await realpath(current);
+      } catch (error) {
+        if (errorCode(error) !== 'ENOENT') throw error;
+        if (current === root) return;
+        const parent = path.dirname(current);
+        if (parent === current) return;
+        current = parent;
+        continue;
+      }
+      realRoot ??= await realpath(root);
+      const expected = current === root ? realRoot : path.join(realRoot, path.relative(root, current));
+      if (actual !== expected) throw linkError();
+      return;
     }
-    realRoot ??= await realpath(root);
-    if (actual !== path.join(realRoot, path.relative(root, dir))) throw linkError();
   }
 
   const confirmParent: PathCheck = (file) => confirmDir(path.dirname(file));
 
   /** The only file system calls that read or change the data, each after `confirmDir`. */
   const io: CheckedIo = {
-    write: (file, data) => writeFileAtomic(file, data, confirmParent),
+    async write(file, data) {
+      await writeFileAtomic(file, data, confirmParent);
+      await syncDirectory(path.dirname(file));
+    },
     rename: (from, to) => renameWithRetry(from, to, confirmParent),
     async remove(file, { recursive = false } = {}) {
       await confirmParent(file);
@@ -164,7 +175,9 @@ export function createFileStore(rootDir: string, options: FileStoreOptions = {})
   async function move(profileId: string, id: string, from: PicturePlace, to: PicturePlace): Promise<string> {
     const source = await requirePicture(profileId, from, id);
     const target = await pictureFiles(profileId, to, id);
-    await mkdir(path.dirname(target.picture), { recursive: true });
+    const targetDir = path.dirname(target.picture);
+    await confirmDir(targetDir);
+    await mkdir(targetDir, { recursive: true });
     // Thumbnail first: a picture file without its thumbnail still lists, the reverse does not.
     await io.rename(source.thumbnail, target.thumbnail).catch((error: unknown) => {
       if (errorCode(error) !== 'ENOENT') throw error;
@@ -407,13 +420,13 @@ async function commitPair(
     if (thumbnail !== null) await io.write(staged.thumbnail, thumbnail);
     await syncDirectory(path.dirname(files.picture));
   } catch (error) {
-    await discardStaged(io, staged);
+    await discardStaged(io, staged).catch(() => undefined);
     throw error;
   }
   try {
     await io.rename(staged.picture, files.picture);
   } catch (error) {
-    await discardStaged(io, staged);
+    await discardStaged(io, staged).catch(() => undefined);
     throw error;
   }
   if (thumbnail === null) {
@@ -430,6 +443,9 @@ async function discardStaged(io: CheckedIo, staged: Record<PictureFile, string>)
   await io.remove(staged.picture);
 }
 
+/** Filesystems such as FUSE, exFAT, or SMB may not support fsync on a directory handle. */
+const UNSUPPORTED_DIR_SYNC_CODES = new Set(['EINVAL', 'ENOTSUP', 'ENOSYS']);
+
 /**
  * Flushes a directory's entries, so a rename is on disk before the next one. Windows cannot
  * open a directory for this and orders its own metadata writes, so it skips the flush. It
@@ -437,9 +453,18 @@ async function discardStaged(io: CheckedIo, staged: Record<PictureFile, string>)
  */
 async function syncDirectory(dir: string): Promise<void> {
   if (process.platform === 'win32') return;
-  const handle = await open(dir, 'r');
+  let handle: Awaited<ReturnType<typeof open>>;
+  try {
+    handle = await open(dir, 'r');
+  } catch (error) {
+    if (UNSUPPORTED_DIR_SYNC_CODES.has(errorCode(error))) return;
+    throw error;
+  }
   try {
     await handle.sync();
+  } catch (error) {
+    if (UNSUPPORTED_DIR_SYNC_CODES.has(errorCode(error))) return;
+    throw error;
   } finally {
     await handle.close();
   }

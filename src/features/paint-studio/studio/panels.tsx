@@ -59,7 +59,7 @@ export function PickerPanel({
     panel?.addEventListener('keydown', onKey);
     return () => {
       panel?.removeEventListener('keydown', onKey);
-      opener?.focus();
+      if (panel !== null && panel.contains(document.activeElement)) opener?.focus();
     };
   }, []);
   return (

@@ -14,6 +14,7 @@ export const strings = defineStrings('typing-course', {
   },
   practice: { text: 'Type the line with the keys you know.' },
   holdShift: { text: 'Hold Shift with the little finger of your other hand.' },
+  capsLock: { text: 'Caps Lock is on. Press Caps Lock to turn it off.' },
   lineDone: { text: 'The whole line is typed.' },
   line: { text: 'The line to type', silent: 'decorative' },
   hands: { text: 'Your hands, with the finger for the next key', silent: 'decorative' },

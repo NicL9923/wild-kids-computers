@@ -33,12 +33,10 @@ export default function FindTheKeyActivity({ level, kit }: ActivityProps<KeyLeve
   if (letter === undefined) throw new RangeError('A find-the-key level has at least one letter.');
   const name = letterNames[letter];
 
-  // The round starts with the main instruction; then each letter is named. A timeout lets the
-  // shell's own start of the round speak first, so this one is not cut off by it.
-  useEffect(
-    () => kit.scope.setTimeout(() => kit.setInstruction([strings.press, letterNames[letter]]), 0),
-    [kit, letter],
-  );
+  // Each letter is named as it comes up.
+  useEffect(() => {
+    kit.setInstruction([strings.press, letterNames[letter]]);
+  }, [kit, letter]);
 
   function light(code: string): void {
     setPressed(code);

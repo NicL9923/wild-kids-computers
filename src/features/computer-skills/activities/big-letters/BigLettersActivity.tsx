@@ -51,15 +51,10 @@ export default function BigLettersActivity({ level, kit }: ActivityProps<ShiftLe
   const want = item.chars[typed];
   const done = want === undefined;
 
-  // Each item is named as it comes up, after the shell's own start of the round.
-  useEffect(
-    () =>
-      kit.scope.setTimeout(
-        () => kit.setInstruction([item.kind === 'word' ? strings.type : strings.holdShiftType, ...itemSpeech(item)]),
-        0,
-      ),
-    [kit, item],
-  );
+  // Each item is named as it comes up.
+  useEffect(() => {
+    kit.setInstruction([item.kind === 'word' ? strings.type : strings.holdShiftType, ...itemSpeech(item)]);
+  }, [kit, item]);
 
   function light(code: string): void {
     setPressed(code);

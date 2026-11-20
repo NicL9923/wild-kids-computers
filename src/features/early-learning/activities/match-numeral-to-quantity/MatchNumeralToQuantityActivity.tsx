@@ -22,8 +22,10 @@ export default function MatchNumeralToQuantityActivity({ level, kit }: ActivityP
   const rows = Math.max(2, Math.ceil(Math.max(...level.groups.map((group) => group.count)) / PER_ROW));
   const shape = { '--cols': PER_ROW, '--rows': rows } as CSSProperties;
 
-  // The shell speaks the main instruction as the round starts; then this names the number.
-  useEffect(() => kit.scope.setTimeout(() => kit.setInstruction([strings.find, number]), 0), [kit, number]);
+  // Names the number for this round.
+  useEffect(() => {
+    kit.setInstruction([strings.find, number]);
+  }, [kit, number]);
 
   return (
     <div className='math-stage match-stage'>

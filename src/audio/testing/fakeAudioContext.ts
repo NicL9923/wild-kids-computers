@@ -24,8 +24,9 @@ class FakeParam {
     this.events.push(['exponential', value, time]);
     return this;
   }
-  setTargetAtTime(value: number, time: number) {
+  setTargetAtTime(value: number, time: number, _timeConstant?: number) {
     this.events.push(['target', value, time]);
+    this.value = value;
     return this;
   }
 }
@@ -59,7 +60,7 @@ class FakeScheduled extends FakeNode {
     if (this.started) throw new Error('A source node can start only once.');
     this.started = true;
   }
-  stop() {
+  stop(_when?: number) {
     if (!this.started) throw new Error('Stopped a source that never started.');
     this.stopped = true;
   }

@@ -143,6 +143,8 @@ export type BridgeErrorCode =
   | 'not-found'
   /** The call came from a frame that is not the app's own page. */
   | 'forbidden'
+  /** The platform ran out of disk space or storage quota. */
+  | 'storage-full'
   /** The platform failed to read or write. */
   | 'io';
 

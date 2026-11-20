@@ -164,6 +164,8 @@ interface Player {
   readonly replay: () => void;
   /** Puts the instruction back to the definition's first spoken string and speaks it. */
   readonly startInstruction: () => void;
+  /** Speaks the definition's first spoken string without changing what replay holds. */
+  readonly speakMainInstruction: () => void;
   /**
    * Runs `next` after the calm pause between rounds and after the speech in progress ends, so a
    * round never cuts off what the last one is still saying.
@@ -226,8 +228,9 @@ function ActivityRunWithState({
     };
   }, [audio, definition.id, visit]);
 
-  // Both stay the same for the whole visit, so a round's effect never restarts the round.
+  // All stay the same for the whole visit, so a round's effect never restarts the round.
   const replay = useCallback(() => void audio.speakSequence(live.current.spoken), [audio]);
+  const speakMainInstruction = useCallback(() => void audio.speakSequence([mainInstruction]), [audio, mainInstruction]);
   const startInstruction = useCallback(() => {
     setInstruction({ spoken: [mainInstruction], shown: [mainInstruction] });
     void audio.speakSequence([mainInstruction]);
@@ -254,9 +257,23 @@ function ActivityRunWithState({
       visit,
       replay,
       startInstruction,
+      speakMainInstruction,
       afterRest,
     }),
-    [afterRest, attachStage, host, instruction, marks, pictures, reducedMotion, replay, startInstruction, state, visit],
+    [
+      afterRest,
+      attachStage,
+      host,
+      instruction,
+      marks,
+      pictures,
+      reducedMotion,
+      replay,
+      speakMainInstruction,
+      startInstruction,
+      state,
+      visit,
+    ],
   );
 
   // Leaving the activity stops its voice, even mid-sentence.
@@ -312,6 +329,79 @@ function Frame({
 }
 
 /**
+ * Holds the latest per-render values (`state`, `reducedMotion`, `pictures`) behind getters so the
+ * round's kit stays referentially identical across state updates and never drops active holds.
+ */
+interface LiveKitValues {
+  readonly read: () => {
+    readonly state: KitState<unknown> | null;
+    readonly reducedMotion: boolean;
+    readonly pictures: KitParts<unknown>['pictures'];
+  };
+  readonly sync: (next: {
+    readonly state: KitState<unknown> | null;
+    readonly reducedMotion: boolean;
+    readonly pictures: KitParts<unknown>['pictures'];
+  }) => void;
+}
+
+function createLiveKitValues(initial: {
+  readonly state: KitState<unknown> | null;
+  readonly reducedMotion: boolean;
+  readonly pictures: KitParts<unknown>['pictures'];
+}): LiveKitValues {
+  let current = initial;
+  return {
+    read: () => current,
+    sync(next) {
+      current = next;
+    },
+  };
+}
+
+interface InstructionTracker {
+  readonly record: (speak: boolean) => void;
+  readonly isChanged: () => boolean;
+  readonly isSpoken: () => boolean;
+  readonly reset: () => void;
+}
+
+function createInstructionTracker(): InstructionTracker {
+  let changed = false;
+  let spoken = false;
+  return {
+    record(speak) {
+      changed = true;
+      if (speak) spoken = true;
+    },
+    isChanged: () => changed,
+    isSpoken: () => spoken,
+    reset() {
+      changed = false;
+      spoken = false;
+    },
+  };
+}
+
+function buildRoundKit(
+  parts: Omit<KitParts<unknown>, 'state' | 'reducedMotion' | 'pictures'>,
+  readLive: LiveKitValues['read'],
+): ActivityKit<unknown> {
+  return createKit({
+    ...parts,
+    get state() {
+      return readLive().state;
+    },
+    get reducedMotion() {
+      return readLive().reducedMotion;
+    },
+    get pictures() {
+      return readLive().pictures;
+    },
+  });
+}
+
+/**
  * One round's component with its own scope and kit. Remounted by key for each round, so nothing
  * carries over. The instruction is spoken when the round starts, and the round's speech stops
  * when it ends.
@@ -336,33 +426,51 @@ function Round({
 }) {
   const scope = useScope();
   const [tally] = useState(createTally);
-  const { host, startInstruction, state, reducedMotion, pictures } = player;
+  const { host, startInstruction, speakMainInstruction, state, reducedMotion, pictures } = player;
+  const [liveValues] = useState(() => createLiveKitValues({ state, reducedMotion, pictures }));
+  liveValues.sync({ state, reducedMotion, pictures });
+  // Tracks whether the round component already set or spoke its own instruction during mount,
+  // because child effects run before this parent effect.
+  const [instructionState] = useState(createInstructionTracker);
+  const roundHost = useMemo<KitHost>(
+    () => ({
+      ...host,
+      onInstruction(handles, speak, shown) {
+        instructionState.record(speak);
+        host.onInstruction(handles, speak, shown);
+      },
+    }),
+    [host, instructionState],
+  );
   // Stable across renders: a new handler would rebuild the kit, and an activity effect that
   // depends on the kit would run again on every render.
   const stepSolved = useMemo(() => onStepSolved ?? noSteps(definition.id), [onStepSolved, definition.id]);
   const { checkpoint, hold } = useMemo(() => session ?? betweenRoundsOnly(definition.id), [session, definition.id]);
-  // Rebuilt when the saved state, motion, or pictures change; the tally keeps the round's counts.
   const kit = useMemo(
     () =>
-      createKit({
-        scope,
-        host,
-        tally,
-        onRoundComplete,
-        onStepSolved: stepSolved,
-        onCheckpoint: checkpoint,
-        onHoldCheckpoint: hold,
-        state,
-        reducedMotion,
-        pictures,
-      }),
-    [scope, host, tally, onRoundComplete, stepSolved, checkpoint, hold, state, reducedMotion, pictures],
+      buildRoundKit(
+        {
+          scope,
+          host: roundHost,
+          tally,
+          onRoundComplete,
+          onStepSolved: stepSolved,
+          onCheckpoint: checkpoint,
+          onHoldCheckpoint: hold,
+        },
+        liveValues.read,
+      ),
+    [scope, roundHost, tally, onRoundComplete, stepSolved, checkpoint, hold, liveValues.read],
   );
 
   useEffect(() => {
     scope.own(() => host.audio.cancelSpeech());
-    startInstruction();
-  }, [scope, host, startInstruction]);
+    if (!instructionState.isChanged()) startInstruction();
+    else if (!instructionState.isSpoken()) speakMainInstruction();
+    return () => {
+      instructionState.reset();
+    };
+  }, [scope, host, instructionState, startInstruction, speakMainInstruction]);
 
   return <RoundComponent definition={definition} level={level} band={band} kit={kit} />;
 }

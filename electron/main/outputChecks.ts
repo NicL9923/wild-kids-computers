@@ -1,6 +1,23 @@
+import os from 'node:os';
 import path from 'node:path';
 import { BridgeError, type PrintResult } from '../../src/core/platform/bridge.ts';
 import { hasPngSignature, MAX_PICTURE_BYTES } from '../../src/core/platform/limits.ts';
+
+/**
+ * Picks a sensible default folder for the save dialog. Minimal Linux installs without
+ * xdg-user-dirs throw on `app.getPath('pictures')`, so fall back to documents, home, or os.homedir.
+ */
+export function resolvePicturesDir(getPath: (name: 'pictures' | 'documents' | 'home') => string): string {
+  for (const name of ['pictures', 'documents', 'home'] as const) {
+    try {
+      const value = getPath(name);
+      if (value !== '') return value;
+    } catch {
+      // Try the next fallback.
+    }
+  }
+  return os.homedir();
+}
 
 export function checkOutputPng(png: Uint8Array): void {
   if (png.length > MAX_PICTURE_BYTES)

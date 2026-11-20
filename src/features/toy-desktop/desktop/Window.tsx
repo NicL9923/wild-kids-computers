@@ -107,6 +107,7 @@ export function DesktopWindow({ window, layer, focused, area }: DesktopWindowPro
       data-focused={focused}
       data-maximized={window.maximized}
       data-moving={moving !== null}
+      data-resizing={growing !== null}
       tabIndex={-1}
       style={{
         left: pixels.x,

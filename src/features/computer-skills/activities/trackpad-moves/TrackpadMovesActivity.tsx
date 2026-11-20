@@ -52,14 +52,11 @@ export default function TrackpadMovesActivity({ level, kit }: ActivityProps<Trac
     element.scrollTop = level.start.row * element.clientHeight;
   }, [level.start]);
 
-  // Each find is named as the child starts looking for it. A timeout lets the shell's own start
-  // of the round speak first, and the first find's words only become the replay.
+  // Each find is named as the child starts looking for it. The first find only sets replay so
+  // the shell still speaks the main instruction, unless the find is already in view below.
   useEffect(() => {
-    if (find === undefined) return undefined;
-    return kit.scope.setTimeout(
-      () => kit.setInstruction([SAY_SCROLL[find.direction], emojiNames[find.kind]], { speak: index > 0 }),
-      0,
-    );
+    if (find === undefined) return;
+    kit.setInstruction([SAY_SCROLL[find.direction], emojiNames[find.kind]], { speak: index > 0 });
   }, [kit, find, index]);
 
   const check = useCallback(() => {

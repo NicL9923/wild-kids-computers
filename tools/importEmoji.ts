@@ -27,6 +27,7 @@ export interface ResolvedEmoji {
   readonly category: string;
   readonly folder: string;
   readonly allow: readonly string[];
+  readonly speech?: string;
 }
 
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -47,7 +48,7 @@ export function resolveSelection(selection: Readonly<Record<string, readonly Emo
   const ids = new Map<string, string>();
   const folders = new Map<string, string>();
   for (const [category, entries] of Object.entries(selection)) {
-    for (const [folder, name, explicitId, allow] of entries) {
+    for (const [folder, name, explicitId, allow, speech] of entries) {
       const id = explicitId ?? emojiIdFor(name);
       if (!ID_PATTERN.test(id)) throw new Error(`Emoji id "${id}" for ${folder} is not kebab-case.`);
       const idOwner = ids.get(id);
@@ -57,7 +58,14 @@ export function resolveSelection(selection: Readonly<Record<string, readonly Emo
         throw new Error(`Upstream folder "${folder}" is listed as ${folderOwner} and ${id}.`);
       ids.set(id, folder);
       folders.set(folder, id);
-      resolved.push({ id, name, category, folder, allow: allow ?? [] });
+      resolved.push({
+        id,
+        name,
+        category,
+        folder,
+        allow: allow ?? [],
+        ...(speech === undefined ? {} : { speech }),
+      });
     }
   }
   return resolved;
@@ -76,9 +84,10 @@ export function colorSvgPath(cloneAssets: string, folder: string): string {
 
 /** The TypeScript source of the generated emoji strings file. */
 export function emojiStringsSource(emoji: readonly ResolvedEmoji[]): string {
-  const lines = emoji.map(({ id, name, allow }) => {
+  const lines = emoji.map(({ id, name, allow, speech }) => {
+    const speechPart = speech === undefined ? '' : `, speech: ${JSON.stringify(speech)}`;
     const allowPart = allow.length > 0 ? `, allow: [${allow.map((rule) => `'${rule}'`).join(', ')}]` : '';
-    return `  '${id}': { text: ${JSON.stringify(name)}${allowPart} },`;
+    return `  '${id}': { text: ${JSON.stringify(name)}${speechPart}${allowPart} },`;
   });
   const categories = [...new Set(emoji.map((entry) => entry.category))];
   const categoryLines = categories.map((category) => {

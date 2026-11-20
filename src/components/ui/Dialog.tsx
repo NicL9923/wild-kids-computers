@@ -28,6 +28,9 @@ export function Dialog({ open, onOpenChange, title, description, closeLabel, chi
         <DialogPrimitive.Overlay className='wk-dialog-scrim' />
         <DialogPrimitive.Content
           className='wk-dialog'
+          data-band='band-9-12'
+          data-text-size='standard'
+          data-letter-spacing='standard'
           {...returnFocus}
           {...(description === undefined ? { 'aria-describedby': undefined } : {})}
         >

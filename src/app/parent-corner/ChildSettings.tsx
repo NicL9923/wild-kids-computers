@@ -65,6 +65,12 @@ export function ChildSettings() {
       )}
 
       <Group title={t(strings.sound)}>
+        <Switch
+          label={t(strings.muteSound)}
+          description={t(strings.muteSoundAbout)}
+          checked={settings.muted}
+          onCheckedChange={(muted) => updateSettings({ muted })}
+        />
         <Slider
           label={t(strings.voiceVolume)}
           min={0}
@@ -72,7 +78,11 @@ export function ChildSettings() {
           step={10}
           value={Math.round(settings.voiceVolume * 100)}
           valueText={percent.format(settings.voiceVolume)}
-          onValueChange={(value) => updateSettings({ voiceVolume: value / 100 })}
+          onValueChange={(value) =>
+            updateSettings(
+              value > 0 && settings.muted ? { voiceVolume: value / 100, muted: false } : { voiceVolume: value / 100 },
+            )
+          }
         />
         <Slider
           label={t(strings.effectsVolume)}
@@ -81,16 +91,37 @@ export function ChildSettings() {
           step={10}
           value={Math.round(settings.effectsVolume * 100)}
           valueText={percent.format(settings.effectsVolume)}
-          onValueChange={(value) => updateSettings({ effectsVolume: value / 100 })}
+          onValueChange={(value) =>
+            updateSettings(
+              value > 0 && settings.muted
+                ? { effectsVolume: value / 100, muted: false }
+                : { effectsVolume: value / 100 },
+            )
+          }
         />
         <div className='wk-parent-row'>
           <Button
             icon={<Volume2 className='wk-lucide' aria-hidden='true' />}
-            onClick={() => void audio.speak(strings.voiceSample)}
+            onClick={() => {
+              if (settings.muted) {
+                updateSettings({ muted: false });
+                audio.setVolume({ muted: false });
+              }
+              void audio.speak(strings.voiceSample);
+            }}
           >
             {t(strings.playVoice)}
           </Button>
-          <Button icon={<Music className='wk-lucide' aria-hidden='true' />} onClick={() => audio.play('chime')}>
+          <Button
+            icon={<Music className='wk-lucide' aria-hidden='true' />}
+            onClick={() => {
+              if (settings.muted) {
+                updateSettings({ muted: false });
+                audio.setVolume({ muted: false });
+              }
+              audio.play('chime');
+            }}
+          >
             {t(strings.playEffect)}
           </Button>
         </div>

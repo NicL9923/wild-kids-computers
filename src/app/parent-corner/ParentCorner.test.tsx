@@ -217,6 +217,75 @@ describe('parent corner', () => {
       await within(skills).findByText(strings.skillsEmpty.text);
     },
   );
+
+  it('toggles mute and automatically unmutes when testing voice or effects', async () => {
+    const harness = await openCorner();
+    const mute = screen.getByRole('switch', { name: strings.muteSound.text });
+    fireEvent.click(mute);
+    await waitFor(() => expect(harness.store.getSnapshot().settings.muted).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: strings.playVoice.text }));
+    await waitFor(() => expect(harness.store.getSnapshot().settings.muted).toBe(false));
+    expect(harness.spoken()).toContain(strings.voiceSample.id);
+  });
+
+  it('recovers when hashing a new PIN fails instead of staying stuck on saving', async () => {
+    await openCorner();
+    const spy = vi
+      .spyOn(globalThis.crypto.subtle, 'deriveBits')
+      .mockRejectedValueOnce(new DOMException('failed', 'OperationError'));
+    try {
+      fireEvent.click(screen.getByRole('button', { name: strings.setPin.text }));
+      const dialog = await screen.findByRole('dialog', { name: strings.setPin.text });
+      fireEvent.change(within(dialog).getByLabelText(strings.newPin.text), { target: { value: '1234' } });
+      fireEvent.change(within(dialog).getByLabelText(strings.repeatPin.text), { target: { value: '1234' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: strings.savePin.text }));
+      await within(dialog).findByText(strings.pinSaveProblem.text);
+      expect(within(dialog).getByRole('button', { name: strings.savePin.text })).toHaveProperty('disabled', false);
+      expect(within(dialog).getByRole('button', { name: strings.cancel.text })).toHaveProperty('disabled', false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('shows saved pictures and lets the grown-up export or print directly', async () => {
+    const exported: string[] = [];
+    const printed: string[] = [];
+    const harness = await openCorner();
+    await harness.fake.bridge.pictures.save(FOX.id, {
+      png: new Uint8Array([1, 2, 3]),
+      thumbnail: new Uint8Array([4, 5, 6]),
+    });
+    harness.fake.bridge.output.exportPicture = async (_png, stem) => {
+      exported.push(stem);
+      return 'saved';
+    };
+    harness.fake.bridge.output.printPicture = async () => {
+      printed.push('printed');
+      return 'printed';
+    };
+
+    // Switch to OWL and back to FOX so PicturesSection reloads after saving.
+    fireEvent.click(screen.getByRole('radio', { name: OWL.name }));
+    await waitFor(() => expect(harness.store.getSnapshot().activeProfile?.id).toBe(OWL.id));
+    fireEvent.click(screen.getByRole('radio', { name: profileStrings['avatar-fox'].text }));
+    await waitFor(() => expect(harness.store.getSnapshot().activeProfile?.id).toBe(FOX.id));
+
+    const picturesSection = screen.getByRole('region', { name: strings.childPictures.text });
+    const saveBtn = await within(picturesSection).findByRole('button', {
+      name: new RegExp(`^${strings.savePicture.text}:`),
+    });
+    fireEvent.click(saveBtn);
+    await within(picturesSection).findByText(strings.pictureSaved.text);
+    expect(exported).toHaveLength(1);
+
+    const printBtn = within(picturesSection).getByRole('button', {
+      name: new RegExp(`^${strings.printPicture.text}:`),
+    });
+    fireEvent.click(printBtn);
+    await within(picturesSection).findByText(strings.picturePrinted.text);
+    expect(printed).toHaveLength(1);
+  });
 });
 
 const notices = () => within(screen.getByRole('region', { name: strings.notices.text }));

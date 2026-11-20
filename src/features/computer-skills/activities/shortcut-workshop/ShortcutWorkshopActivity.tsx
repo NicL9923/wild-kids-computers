@@ -165,8 +165,10 @@ export default function ShortcutWorkshopActivity({ level, kit }: ActivityProps<W
   const os = usePlatformOs();
   const [attempt, setAttempt] = useState(0);
 
-  // What to do and how to press it on this computer, after the shell's own start of the step.
-  useEffect(() => kit.scope.setTimeout(() => kit.setInstruction(stepInstruction(level, os)), 0), [kit, level, os]);
+  // What to do and how to press it on this computer.
+  useEffect(() => {
+    kit.setInstruction(stepInstruction(level, os));
+  }, [kit, level, os]);
 
   return (
     <WorkshopStepView

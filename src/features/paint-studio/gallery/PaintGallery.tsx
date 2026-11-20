@@ -29,18 +29,27 @@ interface GalleryItem {
 /** How long the "bring it back" control stays after a picture goes in the trash. */
 const UNDO_DELETE_MS = 12_000;
 
+interface GalleryLoadResult {
+  readonly ok: boolean;
+  readonly items: GalleryItem[];
+}
+
+/** Reads one picture's thumbnail into an object URL, or null when unreadable. */
+async function readGalleryItem(pictures: ProfilePictures, id: string, updatedAt: number): Promise<GalleryItem | null> {
+  const thumbnail = await pictures.read(id, 'thumbnail');
+  if (!thumbnail.ok) return null;
+  const url = URL.createObjectURL(new Blob([new Uint8Array(thumbnail.value)], { type: 'image/png' }));
+  return { id, updatedAt, url };
+}
+
 /** The gallery's pictures, newest first, each with its thumbnail ready to show. */
-async function loadGallery(pictures: ProfilePictures): Promise<GalleryItem[]> {
+async function loadGallery(pictures: ProfilePictures): Promise<GalleryLoadResult> {
   const listed = await pictures.list('gallery');
-  if (!listed.ok) return [];
-  const loaded: GalleryItem[] = [];
-  for (const summary of listed.value) {
-    const thumbnail = await pictures.read(summary.id, 'thumbnail');
-    if (!thumbnail.ok) continue;
-    const url = URL.createObjectURL(new Blob([new Uint8Array(thumbnail.value)], { type: 'image/png' }));
-    loaded.push({ id: summary.id, updatedAt: summary.updatedAt, url });
-  }
-  return loaded;
+  if (!listed.ok) return { ok: false, items: [] };
+  const results = await Promise.all(
+    listed.value.map((summary) => readGalleryItem(pictures, summary.id, summary.updatedAt)),
+  );
+  return { ok: true, items: results.filter((item): item is GalleryItem => item !== null) };
 }
 
 /** The active profile's pictures. Pictures belong to a profile, so without one it goes to the start. */
@@ -59,20 +68,42 @@ function GalleryScreen() {
   const navigate = useNavigate();
   const requestParentGate = useRequestParentGate();
   const [items, setItems] = useState<readonly GalleryItem[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [trashed, setTrashed] = useState<string | null>(null);
   const [outputFailed, setOutputFailed] = useState(false);
   const undo = useRef<TrashUndo | null>(null);
-  const urls = useRef<string[]>([]);
+  const urls = useRef<Set<string>>(new Set());
+  const mounted = useRef(true);
+  const loadGen = useRef(0);
+  const outputBusy = useRef(false);
 
-  const show = useCallback((loaded: readonly GalleryItem[]) => {
+  const revokeAll = useCallback(() => {
     for (const url of urls.current) URL.revokeObjectURL(url);
-    urls.current = loaded.map((item) => item.url);
-    setItems(loaded);
+    urls.current.clear();
   }, []);
 
-  const refresh = useCallback(async () => show(await loadGallery(pictures)), [pictures, show]);
+  const show = useCallback(
+    (loaded: readonly GalleryItem[]) => {
+      revokeAll();
+      for (const item of loaded) urls.current.add(item.url);
+      setItems(loaded);
+    },
+    [revokeAll],
+  );
+
+  const refresh = useCallback(async () => {
+    const gen = ++loadGen.current;
+    const result = await loadGallery(pictures);
+    if (!mounted.current || gen !== loadGen.current) {
+      for (const item of result.items) URL.revokeObjectURL(item.url);
+      return;
+    }
+    setLoadFailed(!result.ok);
+    show(result.items);
+  }, [pictures, show]);
 
   useEffect(() => {
+    mounted.current = true;
     const created = createScope(kitScheduler);
     const trashUndo = new TrashUndo({
       scope: created,
@@ -81,24 +112,27 @@ function GalleryScreen() {
       onChange: setTrashed,
     });
     undo.current = trashUndo;
-    let live = true;
+    const gen = ++loadGen.current;
     void (async () => {
       // A picture left in the trash by an earlier visit that never closed, such as a crash, has
       // no way back on screen, so it goes now.
       const leftOver = await pictures.list('trash');
       if (leftOver.ok) for (const picture of leftOver.value) void pictures.purge(picture.id);
-      const loaded = await loadGallery(pictures);
-      if (live) show(loaded);
-      else for (const item of loaded) URL.revokeObjectURL(item.url);
+      const result = await loadGallery(pictures);
+      if (mounted.current && gen === loadGen.current) {
+        setLoadFailed(!result.ok);
+        show(result.items);
+      } else {
+        for (const item of result.items) URL.revokeObjectURL(item.url);
+      }
     })();
     return () => {
-      live = false;
+      mounted.current = false;
       trashUndo.close();
       created.dispose();
-      for (const url of urls.current) URL.revokeObjectURL(url);
-      urls.current = [];
+      revokeAll();
     };
-  }, [pictures, show]);
+  }, [pictures, show, revokeAll]);
 
   const open = (id: string): void => {
     audio.play('open');
@@ -106,44 +140,89 @@ function GalleryScreen() {
   };
 
   const copy = async (id: string): Promise<void> => {
+    const result = await pictures.copy(id);
+    if (!result.ok || !mounted.current) return;
     audio.play('snap');
     void audio.speak(strings.copyPicture);
-    const result = await pictures.copy(id);
-    if (result.ok) await refresh();
+    const added = await readGalleryItem(pictures, result.value.id, result.value.updatedAt);
+    if (!mounted.current) {
+      if (added !== null) URL.revokeObjectURL(added.url);
+      return;
+    }
+    if (added === null) {
+      await refresh();
+      return;
+    }
+    urls.current.add(added.url);
+    setItems((current) => (current === null ? [added] : [added, ...current]));
   };
 
   const trash = async (id: string): Promise<void> => {
+    const result = await pictures.trash(id);
+    if (!result.ok || !mounted.current) return;
     audio.play('whoosh');
     void audio.speak(strings.pictureGone);
-    const result = await pictures.trash(id);
-    if (!result.ok) return;
     undo.current?.trashed(id);
-    await refresh();
+    setItems((current) => {
+      if (current === null) return current;
+      const removed = current.find((item) => item.id === id);
+      if (removed !== undefined) {
+        URL.revokeObjectURL(removed.url);
+        urls.current.delete(removed.url);
+      }
+      return current.filter((item) => item.id !== id);
+    });
   };
 
   const bringBack = async (): Promise<void> => {
-    const id = undo.current?.bringBack() ?? null;
+    const id = undo.current?.beginBringBack() ?? null;
     if (id === null) return;
+    const result = await pictures.restore(id);
+    if (!result.ok) {
+      undo.current?.cancelBringBack(id);
+      return;
+    }
+    undo.current?.finishBringBack(id);
+    if (!mounted.current) return;
     audio.play('pop');
     void audio.speak(strings.bringBack);
-    const result = await pictures.restore(id);
-    if (result.ok) await refresh();
+    const restored = await readGalleryItem(pictures, result.value.id, result.value.updatedAt);
+    if (!mounted.current) {
+      if (restored !== null) URL.revokeObjectURL(restored.url);
+      return;
+    }
+    if (restored === null) {
+      await refresh();
+      return;
+    }
+    urls.current.add(restored.url);
+    setItems((current) =>
+      current === null
+        ? [restored]
+        : [restored, ...current.filter((item) => item.id !== restored.id)].toSorted(
+            (a, b) => b.updatedAt - a.updatedAt,
+          ),
+    );
   };
 
   const output = async (id: string, reason: ParentGateReason): Promise<void> => {
+    if (outputBusy.current) return;
+    outputBusy.current = true;
     setOutputFailed(false);
-    if (!(await requestParentGate(reason))) return;
-    const read = await pictures.read(id, 'picture');
-    if (!read.ok) {
-      setOutputFailed(true);
-      return;
-    }
     try {
+      if (!(await requestParentGate(reason))) return;
+      const read = await pictures.read(id, 'picture');
+      if (!read.ok) {
+        if (mounted.current) setOutputFailed(true);
+        return;
+      }
       const bridge = getBridge();
       if (reason === 'export') await bridge.output.exportPicture(read.value, `Wild Kids picture ${id.slice(0, 8)}`);
       else await bridge.output.printPicture(read.value);
     } catch {
-      setOutputFailed(true);
+      if (mounted.current) setOutputFailed(true);
+    } finally {
+      outputBusy.current = false;
     }
   };
 
@@ -183,7 +262,8 @@ function GalleryScreen() {
             </output>
           )}
           {outputFailed && <output className='wk-paint-problem'>{t(strings.outputFailed)}</output>}
-          {items !== null && items.length === 0 && (
+          {loadFailed && <output className='wk-paint-problem'>{t(strings.galleryLoadFailed)}</output>}
+          {!loadFailed && items !== null && items.length === 0 && (
             <div className='wk-paint-empty'>
               <EmojiPicture id='paint-palette' />
               <p className='wk-reading-text'>{t(strings.noPictures)}</p>
@@ -200,42 +280,45 @@ function GalleryScreen() {
           )}
           {items !== null && items.length > 0 && (
             <ul className='wk-paint-gallery-grid' aria-label={t(strings.galleryTitle)}>
-              {items.map((item) => (
-                <li key={item.id} className='wk-paint-card' data-picture={item.id}>
-                  <button
-                    type='button'
-                    className='wk-paint-card-open'
-                    aria-label={t(strings.openPicture)}
-                    onClick={() => open(item.id)}
-                  >
-                    <img src={item.url} alt='' draggable={false} />
-                  </button>
-                  <div className='wk-paint-card-actions'>
-                    <IconButton
-                      label={t(strings.copyPicture)}
-                      icon={<EmojiPicture id='clipboard' />}
-                      onClick={() => void copy(item.id)}
-                    />
-                    <IconButton
-                      label={t(strings.deletePicture)}
-                      icon={<EmojiPicture id='trash-can' />}
-                      onClick={() => void trash(item.id)}
-                    />
-                    <span className='wk-paint-card-adult'>
+              {items.map((item, index) => {
+                const openLabel = `${t(strings.openPicture)} ${String(index + 1)}`;
+                return (
+                  <li key={item.id} className='wk-paint-card' data-picture={item.id}>
+                    <button
+                      type='button'
+                      className='wk-paint-card-open'
+                      aria-label={openLabel}
+                      onClick={() => open(item.id)}
+                    >
+                      <img src={item.url} alt='' draggable={false} />
+                    </button>
+                    <div className='wk-paint-card-actions'>
                       <IconButton
-                        label={t(strings.exportPicture)}
-                        icon={<Download aria-hidden='true' className='wk-lucide' />}
-                        onClick={() => void output(item.id, 'export')}
+                        label={t(strings.copyPicture)}
+                        icon={<EmojiPicture id='clipboard' />}
+                        onClick={() => void copy(item.id)}
                       />
                       <IconButton
-                        label={t(strings.printPicture)}
-                        icon={<Printer aria-hidden='true' className='wk-lucide' />}
-                        onClick={() => void output(item.id, 'print')}
+                        label={t(strings.deletePicture)}
+                        icon={<EmojiPicture id='trash-can' />}
+                        onClick={() => void trash(item.id)}
                       />
-                    </span>
-                  </div>
-                </li>
-              ))}
+                      <span className='wk-paint-card-adult'>
+                        <IconButton
+                          label={t(strings.exportPicture)}
+                          icon={<Download aria-hidden='true' className='wk-lucide' />}
+                          onClick={() => void output(item.id, 'export')}
+                        />
+                        <IconButton
+                          label={t(strings.printPicture)}
+                          icon={<Printer aria-hidden='true' className='wk-lucide' />}
+                          onClick={() => void output(item.id, 'print')}
+                        />
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

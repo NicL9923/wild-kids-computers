@@ -84,7 +84,10 @@ describe('paint registry', () => {
     if (load === undefined) throw new Error('The meadow-sans glyph table is missing.');
     const font = await load();
     expect(font.glyphs.a?.d).toMatch(/^M/);
-    expect(Object.keys(font.glyphs)).toHaveLength(102);
+    expect(font.glyphs['é']?.d).toMatch(/^M/);
+    expect(font.glyphs['ñ']?.d).toMatch(/^M/);
+    expect(font.glyphs['ü']?.d).toMatch(/^M/);
+    expect(Object.keys(font.glyphs)).toHaveLength(197);
   });
 });
 

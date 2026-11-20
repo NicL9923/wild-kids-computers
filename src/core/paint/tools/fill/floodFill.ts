@@ -22,15 +22,25 @@ import type { FillStyle } from '../../types.ts';
 /** Largest sum of the red, green, and blue differences from the clicked color that still fills. */
 export const FILL_TOLERANCE = 96;
 
-const regions = new WeakMap<PaintDocument, Uint8Array>();
+interface RegionScratch {
+  readonly stamps: Uint32Array;
+  gen: number;
+}
 
-function regionBuffer(doc: PaintDocument): Uint8Array {
-  let region = regions.get(doc);
-  if (region === undefined) {
-    region = new Uint8Array(doc.width * doc.height);
-    regions.set(doc, region);
+const regions = new WeakMap<PaintDocument, RegionScratch>();
+
+function regionScratch(doc: PaintDocument): { stamps: Uint32Array; inStamp: number; edgeStamp: number } {
+  let entry = regions.get(doc);
+  if (entry === undefined) {
+    entry = { stamps: new Uint32Array(doc.width * doc.height), gen: 0 };
+    regions.set(doc, entry);
   }
-  return region;
+  if (entry.gen >= 0xffff_fff0) {
+    entry.stamps.fill(0);
+    entry.gen = 0;
+  }
+  entry.gen += 2;
+  return { stamps: entry.stamps, inStamp: entry.gen, edgeStamp: entry.gen + 1 };
 }
 
 /** Writes the fill color for pixel (x, y) into out[0..2]. */
@@ -102,28 +112,23 @@ export function floodFill(
     return EMPTY_RECT;
   }
 
-  const region = regionBuffer(doc);
-  // Region states. One tight pass marks every pixel that cannot join (a wall, or a color too far
-  // from the clicked one) as BLOCKED, so the flood itself reads one byte per pixel. A BLOCKED
-  // pixel the flood reaches becomes an EDGE: outside the region, touching it.
-  const OPEN = 0;
-  const IN = 1;
-  const EDGE = 2;
-  const BLOCKED = 3;
-  const total = width * height;
-  for (let p = 0, i = 0; p < total; p++, i += 4) {
+  const { stamps, inStamp, edgeStamp } = regionScratch(doc);
+  // Lazily test pixels as the scanline flood visits them, using generation stamps so no full-canvas
+  // scan or trailing clear is needed.
+  const canFill = (p: number): boolean => {
+    const i = p * 4;
+    if (wall !== undefined && (wall[i + 3] ?? 0) >= MASK_WALL_ALPHA) return false;
     let dr = (data[i] ?? 0) - sr;
     if (dr < 0) dr = -dr;
     let dg = (data[i + 1] ?? 0) - sg;
     if (dg < 0) dg = -dg;
     let db = (data[i + 2] ?? 0) - sb;
     if (db < 0) db = -db;
-    const walled = wall !== undefined && (wall[i + 3] ?? 0) >= MASK_WALL_ALPHA;
-    region[p] = walled || dr + dg + db > FILL_TOLERANCE ? BLOCKED : OPEN;
-  }
+    return dr + dg + db <= FILL_TOLERANCE;
+  };
   const edgePixels: number[] = [];
   const markEdge = (p: number): void => {
-    region[p] = EDGE;
+    stamps[p] = edgeStamp;
     edgePixels.push(p);
   };
 
@@ -135,16 +140,30 @@ export function floodFill(
   const stack: number[] = [seed];
   while (stack.length > 0) {
     const start = stack.pop() ?? 0;
-    if (region[start] !== OPEN) continue;
+    if ((stamps[start] ?? 0) >= inStamp) continue;
     const ry = Math.floor(start / width);
     const row = ry * width;
     let left = start - row;
-    while (left > 0 && region[row + left - 1] === OPEN) left--;
-    if (left > 0 && region[row + left - 1] === BLOCKED) markEdge(row + left - 1);
+    while (left > 0) {
+      const q = row + left - 1;
+      if ((stamps[q] ?? 0) >= inStamp) break;
+      if (!canFill(q)) {
+        markEdge(q);
+        break;
+      }
+      left--;
+    }
     let right = start - row;
-    while (right < width - 1 && region[row + right + 1] === OPEN) right++;
-    if (right < width - 1 && region[row + right + 1] === BLOCKED) markEdge(row + right + 1);
-    region.fill(IN, row + left, row + right + 1);
+    while (right < width - 1) {
+      const q = row + right + 1;
+      if ((stamps[q] ?? 0) >= inStamp) break;
+      if (!canFill(q)) {
+        markEdge(q);
+        break;
+      }
+      right++;
+    }
+    stamps.fill(inStamp, row + left, row + right + 1);
     if (left < minX) minX = left;
     if (right > maxX) maxX = right;
     if (ry < minY) minY = ry;
@@ -155,12 +174,15 @@ export function floodFill(
       const to = row + side * width + right;
       let inRun = false;
       for (let q = from; q <= to; q++) {
-        const state = region[q];
-        if (state === OPEN) {
-          if (!inRun) stack.push(q);
-          inRun = true;
+        if ((stamps[q] ?? 0) < inStamp) {
+          if (canFill(q)) {
+            if (!inRun) stack.push(q);
+            inRun = true;
+          } else {
+            markEdge(q);
+            inRun = false;
+          }
         } else {
-          if (state === BLOCKED) markEdge(q);
           inRun = false;
         }
       }
@@ -203,7 +225,7 @@ export function floodFill(
         const ny = py + dy;
         if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
         const q = ny * width + nx;
-        if (region[q] === IN) continue;
+        if (stamps[q] === inStamp) continue;
         const j = q * 4;
         const d = Math.abs((data[j] ?? 0) - sr) + Math.abs((data[j + 1] ?? 0) - sg) + Math.abs((data[j + 2] ?? 0) - sb);
         if (d > farthest) {
@@ -239,7 +261,7 @@ export function floodFill(
     for (let py = bounds.y; py < bounds.y + bounds.height; py++) {
       const row = py * width;
       for (let p = row + bounds.x; p < row + bounds.x + bounds.width; p++) {
-        if (region[p] === IN) pixels[p] = value;
+        if (stamps[p] === inStamp) pixels[p] = value;
       }
     }
   } else {
@@ -247,14 +269,12 @@ export function floodFill(
       const row = py * width;
       for (let px = bounds.x; px < bounds.x + bounds.width; px++) {
         const p = row + px;
-        if (region[p] !== IN) continue;
+        if (stamps[p] !== inStamp) continue;
         shade(px, py, fill);
         blendPixel(data, p * 4, fill[0] ?? 0, fill[1] ?? 0, fill[2] ?? 0, alpha);
       }
     }
   }
-  // Blocked pixels the flood never reached still hold their mark. Clear the buffer for the next fill.
-  region.fill(OPEN);
   for (let k = 0; k < edges.length; k += 5) {
     const p = edges[k] ?? 0;
     blendPixel(data, p * 4, edges[k + 1] ?? 0, edges[k + 2] ?? 0, edges[k + 3] ?? 0, edges[k + 4] ?? 0);

@@ -85,9 +85,19 @@ export class Change {
   restore(rect: Rect): Rect {
     const area = intersectRect(rect, this.touched);
     if (isEmptyRect(area)) return EMPTY_RECT;
-    for (const [index, saved] of this.tiles) {
-      const part = intersectRect(area, this.tileRect(index));
-      if (!isEmptyRect(part)) this.copy(index, saved, part, 'to-document');
+    const firstColumn = area.x >> TILE_SHIFT;
+    const lastColumn = (area.x + area.width - 1) >> TILE_SHIFT;
+    const firstRow = area.y >> TILE_SHIFT;
+    const lastRow = (area.y + area.height - 1) >> TILE_SHIFT;
+    for (let row = firstRow; row <= lastRow; row++) {
+      const rowBase = row * this.columns;
+      for (let column = firstColumn; column <= lastColumn; column++) {
+        const index = rowBase + column;
+        const saved = this.tileArray[index];
+        if (saved === undefined) continue;
+        const part = intersectRect(area, this.tileRect(index));
+        if (!isEmptyRect(part)) this.copy(index, saved, part, 'to-document');
+      }
     }
     return area;
   }

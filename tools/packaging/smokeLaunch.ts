@@ -24,7 +24,7 @@ const FATAL_PATTERNS = [
   /Segmentation fault/,
 ];
 
-const SANDBOX_OFF = /--no-sandbox|--disable-seccomp-filter-sandbox/;
+const SANDBOX_OFF = /--no-sandbox|--disable-seccomp-filter-sandbox|--disable-gpu-sandbox|--in-process-gpu/;
 
 export interface SmokeObservation {
   /** The exit code, or null when the process was still running at the end of the wait. */

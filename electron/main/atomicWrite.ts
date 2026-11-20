@@ -21,9 +21,9 @@ export const NO_PATH_CHECK: PathCheck = async () => {};
  * on the temporary file before it is created and on both names before the rename.
  */
 export async function writeFileAtomic(target: string, data: string | Uint8Array, check: PathCheck): Promise<void> {
-  await mkdir(path.dirname(target), { recursive: true });
   const temporary = `${target}.${randomUUID()}.tmp`;
   await check(temporary);
+  await mkdir(path.dirname(target), { recursive: true });
   try {
     const handle = await open(temporary, 'wx');
     try {

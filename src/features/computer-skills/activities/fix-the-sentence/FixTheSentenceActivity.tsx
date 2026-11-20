@@ -43,11 +43,10 @@ export default function FixTheSentenceActivity({ level, kit }: ActivityProps<Fix
   const sentence = SENTENCE_SPEECH[level.sentence];
   const tip = tipFor(level, os);
 
-  // The sentence and the tip, after the shell's own start of the round.
-  useEffect(
-    () => kit.scope.setTimeout(() => kit.setInstruction([strings.itSays, sentence, tip]), 0),
-    [kit, sentence, tip],
-  );
+  // The sentence and the tip.
+  useEffect(() => {
+    kit.setInstruction([strings.itSays, sentence, tip]);
+  }, [kit, sentence, tip]);
 
   // A key pressed while focus is elsewhere, such as on the replay control, still edits the text.
   useActivityKeys(kit, (event) => editorField.current?.takeKey(event));

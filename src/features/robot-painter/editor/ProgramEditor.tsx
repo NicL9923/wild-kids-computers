@@ -204,15 +204,6 @@ export function ProgramEditor(props: ProgramEditorProps) {
         )}
       </section>
       <section className='rp-program' aria-label={t(strings.program)}>
-        <SpokenButton
-          kit={kit}
-          speech={[strings.takeOut]}
-          className='rp-take-out'
-          data-ready={carryingBlock}
-          {...carry.target('remove')}
-        >
-          <TakeOutPicture />
-        </SpokenButton>
         <div className='rp-program-scroll'>
           <BlockList list={MAIN} blocks={editor.program.blocks} context={context} />
           {editor.program.definitions.map((definition) => (
@@ -237,6 +228,16 @@ export function ProgramEditor(props: ProgramEditorProps) {
             </section>
           ))}
         </div>
+        {/* Ordered visually to the top by CSS so keyboard carry lands on a program slot first instead of remove. */}
+        <SpokenButton
+          kit={kit}
+          speech={[strings.takeOut]}
+          className='rp-take-out'
+          data-ready={carryingBlock}
+          {...carry.target('remove')}
+        >
+          <TakeOutPicture />
+        </SpokenButton>
       </section>
     </div>
   );

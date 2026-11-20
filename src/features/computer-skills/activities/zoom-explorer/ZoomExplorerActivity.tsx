@@ -56,11 +56,10 @@ export default function ZoomExplorerActivity({ level, kit }: ActivityProps<ZoomL
     live.current = zoomStep;
   });
 
-  // Names the thing to find, after the shell's own start of the round has spoken.
-  useEffect(
-    () => kit.scope.setTimeout(() => kit.setInstruction([strings.findTiny, emojiNames[level.target]]), 0),
-    [kit, level.target],
-  );
+  // Names the thing to find.
+  useEffect(() => {
+    kit.setInstruction([strings.findTiny, emojiNames[level.target]]);
+  }, [kit, level.target]);
 
   /** Changes the zoom by `delta` steps, keeping the point `at` (viewport pixels) still. */
   function zoomBy(delta: number, at?: { x: number; y: number }): void {

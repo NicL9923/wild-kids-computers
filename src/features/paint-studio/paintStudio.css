@@ -169,6 +169,16 @@
     opacity: 0.6;
   }
 
+  .wk-paint-text-caret {
+    position: absolute;
+    width: var(--wk-focus-width);
+    background: var(--wk-color-focus);
+    border-radius: var(--wk-radius-round);
+    box-shadow: 0 0 0 var(--wk-border-width) var(--wk-color-surface);
+    transform: translate(-50%, -80%);
+    pointer-events: none;
+  }
+
   /* The pen is down. A fixed place at the picture's top left corner: a round badge with the
      brush for the youngest, and a pill with the brush and the sentence on one line for readers. */
   .wk-paint-pen-badge {

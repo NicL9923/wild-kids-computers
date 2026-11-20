@@ -18,10 +18,19 @@ function toSurface(ctx: OffscreenCanvasRenderingContext2D, width: number, height
   return surfaceFromData(width, height, ctx.getImageData(0, 0, width, height).data);
 }
 
+function plainPixels(data: Uint8ClampedArray): Uint8ClampedArray<ArrayBuffer> {
+  if (data.buffer instanceof ArrayBuffer) {
+    // Narrowed: non-shared ArrayBuffer can back ImageData directly without copying.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return data as Uint8ClampedArray<ArrayBuffer>;
+  }
+  return new Uint8ClampedArray(data);
+}
+
 /** Encodes straight RGBA pixels as a PNG file. */
 export async function encodePng(surface: Surface): Promise<Uint8Array> {
   const ctx = context(surface.width, surface.height);
-  ctx.putImageData(new ImageData(new Uint8ClampedArray(surface.data), surface.width, surface.height), 0, 0);
+  ctx.putImageData(new ImageData(plainPixels(surface.data), surface.width, surface.height), 0, 0);
   const blob = await ctx.canvas.convertToBlob({ type: 'image/png' });
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -75,7 +84,7 @@ export async function rasterizeSvg(url: string, longestSide: number): Promise<Su
 /** Scales any picture to fit the document on white paper, centered, keeping its shape. */
 export function fitOnPaper(source: Surface, width: number, height: number): Surface {
   const from = context(source.width, source.height);
-  from.putImageData(new ImageData(new Uint8ClampedArray(source.data), source.width, source.height), 0, 0);
+  from.putImageData(new ImageData(plainPixels(source.data), source.width, source.height), 0, 0);
   const ctx = context(width, height);
   ctx.fillStyle = `rgb(${PAPER.r} ${PAPER.g} ${PAPER.b})`;
   ctx.fillRect(0, 0, width, height);

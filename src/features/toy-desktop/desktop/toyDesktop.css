@@ -539,6 +539,10 @@
   outline-offset: var(--wk-focus-offset);
 }
 
+.td-window[data-resizing='true'] {
+  overflow: visible;
+}
+
 .td-window:focus-visible {
   outline-offset: calc(var(--wk-focus-width) * -1);
 }
@@ -553,8 +557,13 @@
   min-height: calc(var(--td-control) + var(--wk-space-unit) * 2);
   padding: var(--wk-space-unit);
   box-sizing: border-box;
+  border-radius: var(--wk-radius-control) var(--wk-radius-control) 0 0;
   background: var(--td-title-back);
   color: var(--td-title-back-ink);
+}
+
+.td-window[data-maximized='true'] > .td-title-bar {
+  border-radius: 0;
 }
 
 .td-window[data-focused='true'] > .td-title-bar {

@@ -394,6 +394,53 @@ describe('useCarry with drop targets', () => {
     expect(log.drops).toEqual([]);
   });
 
+  it('puts a keyboard-carried item back when Escape fires on window, focus leaves, or a pointer presses', () => {
+    const { log, apple } = renderPicnic();
+    key(apple, 'Enter');
+    expect(apple.dataset.carried).toBe('true');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(apple.dataset.carried).toBe('false');
+
+    key(apple, 'Enter');
+    expect(apple.dataset.carried).toBe('true');
+    fireEvent.blur(apple);
+    expect(apple.dataset.carried).toBe('false');
+
+    key(apple, 'Enter');
+    expect(apple.dataset.carried).toBe('true');
+    fireEvent.pointerDown(document.body, { clientX: 10, clientY: 10, button: 0, buttons: 1, pointerId: MOUSE });
+    expect(apple.dataset.carried).toBe('false');
+    expect(log.drops).toEqual([]);
+  });
+
+  it('notifies onOverChange as keyboard arrows step through valid targets', () => {
+    const kit = fakeKit();
+    const seen: string[] = [];
+    function AnnouncingPicnic() {
+      const carry = useCarry<Fruit, Place>(kit, {
+        kind: 'targets',
+        onOverChange: (target, how) => seen.push(`${String(target)}:${how}`),
+        onDrop: () => undefined,
+      });
+      return (
+        <div>
+          <button type='button' {...carry.item('pear')}>
+            pear
+          </button>
+          <div {...carry.target('basket')}>basket</div>
+          <div {...carry.target('plate')}>plate</div>
+        </div>
+      );
+    }
+    render(<AnnouncingPicnic />);
+    const pear = screen.getByText('pear');
+    key(pear, 'Enter');
+    key(pear, 'ArrowRight');
+    key(pear, 'ArrowRight');
+    key(pear, 'Escape');
+    expect(seen).toEqual(['basket:keyboard', 'plate:keyboard', 'basket:keyboard']);
+  });
+
   it.each([
     ['leaves the screen', { basket: false }],
     ['stops taking the item', { basketTakes: false }],
@@ -554,6 +601,19 @@ describe('useCarry with free positions', () => {
     key(item, 'ArrowDown');
     key(item, 'Enter');
     expect(placed).toEqual([{ x: 120, y: 110 }]);
+  });
+
+  it('clamps keyboard free-mode offset at the area edge so extra arrow presses do not drift', () => {
+    const { placed, item } = renderDesk();
+    key(item, 'Enter');
+    // Starts at x = 100 with keyStep = 10; 15 left presses stop at x = 0 (offset -100), not -150.
+    for (let step = 0; step < 15; step += 1) key(item, 'ArrowLeft');
+    expect(item.style.translate).toBe('-100px');
+    // One ArrowRight moves right back to x = 10 immediately.
+    key(item, 'ArrowRight');
+    expect(item.style.translate).toBe('-90px');
+    key(item, 'Enter');
+    expect(placed).toEqual([{ x: 10, y: 100 }]);
   });
 
   it.each([

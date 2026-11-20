@@ -30,11 +30,17 @@ const FILE_CHOOSER_COMMANDS: ReadonlyArray<readonly [string, Record<string, unkn
  * the closing one destroyed only after the detach, so the check waits one task. Reattaching at once
  * to a closing web contents would detach again, over and over, on Electron 45.3.2.
  */
+const MAX_REATTACH_ATTEMPTS = 8;
+const INITIAL_BACKOFF_MS = 50;
+
 export function blockFileChoosers(
   debug: ChooserDebugger,
   isDestroyed: () => boolean,
   report: (message: string, error: unknown) => void = (message, error) => console.error(message, error),
 ): void {
+  let consecutiveDetaches = 0;
+  let scheduled = false;
+
   const apply = () => {
     try {
       if (!debug.isAttached()) debug.attach();
@@ -42,16 +48,38 @@ export function blockFileChoosers(
       report('The file chooser block could not attach.', error);
       return;
     }
+    let pending = FILE_CHOOSER_COMMANDS.length;
     for (const [method, params] of FILE_CHOOSER_COMMANDS) {
-      debug.sendCommand(method, params).catch((error: unknown) => {
-        report(`The file chooser block failed at ${method}.`, error);
-      });
+      debug
+        .sendCommand(method, params)
+        .then(() => {
+          pending -= 1;
+          if (pending === 0) consecutiveDetaches = 0;
+          return undefined;
+        })
+        .catch((error: unknown) => {
+          report(`The file chooser block failed at ${method}.`, error);
+        });
     }
   };
   debug.on('detach', () => {
-    setImmediate(() => {
+    if (scheduled) return;
+    consecutiveDetaches += 1;
+    if (consecutiveDetaches > MAX_REATTACH_ATTEMPTS) {
+      report('The file chooser block stopped reattaching after repeated detaches.', new Error('detach loop'));
+      return;
+    }
+    scheduled = true;
+    const retry = () => {
+      scheduled = false;
       if (!isDestroyed()) apply();
-    });
+    };
+    if (consecutiveDetaches === 1) {
+      setImmediate(retry);
+    } else {
+      const delay = INITIAL_BACKOFF_MS * 2 ** (consecutiveDetaches - 2);
+      setTimeout(retry, delay);
+    }
   });
   apply();
 }

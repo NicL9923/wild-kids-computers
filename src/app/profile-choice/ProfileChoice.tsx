@@ -68,6 +68,9 @@ export default function ProfileChoice() {
                 data-profile={profile.id}
                 onClick={() => choose(profile)}
                 onFocus={() => sayName(profile)}
+                onBlur={() => {
+                  spoken.current = null;
+                }}
                 onPointerEnter={() => sayName(profile)}
                 onPointerLeave={() => {
                   spoken.current = null;

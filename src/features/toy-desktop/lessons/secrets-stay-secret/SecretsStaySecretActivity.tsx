@@ -71,6 +71,11 @@ export default function SecretsStaySecretActivity({ level, band, kit }: Activity
 
   const carry = useCarry<FactId, Bin>(kit, {
     kind: 'targets',
+    onOverChange(bin, how) {
+      if (how === 'keyboard' && bin !== null && talkative) {
+        void kit.speak(bin === 'private' ? strings.keepPrivate : strings.fineToShare);
+      }
+    },
     onDrop(fact, bin) {
       const element = bins.current.get(bin);
       if (binOf(fact) === bin) {
@@ -198,7 +203,7 @@ export default function SecretsStaySecretActivity({ level, band, kit }: Activity
                   className='sss-bin'
                   data-bin={bin}
                   data-hint={lit === bin}
-                  {...sayName(name)}
+                  {...(talkative ? { onPointerEnter: () => void kit.speak(name) } : {})}
                 >
                   <Emoji id={bin === 'private' ? 'lock' : 'open-lock'} decorative className='sss-bin-picture' />
                   <span className='sss-bin-name'>{t(name)}</span>

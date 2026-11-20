@@ -20,6 +20,8 @@ export interface SortRoundOptions<I extends string, T extends string> {
   readonly onDone: (item: I, target: T) => readonly SpokenHandle[];
   /** What to say before "Try another one." when an item does not belong where it was put. */
   readonly onMiss: (item: I) => readonly SpokenHandle[];
+  /** Optional spoken name of a target, spoken when arrow keys move a carried item onto it. */
+  readonly targetName?: (target: T) => SpokenHandle;
 }
 
 interface Hint<I extends string, T extends string> {
@@ -91,6 +93,11 @@ export function useSortRound<I extends string, T extends string>(
   const carry = useCarry<I, T>(kit, {
     kind: 'targets',
     accepts: (item, target) => !placed.has(item) && (options.holds === 'many' || !taken.has(target)),
+    onOverChange(target, how) {
+      if (how === 'keyboard' && target !== null && options.targetName !== undefined) {
+        void kit.speak(options.targetName(target));
+      }
+    },
     onDrop(item, target) {
       if (placed.has(item) || done) return;
       const at = document.querySelector(`[data-carry-target="${target}"]`) ?? undefined;

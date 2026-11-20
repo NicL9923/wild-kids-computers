@@ -32,7 +32,7 @@ export default function SkipCountingActivity({ level, kit }: ActivityProps<SkipL
     const instruction = atEnd
       ? [COUNT_BY[level.step], ...level.numbers.slice(0, level.blank).map(numberHandle), strings.whatNext]
       : [COUNT_BY[level.step], strings.whichMissing];
-    return kit.scope.setTimeout(() => kit.setInstruction(instruction), 0);
+    kit.setInstruction(instruction);
   }, [kit, level.step, level.numbers, level.blank]);
 
   const hop = (

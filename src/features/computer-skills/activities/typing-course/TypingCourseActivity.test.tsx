@@ -56,4 +56,29 @@ describe('the typing course when keys come faster than the screen draws', () => 
       { call: 'hint', say: FINGER_NAMES[fingerFor(capital)].id },
     ]);
   });
+
+  it('hints to turn off Caps Lock and lights CapsLock on the keyboard picture when Caps Lock is on', () => {
+    const { level, stage, calls } = show();
+    // Advance past the first capital letter to a lowercase character.
+    const chars = Array.from(level.line);
+    const lowerIndex = chars.findIndex((c) => c >= 'a' && c <= 'z');
+    if (lowerIndex < 0) throw new Error('Expected a lowercase letter in the line');
+    pressBeforeRender(chars.slice(0, lowerIndex).map(pressFor));
+    const lower = chars[lowerIndex];
+    if (lower === undefined) throw new Error('Expected lowercase char');
+    const event = new KeyboardEvent('keydown', {
+      key: lower.toUpperCase(),
+      code: codeFor(lower),
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(event, 'getModifierState', {
+      value: (modifier: string) => modifier === 'CapsLock',
+    });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(stage.dataset.capsLock).toBe('true');
+    expect(calls('hint')).toEqual([{ call: 'hint', say: strings.capsLock.id }]);
+  });
 });

@@ -205,9 +205,26 @@ export function rasterizeStroke(
   const area = strokeRect(polylines, radius, clip);
   if (isEmptyRect(area)) return EMPTY_RECT;
   const size = area.width * area.height;
-  if (distanceScratch.length < size) distanceScratch = new Float64Array(size);
+  if (distanceScratch.length < size) {
+    distanceScratch = new Float64Array(size);
+    distanceStamps = new Uint32Array(size);
+    distanceGen = 0;
+  }
+  if (rowMinScratch.length < area.height) {
+    rowMinScratch = new Int32Array(area.height);
+    rowMaxScratch = new Int32Array(area.height);
+  }
+  if (distanceGen >= 0xffff_fffe) {
+    distanceStamps.fill(0);
+    distanceGen = 0;
+  }
+  const gen = ++distanceGen;
   const nearest = distanceScratch;
-  nearest.fill(Number.POSITIVE_INFINITY, 0, size);
+  const stamps = distanceStamps;
+  const rowMin = rowMinScratch;
+  const rowMax = rowMaxScratch;
+  rowMin.fill(area.width, 0, area.height);
+  rowMax.fill(-1, 0, area.height);
   const reach = radius + 1;
   for (const points of polylines) {
     const count = Math.floor(points.length / 2);
@@ -217,6 +234,10 @@ export function rasterizeStroke(
       const j = (i + 1) % count;
       markSegment(
         nearest,
+        stamps,
+        gen,
+        rowMin,
+        rowMax,
         area,
         points[2 * i] ?? 0,
         points[2 * i + 1] ?? 0,
@@ -230,10 +251,17 @@ export function rasterizeStroke(
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
+  const reachSquared = reach * reach;
   for (let row = 0; row < area.height; row++) {
-    for (let column = 0; column < area.width; column++) {
-      const squared = nearest[row * area.width + column] ?? Number.POSITIVE_INFINITY;
-      if (squared >= reach * reach) continue;
+    const left = rowMin[row] ?? area.width;
+    const right = rowMax[row] ?? -1;
+    if (left > right) continue;
+    const rowBase = row * area.width;
+    for (let column = left; column <= right; column++) {
+      const index = rowBase + column;
+      if (stamps[index] !== gen) continue;
+      const squared = nearest[index] ?? Number.POSITIVE_INFINITY;
+      if (squared >= reachSquared) continue;
       const amount = radius - Math.sqrt(squared) + 0.5;
       if (amount <= 0) continue;
       const coverage = amount >= 1 ? 255 : Math.round(amount * 255);
@@ -250,6 +278,10 @@ export function rasterizeStroke(
 }
 
 let distanceScratch = new Float64Array(0);
+let distanceStamps = new Uint32Array(0);
+let distanceGen = 0;
+let rowMinScratch = new Int32Array(0);
+let rowMaxScratch = new Int32Array(0);
 
 /** The pixel rectangle a stroke of this radius can touch, limited to clip. */
 export function strokeRect(polylines: readonly (readonly number[])[], radius: number, clip: Rect): Rect {
@@ -273,6 +305,10 @@ export function strokeRect(polylines: readonly (readonly number[])[], radius: nu
 /** Lowers the squared distance of each pixel center near one segment, row by row within reach. */
 function markSegment(
   nearest: Float64Array,
+  stamps: Uint32Array,
+  gen: number,
+  rowMin: Int32Array,
+  rowMax: Int32Array,
   area: Rect,
   x0: number,
   y0: number,
@@ -298,7 +334,13 @@ function markSegment(
     }
     const firstColumn = Math.max(area.x, Math.floor(low - reach));
     const lastColumn = Math.min(area.x + area.width - 1, Math.ceil(high + reach));
-    const rowBase = (y - area.y) * area.width - area.x;
+    if (firstColumn > lastColumn) continue;
+    const localRow = y - area.y;
+    const localFirst = firstColumn - area.x;
+    const localLast = lastColumn - area.x;
+    if (localFirst < (rowMin[localRow] ?? area.width)) rowMin[localRow] = localFirst;
+    if (localLast > (rowMax[localRow] ?? -1)) rowMax[localRow] = localLast;
+    const rowBase = localRow * area.width - area.x;
     for (let x = firstColumn; x <= lastColumn; x++) {
       const px = x + 0.5;
       let t = lengthSquared === 0 ? 0 : ((px - x0) * dx + (py - y0) * dy) / lengthSquared;
@@ -307,7 +349,11 @@ function markSegment(
       const ex = px - (x0 + dx * t);
       const ey = py - (y0 + dy * t);
       const squared = ex * ex + ey * ey;
-      if (squared < (nearest[rowBase + x] ?? Number.POSITIVE_INFINITY)) nearest[rowBase + x] = squared;
+      const index = rowBase + x;
+      if (stamps[index] !== gen || squared < (nearest[index] ?? Number.POSITIVE_INFINITY)) {
+        stamps[index] = gen;
+        nearest[index] = squared;
+      }
     }
   }
 }

@@ -19,6 +19,8 @@ export const spokenListSchema = z.object({
       clip: z.string().regex(/^[0-9a-f]{16}\.ogg$/),
       /** The normalized text the model reads. */
       speech: z.string().min(1),
+      /** The display text of the first string sharing this clip, used by round-trip checks when speech is phonemes. */
+      text: z.string().min(1).optional(),
       /** Every string id that says this, sorted. */
       ids: z.array(z.string()).min(1),
     }),

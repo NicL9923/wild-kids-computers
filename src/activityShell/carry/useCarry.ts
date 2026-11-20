@@ -45,6 +45,8 @@ export type CarryMode<I extends string, T extends string> =
       /** Whether a target takes this item. A target that does not is never marked valid. */
       readonly accepts?: (item: I, target: T) => boolean;
       readonly onDrop: (item: I, target: T) => void;
+      /** Called when the target under a carried item changes, such as as arrow keys step through targets. */
+      readonly onOverChange?: (target: T | null, how: CarryHow) => void;
       /**
        * For items whose click already means something, such as a toolbox block that a click adds.
        * Called for a press and release without a drag, and for Enter or Space. Return true when
@@ -93,6 +95,7 @@ export interface CarryItemProps {
   readonly 'aria-pressed': boolean;
   readonly onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   readonly onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
+  readonly onBlur: () => void;
   readonly style: CSSProperties;
 }
 
@@ -153,6 +156,25 @@ function snap(value: number, min: number, max: number, step: number): number {
   return Math.min(max, Math.max(min, snapped));
 }
 
+function clampFreePoint<I extends string, T extends string>(
+  mode: CarryMode<I, T>,
+  items: ReadonlyMap<I, HTMLElement>,
+  item: I,
+  offset: Point,
+): Point | null {
+  if (mode.kind !== 'free') return null;
+  const area = mode.area.current?.getBoundingClientRect();
+  // With no area on screen there is nowhere to keep the item inside, so it goes back.
+  if (area === undefined) return null;
+  const element = items.get(item)?.getBoundingClientRect();
+  const from = mode.position(item);
+  const x = from.x + offset.x;
+  const y = from.y + offset.y;
+  const maxX = Math.max(0, area.width - (element?.width ?? 0));
+  const maxY = Math.max(0, area.height - (element?.height ?? 0));
+  return { x: Math.min(maxX, Math.max(0, x)), y: Math.min(maxY, Math.max(0, y)) };
+}
+
 /**
  * The kit parts `useCarry` needs. `holdCheckpoint` is optional so a test can pass a bare scope; in
  * free play it keeps the session length from closing the activity while something is carried.
@@ -182,9 +204,13 @@ export function useCarry<I extends string, T extends string = never>(
     live.current = { ...live.current, active: next };
     setActiveState(next);
   }, []);
-  const setOver = useCallback((next: T | null) => {
+  const setOver = useCallback((next: T | null, notifyHow?: CarryHow) => {
+    const prev = live.current.over;
     live.current = { ...live.current, over: next };
     setOverState(next);
+    if (notifyHow !== undefined && next !== prev && live.current.mode.kind === 'targets') {
+      live.current.mode.onOverChange?.(next, notifyHow);
+    }
   }, []);
 
   const targetAt = useCallback((item: I, point: Point): T | null => {
@@ -213,22 +239,6 @@ export function useCarry<I extends string, T extends string = never>(
     return snap(modeNow.min + fraction * (modeNow.max - modeNow.min), modeNow.min, modeNow.max, modeNow.step);
   }, []);
 
-  /** The free-mode top left for an offset, kept inside the area. */
-  const freePoint = useCallback((item: I, offset: Point): Point | null => {
-    const modeNow = live.current.mode;
-    if (modeNow.kind !== 'free') return null;
-    const area = modeNow.area.current?.getBoundingClientRect();
-    // With no area on screen there is nowhere to keep the item inside, so it goes back.
-    if (area === undefined) return null;
-    const element = items.current.get(item)?.getBoundingClientRect();
-    const from = modeNow.position(item);
-    const x = from.x + offset.x;
-    const y = from.y + offset.y;
-    const maxX = Math.max(0, area.width - (element?.width ?? 0));
-    const maxY = Math.max(0, area.height - (element?.height ?? 0));
-    return { x: Math.min(maxX, Math.max(0, x)), y: Math.min(maxY, Math.max(0, y)) };
-  }, []);
-
   /**
    * Puts the carried item down. With `placed` false, or with no target under it, it goes back to
    * where it was. `at` is where the pointer let go; a keyboard drop uses the chosen target.
@@ -252,7 +262,7 @@ export function useCarry<I extends string, T extends string = never>(
       }
       if (modeNow.kind === 'free') {
         const offset = at === undefined ? now.offset : { x: at.x - now.start.x, y: at.y - now.start.y };
-        const point = freePoint(now.item, offset);
+        const point = clampFreePoint(modeNow, items.current, now.item, offset);
         if (placed && point !== null) {
           play('put-down');
           modeNow.onPlace(now.item, point);
@@ -269,7 +279,7 @@ export function useCarry<I extends string, T extends string = never>(
       play('put-down');
       modeNow.onDrop?.(now.item, value);
     },
-    [axisValue, freePoint, play, setActive, setOver, stillTakes, targetAt],
+    [axisValue, play, setActive, setOver, stillTakes, targetAt],
   );
 
   /** Follows the pointer: the offset for targets and free moves, the value for an axis move. */
@@ -281,7 +291,7 @@ export function useCarry<I extends string, T extends string = never>(
         const value = axisValue(point);
         if (value !== null && value !== modeNow.value(now.item)) modeNow.onChange(now.item, value);
       }
-      if (modeNow.kind === 'targets') setOver(targetAt(now.item, point));
+      if (modeNow.kind === 'targets') setOver(targetAt(now.item, point), now.how);
       setActive({ ...now, pending: false, offset });
     },
     [axisValue, setActive, setOver, targetAt],
@@ -293,8 +303,23 @@ export function useCarry<I extends string, T extends string = never>(
   const byPointer = active !== null && active.how !== 'keyboard';
   useEffect(() => {
     if (!engaged) return undefined;
-    // Losing the window, such as to another program, puts back whatever is carried, however.
-    return scope.listen(window, 'blur', () => finish(false));
+    const stops = [
+      // Losing the window, such as to another program, puts back whatever is carried, however.
+      scope.listen(window, 'blur', () => finish(false)),
+      // Escape cancels any carry, even if keyboard focus moved off the carried item.
+      scope.listen(window, 'keydown', (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        finish(false);
+      }),
+      // Starting a pointer press while keyboard-carrying cancels the keyboard carry cleanly.
+      scope.listen(window, 'pointerdown', () => {
+        if (live.current.active?.how === 'keyboard') finish(false);
+      }),
+    ];
+    return () => {
+      for (const stop of stops) stop();
+    };
   }, [engaged, finish, scope]);
 
   // Free play waits for a calm moment to close at the end of the session; a carry is not one.
@@ -361,11 +386,6 @@ export function useCarry<I extends string, T extends string = never>(
       scope.listen(window, 'pointercancel', (event: PointerEvent) => {
         if (carriedFor(event) !== null) finish(false);
       }),
-      scope.listen(window, 'keydown', (event: KeyboardEvent) => {
-        if (event.key !== 'Escape') return;
-        event.preventDefault();
-        finish(false);
-      }),
     ];
     return () => {
       for (const stop of stops) stop();
@@ -427,7 +447,7 @@ export function useCarry<I extends string, T extends string = never>(
               startValue: mode.kind === 'axis' ? mode.value(id) : 0,
               pointerId: null,
             });
-            if (mode.kind === 'targets') setOver(firstTarget(id));
+            if (mode.kind === 'targets') setOver(firstTarget(id), 'keyboard');
             return;
           }
           if (now.item !== id) return;
@@ -446,6 +466,10 @@ export function useCarry<I extends string, T extends string = never>(
           event.preventDefault();
           moveByKey(now, direction);
         },
+        onBlur() {
+          const now = live.current.active;
+          if (now?.how === 'keyboard' && now.item === id) finish(false);
+        },
       };
 
       function firstTarget(itemId: I): T | null {
@@ -459,12 +483,19 @@ export function useCarry<I extends string, T extends string = never>(
           if (valid.length === 0) return;
           const index = live.current.over === null ? -1 : valid.indexOf(live.current.over);
           const delta = direction.x + direction.y > 0 ? 1 : -1;
-          setOver(valid[(index + delta + valid.length) % valid.length] ?? null);
+          setOver(valid[(index + delta + valid.length) % valid.length] ?? null, 'keyboard');
           return;
         }
         if (mode.kind === 'free') {
           const step = mode.keyStep ?? DEFAULT_KEY_STEP;
-          setActive({ ...now, offset: { x: now.offset.x + direction.x * step, y: now.offset.y + direction.y * step } });
+          const raw = { x: now.offset.x + direction.x * step, y: now.offset.y + direction.y * step };
+          const clamped = clampFreePoint(mode, items.current, now.item, raw);
+          if (clamped === null) {
+            setActive({ ...now, offset: raw });
+            return;
+          }
+          const from = mode.position(now.item);
+          setActive({ ...now, offset: { x: clamped.x - from.x, y: clamped.y - from.y } });
           return;
         }
         // Up and right raise an axis value; down and left lower it.

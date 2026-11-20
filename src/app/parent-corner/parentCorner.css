@@ -35,6 +35,10 @@
     font-weight: var(--wk-font-weight-bold);
   }
 
+  .wk-parent-title:focus {
+    outline: none;
+  }
+
   .wk-parent-main {
     display: flex;
     flex-direction: column;
@@ -115,6 +119,62 @@
 
   .wk-parent-problem-text:empty {
     display: none;
+  }
+
+  .wk-parent-problem-detail {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--wk-space-unit) * 2);
+  }
+
+  .wk-parent-folder {
+    display: block;
+    padding: var(--wk-space-item);
+    border-radius: var(--wk-radius-small);
+    background: var(--wk-color-surface-sunken);
+    color: var(--wk-color-text);
+    font-size: var(--wk-text-small);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  .wk-parent-pictures {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--wk-space-container);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .wk-parent-picture {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wk-space-item);
+    padding: var(--wk-space-item);
+    border: var(--wk-border-width) solid var(--wk-color-divider);
+    border-radius: var(--wk-radius-control);
+    background: var(--wk-color-page);
+  }
+
+  .wk-parent-picture-frame {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: var(--wk-radius-small);
+    background: var(--wk-color-surface);
+  }
+
+  .wk-parent-picture-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .wk-parent-picture-date {
+    margin: 0;
+    color: var(--wk-color-text-muted);
+    font-size: var(--wk-text-small);
   }
 
   .wk-parent-badge {

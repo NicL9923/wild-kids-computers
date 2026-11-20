@@ -743,9 +743,10 @@ function explorerCommand(
       const nodeId = `n${state.nextId}`;
       const created = createUntitledFolder(state.fs, explorer.folderId, NEW_FOLDER_NAME, nodeId);
       if (!created.ok) return created.problem;
+      const clearedExplorer = explorer.search.text === '' ? explorer : { ...explorer, search: nameEditor() };
       const next = { ...state, fs: created.fs, nextId: state.nextId + 1 };
       const made = done(next, { type: 'folder-created', nodeId, parentId: explorer.folderId, name: created.node.name });
-      return then(made, (current) => startRename(current, window, explorer, nodeId));
+      return then(made, (current) => startRename(current, window, clearedExplorer, nodeId));
     }
     case 'rename':
       return rename !== null || selected === undefined

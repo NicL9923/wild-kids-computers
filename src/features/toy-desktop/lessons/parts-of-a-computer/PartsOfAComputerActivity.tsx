@@ -35,8 +35,10 @@ export default function PartsOfAComputerActivity({ level, kit }: ActivityProps<P
   const tries = useRef(0);
   const prompt = promptFor(level);
 
-  // The shell says the main instruction as the round starts; this round's own question follows.
-  useEffect(() => kit.scope.setTimeout(() => kit.setInstruction(prompt), 0), [kit, prompt]);
+  // This round's own question.
+  useEffect(() => {
+    kit.setInstruction(prompt);
+  }, [kit, prompt]);
 
   function pick(part: PartId, element: HTMLElement): void {
     if (found) return;
