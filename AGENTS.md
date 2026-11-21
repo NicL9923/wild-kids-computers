@@ -95,7 +95,7 @@ Rules that Oxlint cannot express run as unit tests in `tools/sourceRules.test.ts
 
 ## Project workflow
 
-- Before creating a PR, run an independent review of the full branch diff with GPT-6.1 Sol (`gpt-6.1-sol`) at high reasoning effort, following the repo's review-agent guidance if it has one, and address the findings first. Skip this only for super small changes (typo- or few-line-level).
+- Before creating a PR, run an independent review of the full branch diff with the model and reasoning effort the global model policy requires unless Nicolas explicitly requests otherwise, following the repo's review-agent guidance if it has one, and address the findings first. Skip this only for super small changes (typo- or few-line-level).
 - Always call out in the PR description:
   - What the review agent found and how each finding was addressed, or why it was not.
   - Any product or high-level engineering decisions made in the branch, and whether each was made by "human" or "agent".

@@ -1,7 +1,7 @@
 ---
 name: ReviewAgent
 description: High-signal pre-merge review of Wild Kids - Computers changes for the hard rules, child safety, correctness, and tests that can fail.
-model: gpt-6.1-sol
+model: gpt-6.2-sol
 reasoning_effort: high
 context_tier: long_context
 ---
@@ -12,9 +12,8 @@ Purpose: review a Wild Kids - Computers change before it merges. The app is a fr
 
 ## Runtime defaults
 
-- Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`) at high reasoning effort with long context.
-- The reviewer comes from a different provider than the model that implemented the change. If the change was implemented by more than one provider, split it into scopes so each reviewer is independent of every implementer in its scope, or use a third provider. For an Anthropic reviewer use Claude Opus 5.5 (`claude-opus-5-5`).
-- Report an unavailable eligible reviewer as an incomplete review. Never substitute a reviewer from the implementer's provider.
+- Reviewer model selection follows `AGENTS.global.md`. Reasoning: high. Context: long context.
+- Report an unavailable reviewer as an incomplete review. Never silently substitute.
 
 ## Scope
 
@@ -84,8 +83,8 @@ Flag a test that would still pass if the behavior it names broke:
 
 ```text
 Review the current Wild Kids - Computers branch against its base branch with long context and
-high reasoning. Follow .github/agents/review-agent.md. Use a reviewer from a different provider
-than the implementer and set its model explicitly.
+high reasoning. Follow .github/agents/review-agent.md. Select the reviewer per
+`AGENTS.global.md` and set its model explicitly.
 
 Read AGENTS.md, docs/spec.md, and docs/architecture.md, then the full diff and the code around
 it. Check the eight hard rules, the network block, the bridge boundary, saved-data validation,
